@@ -73,6 +73,8 @@ export const api = {
   renameConversation: (id, title) => request("PATCH", `/api/conversations/${id}`, { title }),
   deleteConversation: (id) => request("DELETE", `/api/conversations/${id}`),
   undo: (id) => request("POST", `/api/conversations/${id}/undo`),
+  editMessage: (messageId, content) => request("PATCH", `/api/messages/${messageId}`, { content }),
+  rewind: (id, messageId, inclusive) => request("POST", `/api/conversations/${id}/rewind`, { message_id: messageId, inclusive }),
 
   patchState: (id, patch) => request("PATCH", `/api/conversations/${id}/state`, patch),
   addNpc: (id, body) => request("POST", `/api/conversations/${id}/npcs`, body),

@@ -24,7 +24,7 @@ const isQuote = (l) => /^>\s?/.test(l);
 const isItem = (l) => /^\s*([-*+]|\d+\.)\s+/.test(l);
 const startsBlock = (l) => isFence(l) || isHeading(l) || isRule(l) || isQuote(l) || isItem(l);
 
-export function Markdown({ text }) {
+export const Markdown = React.memo(function Markdown({ text }) {
   const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
   const blocks = [];
   let i = 0;
@@ -74,4 +74,4 @@ export function Markdown({ text }) {
     }
   }
   return <div className="md">{blocks}</div>;
-}
+});

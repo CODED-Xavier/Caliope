@@ -159,6 +159,31 @@ export default function App() {
     try { setGame(await api.undo(activeId)); refreshConvs(); } catch (e) { setError(e.message); }
   };
 
+  // --- editing history ------------------------------------------------------
+  const editMessage = async (messageId, content) => {
+    try { await api.editMessage(messageId, content); await reloadGame(); return true; } catch (e) { setError(e.message); return false; }
+  };
+  const resendMessage = (messageId, content) => {
+    // Show the edited message right away; everything after it is discarded by the backend.
+    setGame((g) => {
+      if (!g) return g;
+      const idx = g.messages.findIndex((m) => m.id === messageId);
+      if (idx < 0) return g;
+      const messages = g.messages.slice(0, idx + 1);
+      messages[idx] = { ...messages[idx], content, meta: { ...messages[idx].meta, edited: true } };
+      return { ...g, messages };
+    });
+    runTurn(`/api/conversations/${activeRef.current}/messages/${messageId}/resend`, { content });
+  };
+  const rewindTo = async (messageId, inclusive) => {
+    if (busy || !activeId) return;
+    const text = inclusive
+      ? "Delete this message and everything after it? The sheet, characters and memories go back to how they were before it."
+      : "Delete everything after this message? The sheet, characters and memories go back to how they were at this point.";
+    if (!window.confirm(text)) return;
+    try { setGame(await api.rewind(activeId, messageId, inclusive)); setLastContext(null); setMemoryKey((k) => k + 1); refreshConvs(); } catch (e) { setError(e.message); }
+  };
+
   // --- conversations -------------------------------------------------------
   const startGame = async (scenarioId, playerName) => {
     const data = await api.createConversation({ scenario_id: scenarioId, player_name: playerName });
@@ -215,7 +240,8 @@ export default function App() {
               <button className="btn small" onClick={() => setPanelOpen(!panelOpen)}>{panelOpen ? "Hide panel" : "Show panel"}</button>
             </div>
             <Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
-              onSend={send} onStop={stop} onRegenerate={regenerate} onDismissError={() => setError("")} />
+              onSend={send} onStop={stop} onRegenerate={regenerate} onDismissError={() => setError("")}
+              onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} />
           </>
         ) : (
           <div className="welcome">
