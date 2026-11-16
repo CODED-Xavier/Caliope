@@ -9,13 +9,38 @@ from pathlib import Path
 
 from app.config import SEED_DIR
 from app.dice import DiceError, DiceRoller
+from app.engine import BusyError
 from app.llm import LLMError, ThinkFilter, strip_think
 from app.prompts import PromptBuilder
 from app.services import Services
 from app.state import apply_state_updates, new_state, normalize_updates
 from app.util import extract_json, tokenize
 
-SKILLS_SRC = Path(__file__).resolve().parent.parent / "skills"
+SAMPLE_SKILLS = {
+    "combat-encounters": """---
+name: combat-encounters
+description: Run fair, exciting turn-based combat: attack, fight, battle, initiative, enemies, damage, weapons, spells, ambush and flee.
+---
+
+# Combat encounters
+
+When a fight starts:
+1. Describe the scene and enemies briefly.
+2. Ask the player to roll initiative (d20 + DEX modifier).
+3. Resolve attacks by asking for an attack roll and comparing it with the target's AC.
+""",
+    "npc-dialogue-voices": """---
+name: npc-dialogue-voices
+description: Give every NPC a distinct voice in conversation, talk, persuade, negotiate, interrogate, flirt, bargain, shop or befriend characters.
+---
+
+# NPC dialogue and voices
+
+- Give each NPC one verbal habit and keep it every time they speak.
+- NPCs have goals. They answer what they want to answer.
+- When the player persuades, deceives or intimidates, ask for a Charisma-based roll.
+""",
+}
 
 
 class FakeLLM:
@@ -54,15 +79,14 @@ class FakeLLM:
 
 
 def make_services(llm=None, skills_src=True):
+    """Fresh in-memory app. Skills come from SAMPLE_SKILLS above, never from your real backend/skills folder."""
     tmp = tempfile.mkdtemp()
     skills_dir = Path(tmp) / "skills"
     skills_dir.mkdir()
     if skills_src:
-        import shutil
-
-        for d in SKILLS_SRC.iterdir():
-            if d.is_dir():
-                shutil.copytree(d, skills_dir / d.name)
+        for name, text in SAMPLE_SKILLS.items():
+            (skills_dir / name).mkdir()
+            (skills_dir / name / "SKILL.md").write_text(text, encoding="utf-8")
     return Services(db_path=":memory:", skills_dir=skills_dir, seed_dir=SEED_DIR, llm=llm or FakeLLM())
 
 
@@ -460,6 +484,96 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         msgs = s.conversations.list_messages(cid)
         self.assertEqual(msgs[-1]["role"], "assistant")
         self.assertTrue(msgs[-1]["meta"].get("interrupted"))
+
+
+class HistoryEditTests(unittest.IsolatedAsyncioTestCase):
+    async def start(self, **llm_attrs):
+        llm = FakeLLM()
+        for k, v in llm_attrs.items():
+            setattr(llm, k, v)
+        s = make_services(llm)
+        sc = s.scenarios.get(next(x["id"] for x in s.scenarios.list() if x["mode"] == "gm_world"))
+        return s, llm, s.conversations.create(sc)["id"]
+
+    async def test_edit_in_place(self):
+        s, llm, cid = await self.start()
+        await collect(s.engine.send(cid, "hello there"))
+        msgs = s.conversations.list_messages(cid)
+        edited = s.engine.edit_message(msgs[2]["id"], "  A rewritten reply.  ")
+        self.assertEqual(edited["content"], "A rewritten reply.")
+        self.assertTrue(edited["meta"]["edited"])
+        self.assertNotIn("snapshot", edited["meta"])
+        # snapshot (needed for regenerate) survived the edit
+        self.assertIsNotNone(s.conversations.get_message(msgs[2]["id"], with_snapshot=True)["snapshot"])
+        with self.assertRaises(ValueError):
+            s.engine.edit_message(msgs[2]["id"], "   ")
+        await s.engine._lock(cid).acquire()
+        with self.assertRaises(BusyError):
+            s.engine.edit_message(msgs[2]["id"], "x")
+
+    async def test_rewind_keeps_or_removes_selected_message(self):
+        s, llm, cid = await self.start(analysis={"gold_change": 10, "memories": [{"text": "Something memorable happened here", "importance": 3}]})
+        await collect(s.engine.send(cid, "turn one"))
+        llm.analysis = {"gold_change": 10, "memories": [{"text": "A different memorable event later", "importance": 3}]}
+        await collect(s.engine.send(cid, "turn two"))
+        self.assertEqual(s.conversations.get_state(cid)["gold"], 35)
+        msgs = s.conversations.list_messages(cid)
+        self.assertEqual(len(msgs), 5)
+        # keep the first reply, remove turn two
+        self.assertEqual(s.engine.rewind(cid, msgs[2]["id"], inclusive=False)["removed"], 2)
+        self.assertEqual(s.conversations.get_state(cid)["gold"], 25)
+        self.assertEqual([m["text"] for m in s.memory.list(cid)], ["Something memorable happened here"])
+        self.assertEqual(len(s.conversations.list_messages(cid)), 3)
+        # delete turn one entirely, including the selected message
+        self.assertEqual(s.engine.rewind(cid, msgs[1]["id"], inclusive=True)["removed"], 2)
+        self.assertEqual(s.conversations.get_state(cid)["gold"], 15)
+        self.assertEqual(s.memory.count(cid), 0)
+        self.assertEqual(len(s.conversations.list_messages(cid)), 1)
+        with self.assertRaises(ValueError):
+            s.engine.rewind(cid, msgs[0]["id"], inclusive=True)  # opening scene is protected
+        self.assertEqual(s.engine.rewind(cid, msgs[0]["id"], inclusive=False)["removed"], 0)
+
+    async def test_rewind_discards_summary_that_covered_removed_text(self):
+        s, llm, cid = await self.start()
+        await collect(s.engine.send(cid, "one"))
+        await collect(s.engine.send(cid, "two"))
+        msgs = s.conversations.list_messages(cid)
+        s.conversations.set_summary(cid, "An old summary", msgs[3]["id"])
+        s.engine.rewind(cid, msgs[2]["id"], inclusive=False)
+        conv = s.conversations.get(cid)
+        self.assertEqual((conv["summary"], conv["summary_upto"]), ("", 0))
+
+    async def test_resend_edited_message(self):
+        s, llm, cid = await self.start(analysis={"gold_change": 10})
+        await collect(s.engine.send(cid, "first"))
+        await collect(s.engine.send(cid, "second"))
+        self.assertEqual(s.conversations.get_state(cid)["gold"], 35)
+        first_user = s.conversations.list_messages(cid)[1]
+        llm.reply = "A fresh answer."
+        llm.analysis = {"gold_change": 3}
+        events = await collect(s.engine.resend(cid, first_user["id"], "first, but edited"))
+        self.assertEqual(events[0]["type"], "rolled_back")
+        self.assertEqual(events[-1]["type"], "done")
+        msgs = s.conversations.list_messages(cid)
+        self.assertEqual([m["role"] for m in msgs], ["assistant", "user", "assistant"])
+        self.assertEqual(msgs[1]["content"], "first, but edited")
+        self.assertTrue(msgs[1]["meta"]["edited"])
+        self.assertEqual(msgs[2]["content"], "A fresh answer.")
+        self.assertEqual(s.conversations.get_state(cid)["gold"], 18)  # 15 + 3, turn two undone
+        self.assertEqual(s.memory.count(cid), 1)
+        last_prompt = llm.stream_calls[-1]
+        self.assertEqual(last_prompt[-1]["content"], "first, but edited")
+        self.assertNotIn("second", json.dumps(last_prompt))
+
+    async def test_resend_rejects_wrong_targets(self):
+        s, llm, cid = await self.start()
+        await collect(s.engine.send(cid, "hi"))
+        msgs = s.conversations.list_messages(cid)
+        events = await collect(s.engine.resend(cid, msgs[2]["id"], "x"))  # an assistant message
+        self.assertEqual(events[0]["type"], "error")
+        events = await collect(s.engine.resend(cid, msgs[1]["id"], "  "))
+        self.assertEqual(events[0]["type"], "error")
+        self.assertEqual(len(s.conversations.list_messages(cid)), 3)  # nothing was destroyed
 
 
 if __name__ == "__main__":
