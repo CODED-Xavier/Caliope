@@ -135,9 +135,9 @@ class ConversationRepository:
             raise NotFound(f"Message {message_id} not found")
         return self._msg(row, with_snapshot)
 
-    def list_messages(self, conv_id: int, after_id: int = 0) -> list[dict]:
+    def list_messages(self, conv_id: int, after_id: int = 0, with_snapshot: bool = False) -> list[dict]:
         rows = self.db.query("SELECT * FROM messages WHERE conversation_id = ? AND id > ? ORDER BY id", (conv_id, after_id))
-        return [self._msg(r) for r in rows]
+        return [self._msg(r, with_snapshot) for r in rows]
 
     def last_message(self, conv_id: int) -> dict | None:
         row = self.db.query_one("SELECT * FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1", (conv_id,))

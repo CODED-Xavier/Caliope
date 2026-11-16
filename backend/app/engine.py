@@ -27,6 +27,10 @@ log = logging.getLogger("rpg.engine")
 DEFAULT_TITLES = ("", "Freeform adventure")
 
 
+class BusyError(Exception):
+    """The conversation is generating a reply right now."""
+
+
 class ChatEngine:
     def __init__(self, repo: ConversationRepository, settings: SettingsStore, llm, memory: MemoryManager,
                  skills: SkillManager, dice: DiceRoller):
@@ -97,6 +101,85 @@ class ChatEngine:
                 return
             yield {"type": "rolled_back", "last_message_id": last["id"]}
             async with aclosing(self._reply(conv_id, last)) as turn:
+                async for event in turn:
+                    yield event
+
+    # ------------------------------------------------------- editing history
+    def is_busy(self, conv_id: int) -> bool:
+        return self._lock(conv_id).locked()
+
+    def edit_message(self, message_id: int, content: str) -> dict:
+        """Change the text of one message in place. Sheet, NPCs and memories are left as they are."""
+        msg = self.repo.get_message(message_id)
+        if self.is_busy(msg["conversation_id"]):
+            raise BusyError("Wait for the current reply to finish before editing.")
+        content = (content or "").strip()
+        if not content:
+            raise ValueError("A message cannot be empty.")
+        self.repo.update_message(message_id, content)
+        self.repo.update_message_meta(message_id, {"edited": True})
+        return self.repo.get_message(message_id)
+
+    def _truncate_after(self, conv_id: int, message_id: int, inclusive: bool) -> int:
+        """Delete the messages after `message_id` (and itself if `inclusive`).
+
+        Sheet and NPCs go back to how they were before the first removed reply, the
+        memories created by removed messages are forgotten, and a summary that covered
+        removed text is discarded (it is rebuilt automatically when the story gets long).
+        """
+        rows = self.repo.list_messages(conv_id, after_id=message_id - 1 if inclusive else message_id, with_snapshot=True)
+        if not rows:
+            return 0
+        snap_msg = next((m for m in rows if m["role"] == "assistant" and m.get("snapshot")), None)
+        if snap_msg:
+            self.repo.restore_snapshot(conv_id, snap_msg["snapshot"])
+        for m in rows:
+            self.memory.delete_by_message(m["id"])
+            self.repo.delete_message(m["id"])
+        conv = self.repo.get(conv_id)
+        if conv["summary"] and conv["summary_upto"] >= rows[0]["id"]:
+            self.repo.set_summary(conv_id, "", 0)
+        return len(rows)
+
+    def rewind(self, conv_id: int, message_id: int, inclusive: bool = False) -> dict:
+        """Go back in the story: remove everything after a message (and the message too if `inclusive`)."""
+        if self.is_busy(conv_id):
+            raise BusyError("Wait for the current reply to finish before rewinding.")
+        msg = self.repo.get_message(message_id)
+        if msg["conversation_id"] != conv_id:
+            raise NotFound(f"Message {message_id} not found")
+        if inclusive and msg["meta"].get("opening"):
+            raise ValueError("The opening scene cannot be deleted. Rewind to it instead.")
+        return {"removed": self._truncate_after(conv_id, message_id, inclusive)}
+
+    async def resend(self, conv_id: int, message_id: int, content: str) -> AsyncIterator[dict]:
+        """Edit one of the player's messages, discard everything after it and write a new reply."""
+        lock = self._lock(conv_id)
+        if lock.locked():
+            yield {"type": "error", "message": "This conversation is still busy with the previous turn."}
+            return
+        async with lock:
+            try:
+                msg = self.repo.get_message(message_id)
+            except NotFound as exc:
+                yield {"type": "error", "message": str(exc)}
+                return
+            content = (content or "").strip()
+            if msg["conversation_id"] != conv_id or msg["role"] != "user":
+                yield {"type": "error", "message": "Only your own messages can be re-sent."}
+                return
+            if not content:
+                yield {"type": "error", "message": "A message cannot be empty."}
+                return
+            self._truncate_after(conv_id, message_id, inclusive=False)
+            conv = self.repo.get(conv_id)
+            if conv["summary"] and conv["summary_upto"] >= message_id:
+                self.repo.set_summary(conv_id, "", 0)
+            self.repo.update_message(message_id, content)
+            self.repo.update_message_meta(message_id, {"edited": True})
+            user_msg = self.repo.get_message(message_id)
+            yield {"type": "rolled_back", "last_message_id": message_id}
+            async with aclosing(self._reply(conv_id, user_msg)) as turn:
                 async for event in turn:
                     yield event
 

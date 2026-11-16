@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import BASE_DIR
 from .conversations import NotFound
 from .dice import DiceError
+from .engine import BusyError
 from .llm import LLMError
 from .scenarios import generate_scenario
 from .services import Services
@@ -53,6 +54,11 @@ async def _not_found(_: Request, exc: NotFound):
 @app.exception_handler(ValueError)  # also covers DiceError and SkillError
 async def _bad_request(_: Request, exc: ValueError):
     return JSONResponse({"detail": str(exc)}, status_code=400)
+
+
+@app.exception_handler(BusyError)
+async def _busy(_: Request, exc: BusyError):
+    return JSONResponse({"detail": str(exc)}, status_code=409)
 
 
 @app.exception_handler(LLMError)
@@ -216,10 +222,24 @@ async def undo(conv_id: int):
 
 @app.patch("/api/messages/{message_id}")
 async def edit_message(message_id: int, body: dict[str, Any] = Body(...)):
-    content = str(body.get("content", "")).strip()
-    if not content:
-        raise ValueError("Message cannot be empty.")
-    return svc().conversations.update_message(message_id, content)
+    """Edit the text of one message in place (sheet and memories are not touched)."""
+    return svc().engine.edit_message(message_id, str(body.get("content", "")))
+
+
+@app.post("/api/conversations/{conv_id}/rewind")
+async def rewind(conv_id: int, body: dict[str, Any] = Body(...)):
+    """Remove everything after a message (and the message itself if inclusive=true)."""
+    svc().conversations.get(conv_id)
+    result = svc().engine.rewind(conv_id, int(body.get("message_id", 0)), bool(body.get("inclusive", False)))
+    return {**result, **full_conversation(conv_id)}
+
+
+@app.post("/api/conversations/{conv_id}/messages/{message_id}/resend")
+async def resend(conv_id: int, message_id: int, body: dict[str, Any] = Body(...)):
+    """Edit one of your messages, discard what came after it and stream a new reply."""
+    svc().conversations.get(conv_id)
+    svc().conversations.get_message(message_id)
+    return stream_response(svc().engine.resend(conv_id, message_id, str(body.get("content", ""))))
 
 
 # -------------------------------------------------------------------------- state
