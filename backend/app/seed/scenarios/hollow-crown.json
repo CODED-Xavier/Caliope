@@ -1,0 +1,25 @@
+{
+  "name": "The Hollow Crown (preset cast)",
+  "mode": "gm_cast",
+  "description": "A political mystery in a royal court with a fixed cast of NPCs with their own agendas. The AI is the GM.",
+  "system_rules": "Simple narrative rules: for risky actions ask the player for a d20 roll with a DC (10 easy, 14 hard, 18 very hard). Social actions use the relevant NPC's relationship value: friendly NPCs are easier to persuade, hostile ones are much harder. Information can be hidden; NPCs lie when it suits them.",
+  "world": "The court of Aldermere. King Edric is dying and has named no heir. The crown is rumored to be cursed. The player is a newly arrived court investigator with no allies yet.",
+  "tone": "Tense, intrigue-focused, dialogue-heavy. Every NPC wants something.",
+  "opening_message": "The bells of Aldermere toll for the third night in a row. You arrive at the palace gates with a sealed letter that names you Royal Investigator, and no one seems pleased to see you.\n\nA steward leads you to a dim hall where three figures wait. Who do you speak to first?",
+  "player": {
+    "name": "Investigator",
+    "class": "Investigator",
+    "level": 1,
+    "hp": {"current": 10, "max": 10},
+    "ac": 11,
+    "gold": 30,
+    "inventory": [{"name": "Royal seal", "qty": 1}, {"name": "Dagger", "qty": 1}, {"name": "Notebook", "qty": 1}],
+    "location": "Palace of Aldermere"
+  },
+  "npcs": [
+    {"name": "Lady Seraphine Vael", "description": "The king's chancellor, elegant and calm, in her fifties.", "personality": "Calculating, polite, never answers directly. Protects the realm, or so she says.", "speech_style": "Formal, measured, uses questions to deflect.", "relationship": -10},
+    {"name": "Captain Doran Hale", "description": "Head of the palace guard, broad and scarred.", "personality": "Blunt, loyal to the king, distrusts courtiers and outsiders.", "speech_style": "Short sentences, soldier slang.", "relationship": 0},
+    {"name": "Wren", "description": "A young palace scribe who sees everything.", "personality": "Nervous, curious, secretly sells information.", "speech_style": "Quick, whispers, trails off when scared.", "relationship": 10}
+  ],
+  "skills": {"mode": "auto", "allow": [], "pinned": []}
+}

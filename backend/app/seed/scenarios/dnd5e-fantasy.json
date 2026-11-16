@@ -1,0 +1,31 @@
+{
+  "name": "Fantasy Adventure (D&D 5e style)",
+  "mode": "gm_world",
+  "description": "Classic high fantasy with simplified 5th-edition rules. The GM invents the world, towns and characters as you explore.",
+  "language": "",
+  "system_rules": "Use simplified D&D 5e rules.\n- Checks: d20 + ability modifier (+ proficiency bonus if proficient) against a Difficulty Class (easy 10, medium 13, hard 16, very hard 20). Natural 20 is a great success, natural 1 a bad one.\n- Ability modifier = (score - 10) / 2, rounded down. Proficiency bonus: +2 at levels 1-4, +3 at 5-8.\n- Advantage = roll two d20 and keep the higher; disadvantage = keep the lower.\n- Attack roll: d20 + modifier vs target Armor Class (AC). A hit deals weapon damage + modifier. Natural 20 doubles the damage dice.\n- Combat: roll initiative (d20 + DEX). Each turn: one action, one move, and sometimes a bonus action. Describe enemies' attacks and ask the player to roll saving throws when needed.\n- At 0 HP the player falls unconscious and makes death saving throws (d20, 10+ succeeds, three successes stabilize, three failures die). A long rest restores all HP.\n- Be fair but dangerous: poor decisions have consequences, and enemies fight smart.",
+  "world": "A low-magic medieval fantasy continent of old kingdoms, wild forests, ruined temples and dangerous roads. Gods are distant, magic is rare and feared, and coin and reputation matter. Invent towns, factions and characters as needed and keep them consistent.",
+  "tone": "Vivid, grounded and atmospheric. Show consequences. Give NPCs their own goals and secrets.",
+  "opening_message": "The rain has followed you for three days, and the lantern of the Crooked Lantern Inn is the first warm light you have seen since the mountain pass. Inside, the common room smells of woodsmoke and stew. A scarred innkeeper polishes a mug and eyes your muddy boots; in the corner, a hooded stranger has not touched their drink.\n\nWhat do you do?",
+  "player": {
+    "name": "Adventurer",
+    "race": "Human",
+    "class": "Fighter",
+    "level": 1,
+    "background": "Former soldier looking for work.",
+    "stats": {"STR": 16, "DEX": 12, "CON": 14, "INT": 10, "WIS": 11, "CHA": 10},
+    "hp": {"current": 13, "max": 13},
+    "ac": 16,
+    "gold": 15,
+    "inventory": [
+      {"name": "Longsword", "qty": 1},
+      {"name": "Shield", "qty": 1},
+      {"name": "Chain shirt", "qty": 1},
+      {"name": "Rations", "qty": 3},
+      {"name": "Waterskin", "qty": 1}
+    ],
+    "location": "The Crooked Lantern Inn"
+  },
+  "npcs": [],
+  "skills": {"mode": "auto", "allow": [], "pinned": []}
+}

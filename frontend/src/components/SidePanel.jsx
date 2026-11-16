@@ -1,0 +1,376 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../api.js";
+import { NumberField, TextField } from "./Fields.jsx";
+import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
+
+/* ------------------------------------------------------------------ Sheet */
+function SheetTab({ state, onPatch, mode }) {
+  const p = state.player;
+  const hp = p.hp;
+  const pct = clamp((hp.current / Math.max(1, hp.max)) * 100, 0, 100);
+  return (
+    <div className="tab-body">
+      <TextField className="title-input" value={p.name} onCommit={(v) => onPatch({ player: { name: v } })} />
+      <div className="row gap">
+        <TextField value={p.race} placeholder="Race" onCommit={(v) => onPatch({ player: { race: v } })} />
+        <TextField value={p.class} placeholder="Class" onCommit={(v) => onPatch({ player: { class: v } })} />
+      </div>
+      <div className="stat-row">
+        <label>Level <NumberField value={p.level} min={1} max={30} width={56} onCommit={(v) => onPatch({ player: { level: v } })} /></label>
+        <label>AC <NumberField value={p.ac} min={0} max={40} width={56} onCommit={(v) => onPatch({ player: { ac: v } })} /></label>
+        <label>Gold <NumberField value={state.gold} min={0} width={80} onCommit={(v) => onPatch({ gold: v })} /></label>
+      </div>
+
+      <div className="section-title">Hit points</div>
+      <div className="hpbar"><div className="hpfill" style={{ width: `${pct}%`, background: pct < 30 ? "var(--bad)" : pct < 60 ? "var(--warn)" : "var(--good)" }} /></div>
+      <div className="row gap center">
+        <button className="btn small" onClick={() => onPatch({ player: { hp: { current: Math.max(0, hp.current - 1) } } })}>−1</button>
+        <NumberField value={hp.current} min={0} max={hp.max} width={56} onCommit={(v) => onPatch({ player: { hp: { current: v } } })} />
+        <span className="muted">/</span>
+        <NumberField value={hp.max} min={1} width={56} onCommit={(v) => onPatch({ player: { hp: { max: v } } })} />
+        <button className="btn small" onClick={() => onPatch({ player: { hp: { current: Math.min(hp.max, hp.current + 1) } } })}>+1</button>
+      </div>
+
+      <div className="section-title">Abilities</div>
+      <div className="stats-grid">
+        {Object.entries(p.stats || {}).map(([k, v]) => (
+          <div className="stat" key={k}>
+            <div className="stat-name">{k}</div>
+            <div className="stat-mod">{fmtMod(abilityMod(v))}</div>
+            <NumberField value={v} min={1} max={30} width={46} onCommit={(n) => onPatch({ player: { stats: { [k]: n } } })} />
+          </div>
+        ))}
+      </div>
+
+      <div className="section-title">Scene</div>
+      <label className="lbl">Location</label>
+      <TextField value={state.location} placeholder="Where are you?" onCommit={(v) => onPatch({ location: v })} />
+      <label className="lbl">Time</label>
+      <TextField value={state.time} placeholder="Time of day" onCommit={(v) => onPatch({ time: v })} />
+      <label className="lbl">Appearance / background</label>
+      <TextField multiline rows={3} value={p.description} placeholder="Describe your character…" onCommit={(v) => onPatch({ player: { description: v } })} />
+      <label className="lbl">Your notes</label>
+      <TextField multiline rows={3} value={state.notes} placeholder="Private notes (the AI does not see these)" onCommit={(v) => onPatch({ notes: v })} />
+      {mode === "character" && <div className="muted small">In character-card games the story focuses on the relationship; HP and gold are not tracked automatically.</div>}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------- Bag */
+function BagTab({ state, onPatch }) {
+  const [name, setName] = useState("");
+  const [qty, setQty] = useState(1);
+  const [quest, setQuest] = useState("");
+  const inv = state.inventory;
+  const setInv = (next) => onPatch({ inventory: next });
+  return (
+    <div className="tab-body">
+      <div className="section-title">Inventory ({inv.length})</div>
+      {inv.length === 0 && <div className="muted small">Your bag is empty.</div>}
+      {inv.map((it, i) => (
+        <div className="item-row" key={`${it.name}-${i}`}>
+          <div className="grow">{it.name}{it.notes && <div className="muted small">{it.notes}</div>}</div>
+          <button className="icon-btn" onClick={() => setInv(inv.map((x, j) => (j === i ? { ...x, qty: Math.max(1, x.qty - 1) } : x)))}>−</button>
+          <span className="qty">×{it.qty}</span>
+          <button className="icon-btn" onClick={() => setInv(inv.map((x, j) => (j === i ? { ...x, qty: x.qty + 1 } : x)))}>＋</button>
+          <button className="icon-btn" title="Remove" onClick={() => setInv(inv.filter((_, j) => j !== i))}>✕</button>
+        </div>
+      ))}
+      <form className="row gap" onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; setInv([...inv, { name: name.trim(), qty: Math.max(1, qty), notes: "" }]); setName(""); setQty(1); }}>
+        <input className="field grow" placeholder="Add item…" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="field num" style={{ width: 52 }} value={qty} onChange={(e) => setQty(parseInt(e.target.value, 10) || 1)} />
+        <button className="btn small" type="submit">Add</button>
+      </form>
+
+      <div className="section-title">Quests</div>
+      {state.quests.length === 0 && <div className="muted small">No quests yet.</div>}
+      {state.quests.map((q) => (
+        <div className="quest" key={q.id}>
+          <div className="row gap center">
+            <div className="grow quest-title">{q.title}</div>
+            <select className="field" value={q.status} onChange={(e) => onPatch({ quests: state.quests.map((x) => (x.id === q.id ? { ...x, status: e.target.value } : x)) })}>
+              <option value="active">active</option>
+              <option value="completed">completed</option>
+              <option value="failed">failed</option>
+            </select>
+            <button className="icon-btn" onClick={() => onPatch({ quests: state.quests.filter((x) => x.id !== q.id) })}>✕</button>
+          </div>
+          {q.notes && <div className="muted small">{q.notes}</div>}
+        </div>
+      ))}
+      <form className="row gap" onSubmit={(e) => { e.preventDefault(); if (!quest.trim()) return; onPatch({ quests: [...state.quests, { id: Math.random().toString(16).slice(2, 10), title: quest.trim(), status: "active", notes: "" }] }); setQuest(""); }}>
+        <input className="field grow" placeholder="Add quest…" value={quest} onChange={(e) => setQuest(e.target.value)} />
+        <button className="btn small" type="submit">Add</button>
+      </form>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------- People */
+function RelSlider({ value, onCommit }) {
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  const commit = () => { if (v !== value) onCommit(v); };
+  return (
+    <input type="range" min={-100} max={100} value={v} className="rel-slider"
+      onChange={(e) => setV(parseInt(e.target.value, 10))}
+      onMouseUp={commit} onTouchEnd={commit} onKeyUp={commit} onBlur={commit} />
+  );
+}
+
+function RelBar({ value }) {
+  const w = Math.abs(value) / 2; // percent of full width, each side is 50%
+  return (
+    <div className="relbar">
+      <div className="relmid" />
+      <div className="relfill" style={{ background: relationshipColor(value), width: `${w}%`, left: value >= 0 ? "50%" : `${50 - w}%` }} />
+    </div>
+  );
+}
+
+function NpcCard({ npc, onUpdate, onDelete }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`npc ${npc.is_main ? "main" : ""} ${npc.active ? "" : "inactive"}`}>
+      <div className="row gap center" onClick={() => setOpen(!open)} style={{ cursor: "pointer" }}>
+        <div className="grow">
+          <div className="npc-name">{npc.name}{npc.is_main && <span className="tag">main</span>}</div>
+          <div className="small" style={{ color: relationshipColor(npc.relationship) }}>
+            {relationshipLabel(npc.relationship)} ({npc.relationship > 0 ? "+" : ""}{npc.relationship})
+          </div>
+        </div>
+        <span className="muted">{open ? "▾" : "▸"}</span>
+      </div>
+      <RelBar value={npc.relationship} />
+      <RelSlider value={npc.relationship} onCommit={(v) => onUpdate(npc.id, { relationship: v })} />
+      <div className="relscale muted small"><span>enemy −100</span><span>0</span><span>+100 bond</span></div>
+      {open && (
+        <div className="npc-detail">
+          <label className="lbl">Description</label>
+          <TextField multiline value={npc.description} onCommit={(v) => onUpdate(npc.id, { description: v })} />
+          <label className="lbl">Personality</label>
+          <TextField multiline value={npc.personality} onCommit={(v) => onUpdate(npc.id, { personality: v })} />
+          <label className="lbl">Speech style</label>
+          <TextField value={npc.speech_style} onCommit={(v) => onUpdate(npc.id, { speech_style: v })} />
+          <label className="lbl">Notes (the AI sees these)</label>
+          <TextField multiline rows={2} value={npc.notes} onCommit={(v) => onUpdate(npc.id, { notes: v })} />
+          <div className="row gap">
+            <button className="btn small" onClick={() => onUpdate(npc.id, { active: !npc.active })}>{npc.active ? "Hide from scene" : "Bring back"}</button>
+            <button className="btn small danger" onClick={() => { if (window.confirm(`Delete ${npc.name}?`)) onDelete(npc.id); }}>Delete</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PeopleTab({ npcs, onUpdate, onDelete, onAdd }) {
+  const [name, setName] = useState("");
+  return (
+    <div className="tab-body">
+      <div className="section-title">Characters ({npcs.length})</div>
+      {npcs.length === 0 && <div className="muted small">No characters met yet. They appear here as the story introduces them.</div>}
+      {npcs.map((n) => <NpcCard key={n.id} npc={n} onUpdate={onUpdate} onDelete={onDelete} />)}
+      <form className="row gap" onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; onAdd({ name: name.trim() }); setName(""); }}>
+        <input className="field grow" placeholder="Add a character…" value={name} onChange={(e) => setName(e.target.value)} />
+        <button className="btn small" type="submit">Add</button>
+      </form>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------- Map */
+function layoutNodes(locations, current) {
+  const W = 340, H = 380;
+  const names = locations.map((l) => l.name);
+  const pos = {};
+  names.forEach((n, i) => {
+    const a = (i / Math.max(1, names.length)) * Math.PI * 2;
+    pos[n] = { x: W / 2 + Math.cos(a) * 120, y: H / 2 + Math.sin(a) * 130, vx: 0, vy: 0 };
+  });
+  const edges = [];
+  locations.forEach((l) => l.connections.forEach((c) => { if (pos[c] && l.name < c) edges.push([l.name, c]); }));
+  for (let it = 0; it < 220; it++) {
+    for (const a of names) for (const b of names) {
+      if (a >= b) continue;
+      let dx = pos[a].x - pos[b].x, dy = pos[a].y - pos[b].y;
+      const d2 = Math.max(dx * dx + dy * dy, 25);
+      const f = 9000 / d2, d = Math.sqrt(d2);
+      dx = (dx / d) * f; dy = (dy / d) * f;
+      pos[a].vx += dx; pos[a].vy += dy; pos[b].vx -= dx; pos[b].vy -= dy;
+    }
+    for (const [a, b] of edges) {
+      const dx = pos[b].x - pos[a].x, dy = pos[b].y - pos[a].y;
+      const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+      const f = (d - 115) * 0.02;
+      pos[a].vx += (dx / d) * f * 10; pos[a].vy += (dy / d) * f * 10;
+      pos[b].vx -= (dx / d) * f * 10; pos[b].vy -= (dy / d) * f * 10;
+    }
+    for (const n of names) {
+      pos[n].vx += (W / 2 - pos[n].x) * 0.01; pos[n].vy += (H / 2 - pos[n].y) * 0.01;
+      pos[n].x = clamp(pos[n].x + pos[n].vx * 0.05, 55, W - 55);
+      pos[n].y = clamp(pos[n].y + pos[n].vy * 0.05, 30, H - 36);
+      pos[n].vx *= 0.6; pos[n].vy *= 0.6;
+    }
+  }
+  return { pos, edges, W, H };
+}
+
+function MapTab({ state }) {
+  const locs = state.locations;
+  const [sel, setSel] = useState(null);
+  const key = JSON.stringify(locs.map((l) => [l.name, l.connections]));
+  const layout = useMemo(() => layoutNodes(locs, state.location), [key]); // eslint-disable-line
+  const chosen = locs.find((l) => l.name === sel);
+  return (
+    <div className="tab-body">
+      <div className="section-title">Known places ({locs.length})</div>
+      {locs.length === 0 ? (
+        <div className="muted small">The map fills in as you explore. Places appear when the story names them.</div>
+      ) : (
+        <svg viewBox={`0 0 ${layout.W} ${layout.H}`} className="map">
+          {layout.edges.map(([a, b]) => (
+            <line key={a + b} x1={layout.pos[a].x} y1={layout.pos[a].y} x2={layout.pos[b].x} y2={layout.pos[b].y} className="map-edge" />
+          ))}
+          {locs.map((l) => {
+            const p = layout.pos[l.name];
+            const here = l.name === state.location;
+            return (
+              <g key={l.name} transform={`translate(${p.x},${p.y})`} onClick={() => setSel(l.name)} style={{ cursor: "pointer" }}>
+                <circle r={here ? 9 : 6} className={`map-node ${here ? "here" : ""} ${l.visited ? "visited" : ""}`} />
+                <text y={here ? 22 : 19} textAnchor="middle" className="map-label">{l.name.length > 18 ? l.name.slice(0, 17) + "…" : l.name}</text>
+              </g>
+            );
+          })}
+        </svg>
+      )}
+      {state.location && <div className="small">📍 You are at <strong>{state.location}</strong></div>}
+      {chosen && (
+        <div className="card">
+          <strong>{chosen.name}</strong> <span className="muted small">{chosen.visited ? "visited" : "heard of"}</span>
+          {chosen.description && <div className="small">{chosen.description}</div>}
+          {chosen.connections.length > 0 && <div className="muted small">Connects to: {chosen.connections.join(", ")}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------- Dice */
+const DICE = [4, 6, 8, 10, 12, 20, 100];
+
+function DiceTab({ onRollToChat, canRoll }) {
+  const [mod, setMod] = useState(0);
+  const [mode, setMode] = useState("normal");
+  const [custom, setCustom] = useState("");
+  const [history, setHistory] = useState([]);
+  const [error, setError] = useState("");
+  const build = (sides) => `1d${sides}${mod > 0 ? `+${mod}` : mod < 0 ? mod : ""}${mode === "advantage" && sides === 20 ? " adv" : mode === "disadvantage" && sides === 20 ? " dis" : ""}`;
+  const roll = async (expr, toChat) => {
+    setError("");
+    if (toChat) { onRollToChat(expr); return; }
+    try { const r = await api.roll(expr); setHistory((h) => [r, ...h].slice(0, 20)); } catch (e) { setError(e.message); }
+  };
+  const [toChat, setToChat] = useState(true);
+  return (
+    <div className="tab-body">
+      <div className="section-title">Dice</div>
+      <div className="dice-grid">
+        {DICE.map((s) => <button key={s} className="die" onClick={() => roll(build(s), toChat && canRoll)}>d{s}</button>)}
+      </div>
+      <div className="row gap center">
+        <label className="small">Modifier</label>
+        <button className="icon-btn" onClick={() => setMod(mod - 1)}>−</button>
+        <span className="qty">{fmtMod(mod)}</span>
+        <button className="icon-btn" onClick={() => setMod(mod + 1)}>＋</button>
+        <select className="field" value={mode} onChange={(e) => setMode(e.target.value)}>
+          <option value="normal">normal</option>
+          <option value="advantage">advantage (d20)</option>
+          <option value="disadvantage">disadvantage (d20)</option>
+        </select>
+      </div>
+      <form className="row gap" onSubmit={(e) => { e.preventDefault(); if (custom.trim()) roll(custom.trim(), toChat && canRoll); }}>
+        <input className="field grow" placeholder="Custom: 2d6+3, 4d6kh3…" value={custom} onChange={(e) => setCustom(e.target.value)} />
+        <button className="btn small" type="submit">Roll</button>
+      </form>
+      <label className="row gap center small">
+        <input type="checkbox" checked={toChat} onChange={(e) => setToChat(e.target.checked)} />
+        Send roll into the story (the GM sees it)
+      </label>
+      {error && <div className="error-text small">{error}</div>}
+      <div className="section-title">Private rolls</div>
+      {history.length === 0 && <div className="muted small">With "send into the story" off, rolls show up here only.</div>}
+      {history.map((r, i) => <div key={i} className="roll-line">{r.text.replace(/\*\*/g, "").replace(/~~/g, "")}</div>)}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- Journal */
+function JournalTab({ convId, summary, refreshKey }) {
+  const [mems, setMems] = useState([]);
+  const [filter, setFilter] = useState("");
+  const [text, setText] = useState("");
+  const [error, setError] = useState("");
+  const load = () => api.memories(convId).then(setMems).catch(() => {});
+  useEffect(() => { load(); }, [convId, refreshKey]); // eslint-disable-line
+  const shown = mems.filter((m) => m.text.toLowerCase().includes(filter.toLowerCase()));
+  return (
+    <div className="tab-body">
+      <div className="section-title">Story so far</div>
+      <div className="card small">{summary || <span className="muted">The summary appears once the conversation gets long. Older messages are condensed here so the AI never loses the plot.</span>}</div>
+      <div className="section-title">Long-term memories ({mems.length})</div>
+      <input className="field" placeholder="Search memories…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+      <div className="mem-list">
+        {shown.length === 0 && <div className="muted small">Nothing here yet.</div>}
+        {shown.map((m) => (
+          <div className="mem" key={m.id}>
+            <div className="grow small">{m.text}<div className="muted tiny">{m.kind} · importance {m.importance}</div></div>
+            <button className="icon-btn" title="Forget" onClick={() => api.deleteMemory(m.id).then(load)}>✕</button>
+          </div>
+        ))}
+      </div>
+      <form className="row gap" onSubmit={async (e) => { e.preventDefault(); if (!text.trim()) return; try { await api.addMemory(convId, text.trim()); setText(""); setError(""); load(); } catch (err) { setError(err.message); } }}>
+        <input className="field grow" placeholder="Make the AI remember…" value={text} onChange={(e) => setText(e.target.value)} />
+        <button className="btn small" type="submit">Save</button>
+      </form>
+      {error && <div className="error-text small">{error}</div>}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ Panel */
+const TABS = [
+  ["sheet", "🧙", "Sheet"],
+  ["bag", "🎒", "Bag"],
+  ["people", "👥", "People"],
+  ["map", "🗺", "Map"],
+  ["dice", "🎲", "Dice"],
+  ["journal", "📖", "Journal"],
+];
+
+export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose }) {
+  const { state, npcs, conversation } = game;
+  const mode = conversation.scenario?.mode;
+  const tabs = mode === "character" ? TABS.filter(([k]) => k !== "bag") : TABS;
+  const active = tabs.some(([k]) => k === tab) ? tab : "sheet";
+  return (
+    <aside className="side-panel">
+      <div className="tabs">
+        {tabs.map(([k, icon, label]) => (
+          <button key={k} className={`tab ${active === k ? "active" : ""}`} onClick={() => onTab(k)}>
+            <span>{icon}</span><span className="tab-label">{label}</span>
+          </button>
+        ))}
+        <button className="icon-btn close-panel" onClick={onClose} title="Hide panel">✕</button>
+      </div>
+      <div className="tab-scroll">
+        {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} />}
+        {active === "bag" && <BagTab state={state} onPatch={onPatch} />}
+        {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} />}
+        {active === "map" && <MapTab state={state} />}
+        {active === "dice" && <DiceTab onRollToChat={onRollToChat} canRoll={canRoll} />}
+        {active === "journal" && <JournalTab convId={conversation.id} summary={conversation.summary} refreshKey={memoryKey} />}
+      </div>
+    </aside>
+  );
+}
