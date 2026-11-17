@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api.js";
 import { NumberField, TextField } from "./Fields.jsx";
+import HelpTip from "./HelpTip.jsx";
 import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
 
 /* ------------------------------------------------------------------ Sheet */
@@ -306,7 +307,34 @@ function DiceTab({ onRollToChat, canRoll }) {
 }
 
 /* ---------------------------------------------------------------- Journal */
-function JournalTab({ convId, summary, refreshKey }) {
+function PinnedBox({ value, limit, onSave }) {
+  const [text, setText] = useState(value || "");
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  useEffect(() => setText(value || ""), [value]);
+  const dirty = text.trim() !== (value || "").trim();
+  const save = async () => {
+    setError(""); setSaved(false);
+    const err = await onSave(text);
+    if (err) setError(err); else { setSaved(true); setTimeout(() => setSaved(false), 1500); }
+  };
+  return (
+    <>
+      <div className="section-title">Remember this <HelpTip id="pinned" /></div>
+      <textarea className="field" rows={6} value={text} maxLength={limit + 200} onChange={(e) => setText(e.target.value)}
+        placeholder="Write what the AI must never forget: promises, secrets, personalities, rules of your world…" />
+      <div className="row gap center">
+        <span className={`small ${text.length > limit ? "error-text" : "muted"}`}>{text.length} / {limit}</span>
+        <span className="grow" />
+        {saved && <span className="ok-text small">✓ saved</span>}
+        <button className="btn small primary" onClick={save} disabled={!dirty || text.length > limit}>Save</button>
+      </div>
+      {error && <div className="error-text small">{error}</div>}
+    </>
+  );
+}
+
+function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinnedSave }) {
   const [mems, setMems] = useState([]);
   const [filter, setFilter] = useState("");
   const [text, setText] = useState("");
@@ -314,23 +342,25 @@ function JournalTab({ convId, summary, refreshKey }) {
   const load = () => api.memories(convId).then(setMems).catch(() => {});
   useEffect(() => { load(); }, [convId, refreshKey]); // eslint-disable-line
   const shown = mems.filter((m) => m.text.toLowerCase().includes(filter.toLowerCase()));
+  const who = (m) => { try { return JSON.parse(m.participants || "[]").join(", "); } catch { return ""; } };
   return (
     <div className="tab-body">
+      <PinnedBox value={pinned} limit={pinnedLimit} onSave={onPinnedSave} />
       <div className="section-title">Story so far</div>
       <div className="card small">{summary || <span className="muted">The summary appears once the conversation gets long. Older messages are condensed here so the AI never loses the plot.</span>}</div>
-      <div className="section-title">Long-term memories ({mems.length})</div>
+      <div className="section-title">Remembered facts ({mems.length})</div>
       <input className="field" placeholder="Search memories…" value={filter} onChange={(e) => setFilter(e.target.value)} />
       <div className="mem-list">
         {shown.length === 0 && <div className="muted small">Nothing here yet.</div>}
         {shown.map((m) => (
           <div className="mem" key={m.id}>
-            <div className="grow small">{m.text}<div className="muted tiny">{m.kind} · importance {m.importance}</div></div>
+            <div className="grow small">{m.text}<div className="muted tiny">{who(m) && `${who(m)} · `}{m.kind} · importance {m.importance}</div></div>
             <button className="icon-btn" title="Forget" onClick={() => api.deleteMemory(m.id).then(load)}>✕</button>
           </div>
         ))}
       </div>
       <form className="row gap" onSubmit={async (e) => { e.preventDefault(); if (!text.trim()) return; try { await api.addMemory(convId, text.trim()); setText(""); setError(""); load(); } catch (err) { setError(err.message); } }}>
-        <input className="field grow" placeholder="Make the AI remember…" value={text} onChange={(e) => setText(e.target.value)} />
+        <input className="field grow" placeholder="Add a fact to remember…" value={text} onChange={(e) => setText(e.target.value)} />
         <button className="btn small" type="submit">Save</button>
       </form>
       {error && <div className="error-text small">{error}</div>}
@@ -348,7 +378,7 @@ const TABS = [
   ["journal", "📖", "Journal"],
 ];
 
-export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose }) {
+export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave }) {
   const { state, npcs, conversation } = game;
   const mode = conversation.scenario?.mode;
   const tabs = mode === "character" ? TABS.filter(([k]) => k !== "bag") : TABS;
@@ -369,7 +399,8 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} />}
         {active === "map" && <MapTab state={state} />}
         {active === "dice" && <DiceTab onRollToChat={onRollToChat} canRoll={canRoll} />}
-        {active === "journal" && <JournalTab convId={conversation.id} summary={conversation.summary} refreshKey={memoryKey} />}
+        {active === "journal" && <JournalTab convId={conversation.id} summary={conversation.summary} refreshKey={memoryKey}
+          pinned={conversation.pinned_memory} pinnedLimit={game.pinned_limit || 2000} onPinnedSave={onPinnedSave} />}
       </div>
     </aside>
   );

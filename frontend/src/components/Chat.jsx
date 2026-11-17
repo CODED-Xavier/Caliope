@@ -89,6 +89,15 @@ const Message = memo(function Message({ m, isLast, isLastAssistant, onRegenerate
               {changes.map((c, i) => <span key={i} className="chip">{c}</span>)}
             </div>
           )}
+          {m.meta?.timing && (
+            <div className="muted tiny timing" title="Time to first word, writing speed, sheet tracking and total time for this reply">
+              ⏱ first word {m.meta.timing.first_word_s}s · writing {m.meta.timing.tokens_per_s} t/s
+              {m.meta.timing.tracker_s !== undefined && <> · tracking {m.meta.timing.tracker_s}s</>}
+              {m.meta.timing.summary_s !== undefined && <> · summary {m.meta.timing.summary_s}s</>}
+              {m.meta.timing.total_s !== undefined && <> · total {m.meta.timing.total_s}s</>}
+              {" "}· prompt ~{m.meta.timing.prompt_tokens} tokens
+            </div>
+          )}
           {isLastAssistant && lastContext && (lastContext.skills.length > 0 || lastContext.memories.length > 0) && (
             <div className="muted small ctx">
               {lastContext.skills.length > 0 && <>🧩 {lastContext.skills.join(", ")} </>}

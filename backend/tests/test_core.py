@@ -53,9 +53,11 @@ class FakeLLM:
         self.embeddings = False
         self.fail_stream = False
         self.stream_calls = []
+        self.stream_kwargs = []
 
     async def stream_chat(self, messages, stop=None, **kw):
         self.stream_calls.append(messages)
+        self.stream_kwargs.append({"stop": stop, **kw})
         if self.fail_stream:
             raise LLMError("server down")
         for word in self.reply.split(" "):
@@ -346,7 +348,7 @@ class PromptTests(unittest.TestCase):
             npcs=s.conversations.list_npcs(conv["id"]), summary="", memories=[], skills=[],
             history=[{"id": 1, "role": "user", "content": "Hi", "meta": {}}], settings=s.settings.all())
         self.assertIn("roleplaying as Mira", msgs[0]["content"])
-        self.assertIn("relationship +0, neutral", msgs[0]["content"])
+        self.assertIn("Mira: +0 (neutral)", msgs[-1]["content"])  # relationship values are in the changing notes
         self.assertNotIn("Game Master", msgs[0]["content"])
 
 
@@ -387,7 +389,10 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         ctx = next(e for e in events if e["type"] == "context")
         self.assertEqual(ctx["skills"], ["combat-encounters"])  # auto-picked from "attack"
         system_prompt = llm.stream_calls[0][0]["content"]
-        self.assertIn("Reference material", system_prompt)
+        notes = llm.stream_calls[0][-1]["content"]  # changing information rides on the newest player message
+        self.assertIn("Reference material", notes)
+        self.assertIn("Relationships with the player", notes)
+        self.assertNotIn("Reference material", system_prompt)
         self.assertIn("Captain Doran Hale", system_prompt)
         msgs = s.conversations.list_messages(cid)
         self.assertEqual([m["role"] for m in msgs], ["assistant", "user", "assistant"])
@@ -453,20 +458,17 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_auto_summary_triggers(self):
         s, llm, cid = await self.start()
-        s.settings.update({"state_tracking": False, "context_window": 2048, "max_tokens": 300, "keep_recent_messages": 4})
-        llm.reply = "Long narration " + "words " * 150
+        s.settings.update({"state_tracking": False, "recent_rounds": 3, "fold_block_rounds": 1})
         summarized = False
         for i in range(8):
-            events = await collect(s.engine.send(cid, f"Action {i} " + "detail " * 40))
+            events = await collect(s.engine.send(cid, f"Action {i} " + "detail " * 10))
             summarized = summarized or any(e["type"] == "summary" for e in events)
         self.assertTrue(summarized)
         conv = s.conversations.get(cid)
         self.assertEqual(conv["summary"], llm.summary)
         self.assertGreater(conv["summary_upto"], 0)
-        last_prompt = llm.stream_calls[-1]
-        self.assertIn(llm.summary, last_prompt[0]["content"])
-        full = s.conversations.list_messages(cid)
-        self.assertEqual(len(full), 1 + 16)  # full history is never deleted
+        self.assertIn(llm.summary, llm.stream_calls[-1][0]["content"])
+        self.assertEqual(len(s.conversations.list_messages(cid)), 1 + 16)  # full history is never deleted
 
     async def test_busy_conversation_rejected(self):
         s, llm, cid = await self.start()
@@ -562,7 +564,7 @@ class HistoryEditTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(s.conversations.get_state(cid)["gold"], 18)  # 15 + 3, turn two undone
         self.assertEqual(s.memory.count(cid), 1)
         last_prompt = llm.stream_calls[-1]
-        self.assertEqual(last_prompt[-1]["content"], "first, but edited")
+        self.assertTrue(last_prompt[-1]["content"].endswith("first, but edited"))
         self.assertNotIn("second", json.dumps(last_prompt))
 
     async def test_resend_rejects_wrong_targets(self):
@@ -574,6 +576,121 @@ class HistoryEditTests(unittest.IsolatedAsyncioTestCase):
         events = await collect(s.engine.resend(cid, msgs[1]["id"], "  "))
         self.assertEqual(events[0]["type"], "error")
         self.assertEqual(len(s.conversations.list_messages(cid)), 3)  # nothing was destroyed
+
+
+class SpeedAndMemoryTests(unittest.IsolatedAsyncioTestCase):
+    async def start(self, mode="gm_cast", **llm_attrs):
+        llm = FakeLLM()
+        for k, v in llm_attrs.items():
+            setattr(llm, k, v)
+        s = make_services(llm)
+        sc = s.scenarios.get(next(x["id"] for x in s.scenarios.list() if x["mode"] == mode))
+        return s, llm, s.conversations.create(sc)["id"]
+
+    def test_database_migration_adds_new_columns(self):
+        import sqlite3
+        from app.db import Database
+        path = Path(tempfile.mkdtemp()) / "old.db"
+        con = sqlite3.connect(path)
+        con.executescript(
+            "CREATE TABLE conversations (id INTEGER PRIMARY KEY, title TEXT, scenario_id INTEGER, scenario_snapshot TEXT, "
+            "summary TEXT, summary_upto INTEGER, created_at REAL, updated_at REAL);"
+            "CREATE TABLE memories (id INTEGER PRIMARY KEY, conversation_id INTEGER, message_id INTEGER, text TEXT, kind TEXT, "
+            "importance INTEGER, embedding BLOB, embed_model TEXT, created_at REAL);")
+        con.commit(); con.close()
+        db = Database(path)
+        self.assertIn("pinned_memory", {r["name"] for r in db.query("PRAGMA table_info(conversations)")})
+        self.assertIn("participants", {r["name"] for r in db.query("PRAGMA table_info(memories)")})
+
+    def test_reply_length_and_trimming(self):
+        from app.engine import trim_incomplete
+        from app.prompts import reply_token_limit
+        self.assertEqual(reply_token_limit({"max_tokens": 800, "reply_length": "short"}), 250)
+        self.assertEqual(reply_token_limit({"max_tokens": 800, "reply_length": "long"}), 800)
+        self.assertEqual(reply_token_limit({"max_tokens": 300, "reply_length": "long"}), 300)
+        self.assertEqual(trim_incomplete("She nods slowly and smiles at you. \"Well, I think we shou"), "She nods slowly and smiles at you.")
+        self.assertEqual(trim_incomplete("*She smiles.*"), "*She smiles.*")
+        self.assertEqual(trim_incomplete("Hello there. How are"), "Hello there.")
+        self.assertEqual(trim_incomplete("no sentence end at all"), "no sentence end at all")
+
+    async def test_pinned_memory_box(self):
+        s, llm, cid = await self.start()
+        with self.assertRaises(ValueError):
+            s.conversations.set_pinned(cid, "x" * 2001, 2000)
+        s.conversations.set_pinned(cid, "  Lilia is afraid of fire.  ", 2000)
+        self.assertEqual(s.conversations.get(cid)["pinned_memory"], "Lilia is afraid of fire.")
+        await collect(s.engine.send(cid, "Hello"))
+        system = llm.stream_calls[0][0]["content"]
+        self.assertIn("Always remember", system)
+        self.assertIn("Lilia is afraid of fire.", system)
+        s.conversations.rewind = None  # rewinding the story never touches the box
+        self.assertEqual(s.conversations.get(cid)["pinned_memory"], "Lilia is afraid of fire.")
+
+    async def test_facts_are_recalled_by_character(self):
+        s, llm, cid = await self.start()
+        await s.memory.add(cid, "Doran swore loyalty to Seraphine in the throne room", importance=4, participants=["Doran", "Seraphine"])
+        await s.memory.add(cid, "The market sells cheap apples every Tuesday", importance=3)
+        self.assertEqual(await s.memory.search(cid, "what is the weather like today"), [])
+        hits = await s.memory.search(cid, "what is the weather like today", active_names=["Captain Doran Hale".split()[1]])
+        self.assertEqual([h["text"] for h in hits], ["Doran swore loyalty to Seraphine in the throne room"])
+        self.assertEqual(s.memory.list(cid)[1]["participants"], '["Doran", "Seraphine"]')
+
+    def test_scene_names(self):
+        from app.engine import scene_names
+        npcs = [{"name": "Captain Doran Hale", "active": True}, {"name": "Wren", "active": True}, {"name": "Ghost", "active": False}]
+        self.assertEqual(scene_names(npcs, "I talk to Doran about the guards"), ["Captain Doran Hale"])
+        self.assertEqual(scene_names(npcs, "WREN smiles", "nothing"), ["Wren"])
+        self.assertEqual(scene_names(npcs, "the ghost appears"), [])
+
+    async def test_prompt_start_stays_identical_between_turns(self):
+        s, llm, cid = await self.start(analysis={
+            "gold_change": 5, "relationship_changes": [{"npc": "Doran", "delta": 5, "reason": "x"}],
+            "memories": [{"text": "Something worth remembering happened", "importance": 3, "characters": ["Doran"]}]})
+        s.settings.update({"recent_rounds": 20})
+        for text in ("I greet Doran", "I ask about the king", "I leave the hall"):
+            await collect(s.engine.send(cid, text))
+        calls = llm.stream_calls
+        self.assertEqual(len(calls), 3)
+        for prev, nxt in zip(calls, calls[1:]):
+            # everything except the newest player message (which carried the changing notes) is reusable
+            self.assertEqual(prev[:-1], nxt[: len(prev) - 1])
+        self.assertNotEqual(calls[0][-1]["content"], calls[1][len(calls[0]) - 1]["content"])  # notes were not kept in history
+
+    async def test_folding_happens_in_blocks(self):
+        s, llm, cid = await self.start(mode="gm_world")
+        s.settings.update({"state_tracking": False, "recent_rounds": 4, "fold_block_rounds": 2})
+        uptos = []
+        for i in range(12):
+            await collect(s.engine.send(cid, f"Move {i}"))
+            uptos.append(s.conversations.get(cid)["summary_upto"])
+        changes = [b for a, b in zip(uptos, uptos[1:]) if b != a]
+        self.assertGreaterEqual(len(changes), 2)
+        msgs = s.conversations.list_messages(cid)
+        ids = [m["id"] for m in msgs]
+        unsummarized = [i for i in ids if i > s.conversations.get(cid)["summary_upto"] and not msgs[ids.index(i)]["meta"].get("opening")]
+        self.assertLessEqual(len(unsummarized), 8)       # never more than recent_rounds * 2 after a fold
+        # between folds the summary (start of the prompt) is unchanged
+        starts = [c[0]["content"] for c in llm.stream_calls]
+        self.assertLess(len(set(starts)), len(starts))
+
+    async def test_reply_length_is_sent_and_timing_is_saved(self):
+        s, llm, cid = await self.start(mode="gm_world")
+        s.settings.update({"reply_length": "short"})
+        await collect(s.engine.send(cid, "Look around"))
+        self.assertEqual(llm.stream_kwargs[0]["max_tokens"], 250)
+        self.assertIn("1 to 2 short paragraphs", llm.stream_calls[0][0]["content"])
+        timing = s.conversations.list_messages(cid)[-1]["meta"]["timing"]
+        for key in ("first_word_s", "write_s", "tokens_per_s", "prompt_tokens", "tracker_s", "total_s"):
+            self.assertIn(key, timing)
+        s.settings.update({"show_timing": False})
+        await collect(s.engine.send(cid, "Look again"))
+        self.assertNotIn("timing", s.conversations.list_messages(cid)[-1]["meta"])
+
+    async def test_memory_budget_limits_recalled_facts(self):
+        from app.prompts import fit_memories
+        mems = [{"text": "a" * 400}, {"text": "b" * 400}, {"text": "c" * 400}]
+        self.assertEqual(len(fit_memories(mems, 900)), 2)
+        self.assertEqual(len(fit_memories(mems, 100)), 1)  # always keeps the best one
 
 
 if __name__ == "__main__":

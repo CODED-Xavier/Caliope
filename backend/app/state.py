@@ -137,8 +137,11 @@ def normalize_updates(raw) -> dict:
         if isinstance(mem, str):
             mem = {"text": mem}
         if isinstance(mem, dict) and str(mem.get("text", "")).strip():
+            who = mem.get("characters", [])
+            who = [truncate(str(c).strip(), 60) for c in who[:4] if str(c).strip()] if isinstance(who, list) else []
             updates["memories"].append(
-                {"text": truncate(str(mem["text"]).strip(), 400), "importance": int(clamp(as_int(mem.get("importance", 3), 3), 1, 5))}
+                {"text": truncate(str(mem["text"]).strip(), 400), "importance": int(clamp(as_int(mem.get("importance", 3), 3), 1, 5)),
+                 "characters": who}
             )
     return updates
 

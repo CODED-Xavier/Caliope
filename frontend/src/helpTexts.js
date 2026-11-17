@@ -1,0 +1,30 @@
+// Plain-language help shown by the "?" next to each option.
+// Edit the texts here; each entry has: what it does, when to use it, and what it costs in speed.
+
+export const helpTexts = {
+  llm_base_url: { title: "Server address", what: "Where the AI model server is running.", when: "Leave it as it is when you use LM Studio's default server.", cost: "None." },
+  model: { title: "Chat model", what: "The AI model that writes the story.", when: "Pick the model you loaded in LM Studio.", cost: "Bigger models write better but slower." },
+  embedding_model: { title: "Embedding model", what: "A small helper model so memory search understands meaning, not only exact words.", when: "Turn it on if you loaded an embedding model such as nomic-embed-text.", cost: "Almost none." },
+  context_window: { title: "Context window", what: "How much text the AI can read at once. This is its working memory.", when: "Keep it equal to the Context Length you set when loading the model in LM Studio.", cost: "Bigger = slower and uses more video memory." },
+  temperature: { title: "Creativity", what: "How adventurous the writing is.", when: "Lower for consistent characters and rules, higher for surprising scenes.", cost: "None." },
+  reply_length: { title: "Reply length", what: "How long each reply from the AI is.", when: "Short for fast conversation, Long for rich scenes.", cost: "Short saves roughly 8 to 15 seconds per message. Long adds about as much." },
+  max_tokens: { title: "Hard cap on a reply", what: "The longest reply the AI may ever write, whatever Reply length says.", when: "Leave it unless you want a strict limit.", cost: "Lower = faster." },
+  response_language: { title: "Language of the story", what: "The language the AI writes in.", when: "Choose 'Same as I write' to follow whatever language you type.", cost: "None." },
+  state_tracking: { title: "Track the sheet automatically", what: "After each reply, a second short AI call updates HP, items, relationships and memories.", when: "On for adventures. Off for quick, simple roleplay.", cost: "Adds about 10 to 20 seconds per message." },
+  auto_summary: { title: "Summarize old messages", what: "Older rounds are condensed into a short summary so the AI keeps the plot.", when: "Keep it on for long games.", cost: "A few seconds, only on the turns when rounds are folded." },
+  recent_rounds: { title: "Rounds kept word for word", what: "How many of your latest exchanges the AI reads exactly as written. Older ones live on as summary and remembered facts.", when: "10 is a good start. Use up to 20 only with a bigger context window.", cost: "Each extra round adds about 1 to 2 seconds." },
+  fold_block_rounds: { title: "Fold block size", what: "When the window is full, this many of the oldest rounds are folded into the summary at once. Folding in blocks lets the AI reuse its earlier work, so most replies start faster.", when: "5 is a good balance.", cost: "A bigger block means fewer slow turns, but each fold takes a bit longer." },
+  summary_char_budget: { title: "Summary size", what: "The most characters the story summary may use.", when: "Raise it for complex plots.", cost: "More characters = slightly slower replies." },
+  memory_top_k: { title: "Facts recalled per turn", what: "How many remembered facts can be added to each message.", when: "Raise it for stories with many characters and promises.", cost: "Each fact adds a little reading time." },
+  memory_char_budget: { title: "Space for recalled facts", what: "The most characters all recalled facts may use per message.", when: "900 fits about five facts.", cost: "More space = slightly slower replies." },
+  pinned_memory_limit: { title: "Size of the memory box", what: "How many characters fit in the 'Remember this' box.", when: "2000 is about a page of notes.", cost: "The whole box is read on every message." },
+  show_timing: { title: "Show timing", what: "Shows how long each reply took under the message.", when: "Useful while you tune the speed settings.", cost: "None." },
+  extra_instructions: { title: "Extra instructions", what: "Your own rules, added to every prompt.", when: "For style: 'gritty noir tone', 'no more than two paragraphs'.", cost: "Long text slows replies a little." },
+  top_p: { title: "top_p", what: "Fine control over word choice.", when: "Leave as it is unless you know what you want.", cost: "None." },
+  top_k: { title: "top_k", what: "Fine control over word choice.", when: "Leave as it is unless you know what you want.", cost: "None." },
+  min_p: { title: "min_p", what: "Fine control that drops unlikely words.", when: "Leave as it is unless you know what you want.", cost: "None." },
+  repeat_penalty: { title: "Repeat penalty", what: "Discourages the AI from repeating itself.", when: "Raise slightly if the AI loops.", cost: "None." },
+  skills_top_k: { title: "Skills per message", what: "The most skills added to a message.", when: "Keep it low: each skill uses space.", cost: "Each skill adds about 4 to 8 seconds." },
+  relationship_max_step: { title: "Relationship change per turn", what: "The most a character's feelings can change in one message.", when: "Lower for slow-burning relationships.", cost: "None." },
+  pinned: { title: "Remember this", what: "Text you write here is sent to the AI with every message and is never forgotten.", when: "Important promises, secrets, facts about the world or personalities you want kept.", cost: "The whole box is read each message, so keep it short." },
+};

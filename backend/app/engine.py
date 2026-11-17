@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
+import time
 from contextlib import aclosing
 from typing import AsyncIterator
 
@@ -17,7 +19,7 @@ from .conversations import ConversationRepository, NotFound
 from .dice import DiceError, DiceRoller
 from .llm import LLMError
 from .memory import MemoryManager
-from .prompts import ANALYSIS_SCHEMA, PromptBuilder
+from .prompts import ANALYSIS_SCHEMA, PromptBuilder, reply_token_limit
 from .skills import SkillManager
 from .state import apply_state_updates, normalize_updates
 from .util import clamp, estimate_tokens, extract_json, truncate
@@ -25,6 +27,31 @@ from .util import clamp, estimate_tokens, extract_json, truncate
 log = logging.getLogger("rpg.engine")
 
 DEFAULT_TITLES = ("", "Freeform adventure")
+
+
+def scene_names(npcs: list[dict], *texts: str) -> list[str]:
+    """Characters that look like they are in the scene: their name (or a part of it) is in the recent text."""
+    blob = " ".join(t for t in texts if t).lower()
+    words = set(re.findall(r"[^\W_]{3,}", blob))
+    names = []
+    for n in npcs:
+        if not n["active"]:
+            continue
+        low = n["name"].lower()
+        if low in blob or any(tok in words for tok in re.findall(r"[^\W_]{4,}", low)):
+            names.append(n["name"])
+    return names
+
+
+def trim_incomplete(text: str) -> str:
+    """If the reply was cut off by the length limit, go back to the last finished sentence."""
+    t = text.strip()
+    if not t or t[-1] in ".!?\u2026\"'\u201d\u2019*)]_`~":
+        return t
+    ends = list(re.finditer(r"[.!?\u2026][\"'\u201d\u2019*)\]_]*(?=\s|$)", t))
+    if ends and ends[-1].end() >= len(t) * 0.4:
+        return t[: ends[-1].end()].rstrip()
+    return t
 
 
 class BusyError(Exception):
@@ -215,6 +242,7 @@ class ChatEngine:
                 self.repo.rename(conv_id, truncate(f"{scenario_name}: {text}" if scenario_name else text, 60))
 
     async def _reply(self, conv_id: int, user_msg: dict) -> AsyncIterator[dict]:
+        t_start = time.perf_counter()
         settings = self.settings.all()
         conv = self.repo.get(conv_id)
         scenario = conv["scenario"]
@@ -223,16 +251,18 @@ class ChatEngine:
         history = self.repo.list_messages(conv_id, after_id=conv["summary_upto"])
 
         previous_assistant = next((m for m in reversed(history[:-1]) if m["role"] == "assistant"), None)
-        query = user_msg["content"] + (" " + previous_assistant["content"][-300:] if previous_assistant else "")
-        memories = await self.memory.search(conv_id, query)
+        previous_text = previous_assistant["content"] if previous_assistant else ""
+        query = user_msg["content"] + (" " + previous_text[-300:] if previous_text else "")
+        active = scene_names(npcs, user_msg["content"], previous_text)
+        memories = await self.memory.search(conv_id, query, active_names=active)
         skills = await self.skills.select(query, scenario.get("skills"))
 
         messages, debug = self.prompts.build(
             scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=memories,
-            skills=skills, history=history, settings=settings,
+            skills=skills, history=history, settings=settings, pinned=conv.get("pinned_memory", ""),
         )
         yield {"type": "context", "debug": debug, "skills": [s["name"] for s in skills if s["name"] in debug["skills"]],
-               "memories": [m["text"] for m in memories]}
+               "memories": [m["text"] for m in memories][: debug["memories"]]}
 
         player_name = state["player"].get("name") or "Player"
         stop = [f"\n{player_name}:", "\nPlayer:", "\nUser:"]
@@ -240,9 +270,12 @@ class ChatEngine:
         partial: list[str] = []
         completed = False
         error: str | None = None
+        t_first: float | None = None
         try:
-            async with aclosing(self.llm.stream_chat(messages, stop=stop)) as pieces:
+            async with aclosing(self.llm.stream_chat(messages, stop=stop, max_tokens=reply_token_limit(settings))) as pieces:
                 async for piece in pieces:
+                    if t_first is None:
+                        t_first = time.perf_counter()
                     partial.append(piece)
                     yield {"type": "token", "text": piece}
             completed = True
@@ -256,19 +289,37 @@ class ChatEngine:
         if error:
             yield {"type": "error", "message": error}
             return
+        t_end = time.perf_counter()
 
-        reply = "".join(partial).strip()
+        reply = trim_incomplete("".join(partial))
         if not reply:
             yield {"type": "error", "message": "The model returned an empty reply. Try again or check the model in LM Studio."}
             return
 
+        timing: dict = {}
+        if settings.get("show_timing", True):
+            written = estimate_tokens(reply)
+            write_s = max(0.001, t_end - (t_first or t_end))
+            timing = {
+                "first_word_s": round((t_first or t_end) - t_start, 1),
+                "write_s": round(write_s, 1),
+                "tokens_per_s": round(written / write_s, 1),
+                "prompt_tokens": debug["prompt_tokens"],
+                "stable_tokens": debug["stable_tokens"],
+                "volatile_tokens": debug["volatile_tokens"],
+            }
         snapshot = self.repo.capture_snapshot(conv_id)
-        assistant_msg = self.repo.add_message(conv_id, "assistant", reply, {"snapshot": snapshot})
+        meta = {"snapshot": snapshot}
+        if timing:
+            meta["timing"] = timing
+        assistant_msg = self.repo.add_message(conv_id, "assistant", reply, meta)
         yield {"type": "assistant_message", "message": self.repo.get_message(assistant_msg["id"])}
 
         if settings["state_tracking"]:
             yield {"type": "analysis_start"}
+            t0 = time.perf_counter()
             result = await self._analyze(conv_id, scenario, user_msg["content"], reply, assistant_msg["id"], settings)
+            timing["tracker_s"] = round(time.perf_counter() - t0, 1)
             if result is None:
                 await self._remember_exchange(conv_id, user_msg["content"], reply, assistant_msg["id"])
             else:
@@ -277,9 +328,15 @@ class ChatEngine:
             await self._remember_exchange(conv_id, user_msg["content"], reply, assistant_msg["id"])
 
         if settings["auto_summary"]:
+            t0 = time.perf_counter()
             summary = await self._maybe_summarize(conv_id, settings)
             if summary is not None:
+                timing["summary_s"] = round(time.perf_counter() - t0, 1)
                 yield {"type": "summary", "summary": summary}
+        if settings.get("show_timing", True):
+            timing["total_s"] = round(time.perf_counter() - t_start, 1)
+            self.repo.update_message_meta(assistant_msg["id"], {"timing": timing})
+            yield {"type": "timing", "timing": timing}
         yield {"type": "done"}
 
     async def _remember_exchange(self, conv_id: int, user_text: str, reply: str, message_id: int) -> None:
@@ -333,7 +390,8 @@ class ChatEngine:
 
         added = 0
         for mem in updates["memories"]:
-            if await self.memory.add(conv_id, mem["text"], kind="event", importance=mem["importance"], message_id=message_id):
+            if await self.memory.add(conv_id, mem["text"], kind="event", importance=mem["importance"], message_id=message_id,
+                                     participants=mem.get("characters")):
                 added += 1
         if added == 0 and not updates["memories"]:
             await self._remember_exchange(conv_id, user_text, reply, message_id)
@@ -342,17 +400,40 @@ class ChatEngine:
         return {"state": new_state, "npcs": self.repo.list_npcs(conv_id), "changes": changes, "memories_added": added}
 
     async def _maybe_summarize(self, conv_id: int, settings: dict) -> str | None:
+        """Fold the oldest rounds into the summary, in BLOCKS.
+
+        The last `recent_rounds` rounds stay word for word. Once that window is full, a whole block of the
+        oldest rounds is folded at once, so for the next few turns the start of the prompt stays identical
+        and the model can reuse its earlier work instead of rereading everything.
+        """
         conv = self.repo.get(conv_id)
-        rows = self.repo.list_messages(conv_id, after_id=conv["summary_upto"])
-        rows = [r for r in rows if not r["meta"].get("opening")]
-        keep = int(settings["keep_recent_messages"])
-        history_budget = (int(settings["context_window"]) - int(settings["max_tokens"])) * 0.5
+        rows = [r for r in self.repo.list_messages(conv_id, after_id=conv["summary_upto"]) if not r["meta"].get("opening")]
+        max_msgs = max(4, int(settings["recent_rounds"]) * 2)
+        block_msgs = max(2, int(settings["fold_block_rounds"]) * 2)
+        history_budget = (int(settings["context_window"]) - reply_token_limit(settings)) * 0.5
         total = sum(estimate_tokens(r["content"]) + 6 for r in rows)
-        if len(rows) <= keep + 2 or total < history_budget * 0.8:
+        over_count = len(rows) > max_msgs
+        over_tokens = total > history_budget * 0.85
+        if not (over_count or over_tokens):
             return None
-        old = rows[:-keep]
+        if over_count:
+            fold = max(block_msgs, len(rows) - max_msgs)
+        else:  # long replies: fold until about half of the history budget is free again
+            fold, remaining = 0, total
+            for r in rows:
+                if remaining <= history_budget * 0.55:
+                    break
+                remaining -= estimate_tokens(r["content"]) + 6
+                fold += 1
+            fold = max(fold, 2)
+        fold = min(fold, len(rows) - 2)  # never fold the latest exchange
+        fold -= fold % 2                 # whole rounds only
+        if fold < 2:
+            return None
+        old = rows[:fold]
         summary = conv["summary"]
         language = conv["scenario"].get("language") or settings.get("response_language", "en")
+        max_chars = int(settings["summary_char_budget"])
         chunk, size = [], 0
         try:
             for r in old:  # summarise in chunks so one call never gets huge
@@ -360,17 +441,17 @@ class ChatEngine:
                 chunk.append(line)
                 size += len(line)
                 if size > 6000:
-                    summary = await self._summarize(summary, chunk, language)
+                    summary = await self._summarize(summary, chunk, language, max_chars)
                     chunk, size = [], 0
             if chunk:
-                summary = await self._summarize(summary, chunk, language)
+                summary = await self._summarize(summary, chunk, language, max_chars)
         except LLMError as exc:
             log.warning("Summarization failed: %s", exc)
             return None
         self.repo.set_summary(conv_id, summary, old[-1]["id"])
         return summary
 
-    async def _summarize(self, previous: str, lines: list[str], language: str) -> str:
-        messages = self.prompts.summary_messages(previous=previous, transcript="\n".join(lines), language=language)
+    async def _summarize(self, previous: str, lines: list[str], language: str, max_chars: int = 1500) -> str:
+        messages = self.prompts.summary_messages(previous=previous, transcript="\n".join(lines), language=language, max_chars=max_chars)
         text = await self.llm.chat(messages, temperature=0.3, max_tokens=500)
-        return truncate(text.strip(), 2200) or previous
+        return truncate(text.strip(), max_chars) or previous

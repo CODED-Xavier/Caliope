@@ -184,6 +184,14 @@ export default function App() {
     try { setGame(await api.rewind(activeId, messageId, inclusive)); setLastContext(null); setMemoryKey((k) => k + 1); refreshConvs(); } catch (e) { setError(e.message); }
   };
 
+  const savePinned = async (text) => {
+    try {
+      const conversation = await api.setPinned(activeId, text);
+      setGame((g) => (g ? { ...g, conversation: { ...g.conversation, pinned_memory: conversation.pinned_memory } } : g));
+      return "";
+    } catch (e) { return e.message; }
+  };
+
   // --- conversations -------------------------------------------------------
   const startGame = async (scenarioId, playerName) => {
     const data = await api.createConversation({ scenario_id: scenarioId, player_name: playerName });
@@ -256,7 +264,7 @@ export default function App() {
       </main>
       {game && panelOpen && (
         <SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}
-          onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} />
+          onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} onPinnedSave={savePinned} />
       )}
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={refreshHealth} />}
