@@ -182,6 +182,7 @@ def full_conversation(conv_id: int) -> dict:
         "state": s.conversations.get_state(conv_id),
         "npcs": s.conversations.list_npcs(conv_id),
         "memory_count": s.memory.count(conv_id),
+        "pinned_limit": int(s.settings.get("pinned_memory_limit")),
     }
 
 
@@ -193,6 +194,13 @@ async def get_conversation(conv_id: int):
 @app.patch("/api/conversations/{conv_id}")
 async def rename_conversation(conv_id: int, body: dict[str, Any] = Body(...)):
     return svc().conversations.rename(conv_id, str(body.get("title", "")))
+
+
+@app.put("/api/conversations/{conv_id}/pinned")
+async def set_pinned(conv_id: int, body: dict[str, Any] = Body(...)):
+    """The "remember this" box: text the AI always sees and never forgets (limited in size)."""
+    limit = int(svc().settings.get("pinned_memory_limit"))
+    return svc().conversations.set_pinned(conv_id, str(body.get("text", "")), limit)
 
 
 @app.delete("/api/conversations/{conv_id}")

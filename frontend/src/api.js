@@ -76,6 +76,8 @@ export const api = {
   editMessage: (messageId, content) => request("PATCH", `/api/messages/${messageId}`, { content }),
   rewind: (id, messageId, inclusive) => request("POST", `/api/conversations/${id}/rewind`, { message_id: messageId, inclusive }),
 
+  setPinned: (id, text) => request("PUT", `/api/conversations/${id}/pinned`, { text }),
+
   patchState: (id, patch) => request("PATCH", `/api/conversations/${id}/state`, patch),
   addNpc: (id, body) => request("POST", `/api/conversations/${id}/npcs`, body),
   updateNpc: (npcId, body) => request("PATCH", `/api/npcs/${npcId}`, body),

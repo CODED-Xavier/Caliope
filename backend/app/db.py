@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     scenario_snapshot TEXT NOT NULL DEFAULT '{}',
     summary           TEXT NOT NULL DEFAULT '',
     summary_upto      INTEGER NOT NULL DEFAULT 0,
+    pinned_memory     TEXT NOT NULL DEFAULT '',
     created_at        REAL NOT NULL,
     updated_at        REAL NOT NULL
 );
@@ -71,6 +72,7 @@ CREATE TABLE IF NOT EXISTS memories (
     text            TEXT NOT NULL,
     kind            TEXT NOT NULL DEFAULT 'event',
     importance      INTEGER NOT NULL DEFAULT 3,
+    participants    TEXT NOT NULL DEFAULT '',
     embedding       BLOB,
     embed_model     TEXT,
     created_at      REAL NOT NULL
@@ -126,6 +128,17 @@ class Database:
             if path != ":memory:":
                 self.conn.execute("PRAGMA journal_mode = WAL")
             self.conn.executescript(SCHEMA)
+            self._migrate()
+
+    def _ensure_column(self, table: str, column: str, ddl: str) -> None:
+        cols = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+    def _migrate(self) -> None:
+        """Bring databases created by older versions up to date (adds missing columns)."""
+        self._ensure_column("conversations", "pinned_memory", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column("memories", "participants", "TEXT NOT NULL DEFAULT ''")
 
     @contextmanager
     def transaction(self):

@@ -62,6 +62,7 @@ class ConversationRepository:
             "scenario": json.loads(row["scenario_snapshot"] or "{}"),
             "summary": row["summary"],
             "summary_upto": row["summary_upto"],
+            "pinned_memory": row.get("pinned_memory", "") or "",
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }
@@ -100,6 +101,15 @@ class ConversationRepository:
     def delete(self, conv_id: int) -> None:
         self.get(conv_id)
         self.db.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+
+    def set_pinned(self, conv_id: int, text: str, limit: int) -> dict:
+        """Save the player's "remember this" box (never forgotten, always sent to the AI)."""
+        self.get(conv_id)
+        text = (text or "").replace("\r\n", "\n").strip()
+        if len(text) > limit:
+            raise ValueError(f"The memory box holds at most {limit} characters (you wrote {len(text)}).")
+        self.db.execute("UPDATE conversations SET pinned_memory = ? WHERE id = ?", (text, conv_id))
+        return self.get(conv_id)
 
     def set_summary(self, conv_id: int, summary: str, upto: int) -> None:
         self.db.execute("UPDATE conversations SET summary = ?, summary_upto = ? WHERE id = ?", (summary, upto, conv_id))

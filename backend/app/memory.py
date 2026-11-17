@@ -8,6 +8,7 @@ Results from both are fused (reciprocal rank fusion) and weighted by importance.
 """
 from __future__ import annotations
 
+import json
 import logging
 import math
 from array import array
@@ -49,7 +50,8 @@ class MemoryManager:
         self._get = get_settings
 
     # ------------------------------------------------------------------ writing
-    async def add(self, conv_id: int, text: str, kind: str = "event", importance: int = 3, message_id: int | None = None) -> int | None:
+    async def add(self, conv_id: int, text: str, kind: str = "event", importance: int = 3, message_id: int | None = None,
+                  participants: list[str] | None = None) -> int | None:
         text = " ".join((text or "").split())[:600]
         if len(text) < 8:
             return None
@@ -61,9 +63,11 @@ class MemoryManager:
         vec = await self._embed_one(text)
         model = self._get().get("embedding_model") or None
         cur = self.db.execute(
-            "INSERT INTO memories(conversation_id, message_id, text, kind, importance, embedding, embed_model, created_at) "
-            "VALUES(?,?,?,?,?,?,?,?)",
-            (conv_id, message_id, text, kind, max(1, min(5, int(importance))), _pack(vec) if vec else None, model if vec else None, now()),
+            "INSERT INTO memories(conversation_id, message_id, text, kind, importance, participants, embedding, embed_model, created_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?)",
+            (conv_id, message_id, text, kind, max(1, min(5, int(importance))),
+             json.dumps([p for p in (participants or []) if p][:4], ensure_ascii=False) if participants else "",
+             _pack(vec) if vec else None, model if vec else None, now()),
         )
         return cur.lastrowid
 
@@ -96,7 +100,7 @@ class MemoryManager:
     # ---------------------------------------------------------------- admin/CRUD
     def list(self, conv_id: int, limit: int = 200, offset: int = 0) -> list[dict]:
         return self.db.query(
-            "SELECT id, conversation_id, message_id, text, kind, importance, created_at, "
+            "SELECT id, conversation_id, message_id, text, kind, importance, participants, created_at, "
             "(embedding IS NOT NULL) AS has_embedding FROM memories WHERE conversation_id = ? "
             "ORDER BY id DESC LIMIT ? OFFSET ?",
             (conv_id, limit, offset),
@@ -131,7 +135,7 @@ class MemoryManager:
             return []
         try:
             return self.db.query(
-                "SELECT m.id, m.text, m.kind, m.importance, m.message_id, bm25(memories_fts) AS rank "
+                "SELECT m.id, m.text, m.kind, m.importance, m.message_id, m.participants, bm25(memories_fts) AS rank "
                 "FROM memories_fts JOIN memories m ON m.id = memories_fts.rowid "
                 "WHERE memories_fts MATCH ? AND m.conversation_id = ? ORDER BY rank LIMIT ?",
                 (match, conv_id, limit),
@@ -146,7 +150,7 @@ class MemoryManager:
         if not model or not query.strip():
             return []
         rows = self.db.query(
-            "SELECT id, text, kind, importance, message_id, embedding FROM memories "
+            "SELECT id, text, kind, importance, message_id, participants, embedding FROM memories "
             "WHERE conversation_id = ? AND embedding IS NOT NULL AND embed_model = ?",
             (conv_id, model),
         )
@@ -176,19 +180,44 @@ class MemoryManager:
             out.append(item)
         return out
 
-    async def search(self, conv_id: int, query: str, k: int | None = None) -> list[dict]:
+    def search_by_characters(self, conv_id: int, names: list[str], limit: int = 10) -> list[dict]:
+        """Facts that involve any of the given characters (best importance first, then newest)."""
+        found: dict[int, dict] = {}
+        for name in names[:6]:
+            like = "%" + json.dumps(name, ensure_ascii=False)[1:-1].replace("%", "").replace("_", "") + "%"
+            rows = self.db.query(
+                "SELECT id, text, kind, importance, message_id, participants FROM memories "
+                "WHERE conversation_id = ? AND participants LIKE ? ORDER BY importance DESC, id DESC LIMIT ?",
+                (conv_id, like, limit),
+            )
+            for r in rows:
+                found.setdefault(r["id"], r)
+        return sorted(found.values(), key=lambda r: (-r["importance"], -r["id"]))[:limit]
+
+    async def search(self, conv_id: int, query: str, k: int | None = None, active_names: list[str] | None = None) -> list[dict]:
+        """Best facts for this turn. `active_names` are characters currently in the scene: facts that
+        involve them are favoured even when the words do not match the message."""
         k = k if k is not None else int(self._get().get("memory_top_k", 5))
         if k <= 0:
             return []
         keyword = self.search_keyword(conv_id, query, limit=k * 3)
         semantic = await self.search_semantic(conv_id, query, limit=k * 3)
+        involved = self.search_by_characters(conv_id, active_names or [], limit=k * 2)
         scores: dict[int, float] = defaultdict(float)
         items: dict[int, dict] = {}
-        for ranked in (semantic, keyword):
+        for ranked in (semantic, keyword, involved):
             for rank, item in enumerate(ranked):
                 scores[item["id"]] += 1.0 / (60 + rank)
                 items.setdefault(item["id"], item)
+        wanted = {n.lower() for n in (active_names or [])}
         for mem_id, item in items.items():
             scores[mem_id] *= 1.0 + 0.15 * (item["importance"] - 3)
+            if wanted and item.get("participants"):
+                try:
+                    people = {str(x).lower() for x in json.loads(item["participants"])}
+                except ValueError:
+                    people = set()
+                if people & wanted:
+                    scores[mem_id] *= 1.4
         ordered = sorted(items, key=lambda i: scores[i], reverse=True)[:k]
         return [{**items[i], "score": round(scores[i], 5)} for i in ordered]

@@ -24,7 +24,8 @@ DEFAULT_SETTINGS: dict = {
     "top_k": 40,
     "min_p": 0.05,
     "repeat_penalty": 1.08,
-    "max_tokens": 800,
+    "max_tokens": 800,            # hard cap for one reply (the "Reply length" setting is usually lower)
+    "reply_length": "medium",     # short | medium | long
     "context_window": 8192,   # must match the context length loaded in LM Studio
     # --- Behaviour ---
     "response_language": "en",     # "en", "pt-BR" or "auto"
@@ -33,9 +34,14 @@ DEFAULT_SETTINGS: dict = {
     "relationship_max_step": 20,   # max relationship change per turn
     # --- Memory ---
     "auto_summary": True,
-    "keep_recent_messages": 8,
+    "recent_rounds": 10,          # rounds (player message + reply) kept word for word
+    "fold_block_rounds": 5,       # when full, this many of the oldest rounds are folded into the summary at once
+    "pinned_memory_limit": 2000,  # characters in the "remember this" box
+    "summary_char_budget": 1500,
     "memory_top_k": 5,
+    "memory_char_budget": 900,    # characters of recalled facts added to each turn
     "memory_min_similarity": 0.40,
+    "show_timing": True,
     # --- Skills ---
     "skills_top_k": 2,
     "skills_min_score": 0.6,        # keyword matching threshold
