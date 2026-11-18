@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 
+from .appearance import normalize_appearance
 from .db import Database
 from .scenarios import normalize_scenario
 from .state import new_state
 from .util import clamp, now
 
-NPC_COLUMNS = ("name", "description", "personality", "speech_style", "relationship", "notes", "active", "is_main")
+NPC_COLUMNS = ("name", "description", "personality", "speech_style", "appearance", "relationship", "notes", "active", "is_main")
 
 
 class NotFound(Exception):
@@ -40,6 +41,7 @@ class ConversationRepository:
                     description=npc.get("description", ""),
                     personality=npc.get("personality", ""),
                     speech_style=npc.get("speech_style", ""),
+                    appearance=npc.get("appearance"),
                     relationship=npc.get("relationship", 0),
                     is_main=1 if (data["mode"] == "character" and i == 0) else 0,
                 )
@@ -177,6 +179,10 @@ class ConversationRepository:
     @staticmethod
     def _npc(row: dict) -> dict:
         row = dict(row)
+        try:
+            row["appearance"] = json.loads(row.get("appearance") or "{}")
+        except ValueError:
+            row["appearance"] = {}
         row["active"] = bool(row["active"])
         row["is_main"] = bool(row["is_main"])
         return row
@@ -202,14 +208,15 @@ class ConversationRepository:
         return None
 
     def add_npc(self, conv_id: int, name: str, description: str = "", personality: str = "", speech_style: str = "",
-                relationship: int = 0, is_main: int = 0, notes: str = "") -> dict:
+                relationship: int = 0, is_main: int = 0, notes: str = "", appearance: dict | None = None) -> dict:
         existing = self.db.query_one("SELECT * FROM npcs WHERE conversation_id = ? AND name = ? COLLATE NOCASE", (conv_id, name))
         if existing:
             return self._npc(existing)
         cur = self.db.execute(
-            "INSERT INTO npcs(conversation_id, name, description, personality, speech_style, relationship, notes, active, is_main, created_at) "
-            "VALUES(?,?,?,?,?,?,?,1,?,?)",
-            (conv_id, name.strip(), description, personality, speech_style, int(clamp(relationship, -100, 100)), notes, int(is_main), now()),
+            "INSERT INTO npcs(conversation_id, name, description, personality, speech_style, appearance, relationship, notes, active, is_main, created_at) "
+            "VALUES(?,?,?,?,?,?,?,?,1,?,?)",
+            (conv_id, name.strip(), description, personality, speech_style,
+             json.dumps(normalize_appearance(appearance), ensure_ascii=False), int(clamp(relationship, -100, 100)), notes, int(is_main), now()),
         )
         return self.get_npc(cur.lastrowid)
 
@@ -221,6 +228,8 @@ class ConversationRepository:
                 continue
             if key == "relationship":
                 value = int(clamp(int(value), -100, 100))
+            if key == "appearance":
+                value = json.dumps(normalize_appearance(value), ensure_ascii=False)
             if key in ("active", "is_main"):
                 value = 1 if value else 0
             sets.append(f"{key} = ?")
@@ -263,13 +272,15 @@ class ConversationRepository:
             for npc_id, n in saved.items():
                 if npc_id in current:
                     self.db.execute(
-                        "UPDATE npcs SET description=?, personality=?, speech_style=?, relationship=?, notes=?, active=?, is_main=? WHERE id=?",
-                        (n["description"], n["personality"], n["speech_style"], n["relationship"], n["notes"], int(n["active"]), int(n["is_main"]), npc_id),
+                        "UPDATE npcs SET description=?, personality=?, speech_style=?, appearance=?, relationship=?, notes=?, active=?, is_main=? WHERE id=?",
+                        (n["description"], n["personality"], n["speech_style"], json.dumps(n.get("appearance") or {}, ensure_ascii=False),
+                         n["relationship"], n["notes"], int(n["active"]), int(n["is_main"]), npc_id),
                     )
                 else:
                     self.db.execute(
-                        "INSERT INTO npcs(id, conversation_id, name, description, personality, speech_style, relationship, notes, active, is_main, created_at) "
-                        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                        (npc_id, conv_id, n["name"], n["description"], n["personality"], n["speech_style"], n["relationship"], n["notes"],
+                        "INSERT INTO npcs(id, conversation_id, name, description, personality, speech_style, appearance, relationship, notes, active, is_main, created_at) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (npc_id, conv_id, n["name"], n["description"], n["personality"], n["speech_style"],
+                         json.dumps(n.get("appearance") or {}, ensure_ascii=False), n["relationship"], n["notes"],
                          int(n["active"]), int(n["is_main"]), n["created_at"]),
                     )

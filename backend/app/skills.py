@@ -3,10 +3,11 @@ skills.sh and Claude skills.
 
 How they are used
 -----------------
-* The app works fine with zero skills installed.
-* In "auto" mode each turn the user's message is matched against every enabled skill's
-  name/description (embeddings if available, otherwise BM25 keyword scoring). The best
-  matches are injected into the prompt for that turn only.
+* Skills are CARD ADD-ONS: a card attaches up to 3 of them and their text becomes part of the stable
+  start of the prompt. There is no per-message automatic selection (it cost time, filled the small
+  context window and often picked the wrong skill).
+* The game works the same with zero skills.
+* "Suggest skills for this card" asks the model ONE time to pick the best matches from your library.
 * Skill scripts are NEVER executed. Only the text of SKILL.md is used.
 """
 from __future__ import annotations
@@ -32,6 +33,7 @@ log = logging.getLogger("rpg.skills")
 
 MAX_ZIP_BYTES = 100 * 1024 * 1024
 MAX_SKILL_DEPTH = 5
+MAX_ATTACHED = 3
 IGNORE = shutil.ignore_patterns(".git", ".github", "node_modules", "__pycache__", "*.pyc")
 _FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?(.*)\Z", re.S)
 
@@ -294,53 +296,59 @@ class SkillManager:
                 )
         return vectors
 
-    async def select(self, query: str, policy: dict | None = None) -> list[dict]:
-        """Pick the skills to inject this turn.
-
-        `policy` is the scenario's skills config: {"mode": auto|manual|off, "allow": [...], "pinned": [...]}.
-        Returns dicts with name, description, text, score and reason ("pinned" or "auto").
-        """
-        policy = policy or {}
-        mode = policy.get("mode", "auto")
-        if mode == "off" or not self._skills:
-            return []
-        settings = self._get()
+    def attached(self, names: list[str]) -> list[dict]:
+        """The skills a card has attached (installed and enabled only, at most 3), with text trimmed to share the budget."""
         enabled = self._enabled_map()
-        usable = {n: s for n, s in self._skills.items() if enabled.get(n, True)}
-        chosen: list[tuple[Skill, float, str]] = []
+        chosen = [self._skills[n] for n in names[:MAX_ATTACHED] if n in self._skills and enabled.get(n, True)]
+        if not chosen:
+            return []
+        per_skill = int(self._get().get("skills_char_budget", 3500)) // len(chosen)
+        return [{"name": sk.name, "description": sk.description, "text": self._fit(sk.body, per_skill)} for sk in chosen]
 
-        for name in policy.get("pinned", []):
-            if name in usable:
-                chosen.append((usable[name], 1.0, "pinned"))
+    async def suggest(self, text: str, k: int = 3) -> list[dict]:
+        """Pick the best skills for a card: shortlist by keywords or embeddings, then ask the model once."""
+        enabled = self._enabled_map()
+        pool = [sk for n, sk in self._skills.items() if enabled.get(n, True)]
+        text = (text or "").strip()
+        if not pool or not text:
+            return []
+        shortlist: list[Skill] = []
+        vectors = await self._skill_vectors(pool)
+        qv = (await self.llm.embed([text[:1500]])) if vectors else None
+        if vectors and qv:
+            ranked = sorted(pool, key=lambda sk: cosine(qv[0], vectors[sk.name]) if sk.name in vectors else -1, reverse=True)
+            shortlist = ranked[:12]
+        else:
+            scores = self._bm25(text, {sk.name: sk.search_text for sk in pool})
+            shortlist = [sk for sk in sorted(pool, key=lambda sk: scores.get(sk.name, 0), reverse=True)[:12] if scores.get(sk.name, 0) > 0]
+        if not shortlist:
+            return []
 
-        if mode == "auto":
-            allow = set(policy.get("allow") or [])
-            pool = [s for n, s in usable.items() if (not allow or n in allow) and n not in policy.get("pinned", [])]
-            top_k = int(settings.get("skills_top_k", 2))
-            if pool and top_k > 0 and query.strip():
-                vectors = await self._skill_vectors(pool)
-                qv = (await self.llm.embed([query])) if vectors else None
-                ranked: list[tuple[Skill, float]] = []
-                if vectors and qv:
-                    min_sim = float(settings.get("skills_min_similarity", 0.45))
-                    ranked = [(s, cosine(qv[0], vectors[s.name])) for s in pool if s.name in vectors]
-                    ranked = [(s, v) for s, v in ranked if v >= min_sim]
-                else:
-                    scores = self._bm25(query, {s.name: s.search_text for s in pool})
-                    min_score = float(settings.get("skills_min_score", 0.6))
-                    ranked = [(s, scores[s.name]) for s in pool if scores.get(s.name, 0) >= min_score]
-                ranked.sort(key=lambda t: t[1], reverse=True)
-                chosen.extend((s, v, "auto") for s, v in ranked[:top_k])
+        picked: list[str] = []
+        options = "\n".join(f"- {sk.name}: {truncate(sk.description, 140)}" for sk in shortlist)
+        prompt = (
+            f"A roleplaying card is described below. From the list of skills, choose up to {k} that would really help the "
+            "narrator run THIS card. Choose fewer, or none, if nothing fits.\n\n"
+            f"CARD:\n{text[:1500]}\n\nSKILLS:\n{options}\n\nAnswer as JSON: {{\"skills\": [\"name\", ...]}}"
+        )
+        try:
+            from .util import extract_json
 
-        budget = int(settings.get("skills_char_budget", 3500))
-        out: list[dict] = []
-        for skill, score, reason in chosen:
-            if budget <= 200:
-                break
-            text = self._fit(skill.body, budget)
-            budget -= len(text)
-            out.append({"name": skill.name, "description": skill.description, "text": text, "score": round(float(score), 3), "reason": reason})
-        return out
+            raw = await self.llm.chat(
+                [{"role": "user", "content": prompt}],
+                json_schema={"type": "object", "properties": {"skills": {"type": "array", "items": {"type": "string"}}}, "required": ["skills"]},
+                temperature=0.2, max_tokens=120,
+            )
+            data = extract_json(raw) or {}
+            names = {sk.name for sk in shortlist}
+            picked = [n for n in data.get("skills", []) if isinstance(n, str) and n in names][:k]
+        except Exception as exc:  # no model available: fall back to the shortlist
+            log.info("Skill suggestion fell back to keywords: %s", exc)
+        source = "ai"
+        if not picked:
+            picked, source = [sk.name for sk in shortlist[:k]], "keywords"
+        by_name = {sk.name: sk for sk in shortlist}
+        return [{"name": n, "description": by_name[n].description, "source": source} for n in picked]
 
     @staticmethod
     def _fit(body: str, limit: int) -> str:

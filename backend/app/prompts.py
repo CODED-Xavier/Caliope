@@ -1,6 +1,7 @@
 """Builds what the model actually sees each turn, and fits it into the context window."""
 from __future__ import annotations
 
+from .appearance import appearance_line
 from .util import estimate_tokens, truncate
 
 LANGUAGE_DIRECTIVES = {
@@ -32,7 +33,8 @@ CORE_RULES = """## Rules you always follow
 
 GM_RULES = """- When the outcome of an action is uncertain or risky, tell the player which roll to make (for example "Make a DEX (Stealth) check, DC 13") and wait. Do not decide the result before the roll.
 - A line starting with the dice emoji in the player's message is a real, verified roll result. Use it exactly; never re-roll or change it.
-- You may suggest options, but the player is free to do anything."""
+- You may suggest options, but the player is free to do anything.
+- When you introduce a new character, describe their looks in a sentence (hair, eyes, build, clothing) and keep those details exactly the same afterwards. Characters that have a "Looks" entry must always match it."""
 
 LENGTH_TOKENS = {"short": 250, "medium": 450, "long": 800}
 LENGTH_HINTS = {
@@ -106,6 +108,9 @@ def describe_npcs(npcs: list[dict], limit_chars: int = 3200, with_relationship: 
         parts = [head]
         if n["description"]:
             parts.append(n["description"])
+        looks = appearance_line(n.get("appearance") or {})
+        if looks:
+            parts.append(f"Looks: {looks}")
         if n["personality"]:
             parts.append(f"Personality: {n['personality']}")
         if n["speech_style"]:
@@ -146,7 +151,8 @@ class PromptBuilder:
     """
 
     def build(self, *, scenario: dict, state: dict, npcs: list[dict], summary: str, memories: list[dict],
-              skills: list[dict], history: list[dict], settings: dict, pinned: str = "") -> tuple[list[dict], dict]:
+              skills: list[dict], history: list[dict], settings: dict, pinned: str = "",
+              appearance_hint: str = "") -> tuple[list[dict], dict]:
         """Return (messages, debug_info). History items need id, role, content and meta."""
         ctx = int(settings["context_window"])
         reserve = reply_token_limit(settings) + 150
@@ -159,7 +165,7 @@ class PromptBuilder:
         if opening:
             history = [h for h in history if h is not opening]
 
-        sections = self._stable_sections(scenario, npcs, summary, pinned, language, settings, mode, opening)
+        sections = self._stable_sections(scenario, npcs, summary, pinned, language, settings, mode, opening, skills)
         dropped: list[str] = []
         cap = int(ctx * 0.55)
         if estimate_tokens(self._join(sections)) > cap and "opening" in sections:
@@ -171,7 +177,7 @@ class PromptBuilder:
         system_text = self._join(sections)
 
         used_memories = fit_memories(memories, mem_budget)
-        volatile = self._volatile(state, npcs, used_memories, skills, mode)
+        volatile = self._volatile(state, npcs, used_memories, mode, appearance_hint)
         budget = ctx - reserve - estimate_tokens(system_text) - estimate_tokens(volatile)
 
         kept: list[dict] = []
@@ -190,7 +196,7 @@ class PromptBuilder:
             fresh = [m for m in used_memories if m.get("message_id") is None or m["message_id"] < first_id]
             if len(fresh) != len(used_memories):
                 used_memories = fresh
-                volatile = self._volatile(state, npcs, used_memories, skills, mode)
+                volatile = self._volatile(state, npcs, used_memories, mode, appearance_hint)
 
         # Many chat templates require the first turn after the system prompt to come from the user.
         while kept and kept[0]["role"] == "assistant" and len(kept) > 1:
@@ -232,7 +238,7 @@ class PromptBuilder:
     def _join(sections: dict[str, str]) -> str:
         return "\n\n".join(v for v in sections.values() if v.strip())
 
-    def _stable_sections(self, scenario, npcs, summary, pinned, language, settings, mode, opening) -> dict[str, str]:
+    def _stable_sections(self, scenario, npcs, summary, pinned, language, settings, mode, opening, skills) -> dict[str, str]:
         sec: dict[str, str] = {}
         main = next((n for n in npcs if n.get("is_main")), None)
         if mode == "character" and main:
@@ -251,6 +257,9 @@ class PromptBuilder:
         if style:
             sec["style"] = "## Style\n" + style
 
+        if skills:
+            sec["skills"] = "## Extra guidance for this card\n" + "\n\n".join(f"### {sk['name']}\n{sk['text']}" for sk in skills)
+
         npc_text = describe_npcs(npcs)
         if npc_text:
             head = "## The character you play" if mode == "character" else "## Known NPCs"
@@ -266,7 +275,7 @@ class PromptBuilder:
         return sec
 
     @staticmethod
-    def _volatile(state, npcs, memories, skills, mode) -> str:
+    def _volatile(state, npcs, memories, mode, appearance_hint: str = "") -> str:
         parts: list[str] = []
         if mode != "character":
             parts.append("## Current game state\n" + describe_state(state))
@@ -277,38 +286,57 @@ class PromptBuilder:
             parts.append("## Relationships with the player\n" + rel)
         if memories:
             parts.append("## Relevant memories\n" + "\n".join(f"- {m['text']}" for m in memories))
-        if skills:
-            parts.append("## Reference material (use when relevant)\n" + "\n\n".join(f"### {s['name']}\n{s['text']}" for s in skills))
+        if appearance_hint:
+            parts.append(f"## New characters\nIf you introduce a new named character this turn, give them: {appearance_hint}.")
         return "\n\n".join(parts)
 
     # ----------------------------------------------------- analysis / summarizing
-    def analysis_messages(self, *, scenario: dict, state: dict, npcs: list[dict], user_text: str, reply: str) -> list[dict]:
+    def analysis_messages(self, *, scenario: dict, state: dict, npcs: list[dict], exchanges: list[tuple[str, str]],
+                          tracker: str = "full") -> list[dict]:
+        """Ask the model what changed in the latest exchange(s). `lite` skips HP, gold, items and quests."""
         mode = scenario.get("mode", "gm_world")
         npc_names = ", ".join(n["name"] for n in npcs) or "none yet"
-        inv = ", ".join(i["name"] for i in state["inventory"]) or "nothing"
-        system = (
-            "You are a precise game-state tracker for a text roleplaying game. You do not write story.\n"
-            "Read the latest exchange and report ONLY changes that clearly happened in it, as ONE JSON object.\n"
-            "- hp_change: net change to the player's hit points (negative = damage, positive = healing), else 0.\n"
-            "- gold_change: net change to the player's gold, else 0.\n"
-            "- inventory_add / inventory_remove: items the player gained, or lost/used up (name, qty).\n"
-            "- quests: quests started, updated or finished (title, status: active|completed|failed, notes).\n"
-            "- location: the player's new location name if they moved, else \"\". time: new in-world time if stated, else \"\".\n"
-            "- new_locations: newly mentioned places (name, description, connects_to: names of existing places).\n"
-            "- relationship_changes: how an NPC's feelings toward the player changed (npc, delta between -20 and 20, reason). Only NPCs involved.\n"
-            "- new_npcs: named characters appearing for the first time (name, description, personality).\n"
-            "- memories: 0-3 short, self-contained facts worth remembering long-term, for example \"Doran swore loyalty to Seraphine\" or \"Wren sold the player's secret\". "
-            "Include names. importance 1-5. characters: the names of the characters involved (use the exact names from Known NPCs).\n"
-            "Only record things that actually HAPPENED. Prices, offers, promises, threats and plans are NOT changes: gold changes only when money "
-            "really changes hands, items only when really given, taken or used, HP only when the player is really hurt or healed.\n"
-            "Never invent anything. Use 0, \"\" or [] when nothing changed.\n\n"
-            f"Current state: HP {state['player']['hp']['current']}/{state['player']['hp']['max']}, gold {state['gold']}, "
-            f"inventory: {inv}. Location: {state.get('location') or 'unknown'}.\n"
-            f"Known NPCs: {npc_names}."
-        )
+        full = tracker == "full"
+        lines = ["You are a precise game-state tracker for a text roleplaying game. You do not write story.",
+                 "Read the latest exchange(s) and report ONLY changes that clearly happened in them, as ONE JSON object."]
+        if full:
+            lines += [
+                "- hp_change: net change to the player's hit points (negative = damage, positive = healing), else 0.",
+                "- gold_change: net change to the player's gold, else 0.",
+                "- inventory_add / inventory_remove: items the player gained, or lost/used up (name, qty).",
+                "- quests: quests started, updated or finished (title, status: active|completed|failed, notes).",
+            ]
+        lines += [
+            "- location: the player's new location name if they moved, else \"\". time: new in-world time if stated, else \"\".",
+        ]
+        if full:
+            lines += ["- new_locations: newly mentioned places (name, description, connects_to: names of existing places)."]
+        lines += [
+            "- relationship_changes: how an NPC's feelings toward the player changed (npc, delta between -20 and 20, reason). Only NPCs involved.",
+            "- new_npcs: named characters appearing for the first time (name, description, personality, appearance). "
+            "appearance has race, hair, eyes, build, skin, outfit, extra: copy ONLY what the text says about their looks, use \"\" when it does not say.",
+            "- memories: 0-3 short, self-contained facts worth remembering long-term, for example \"Doran swore loyalty to Seraphine\" or "
+            "\"Wren sold the player's secret\". Include names. importance 1-5. characters: the names of the characters involved "
+            "(use the exact names from Known NPCs).",
+            "Only record things that actually HAPPENED. Prices, offers, promises, threats and plans are NOT changes"
+            + (": gold changes only when money really changes hands, items only when really given, taken or used, HP only when the player is really hurt or healed." if full else "."),
+            "Never invent anything. Use 0, \"\" or [] when nothing changed.",
+            "",
+        ]
+        if full:
+            inv = ", ".join(i["name"] for i in state["inventory"]) or "nothing"
+            lines.append(f"Current state: HP {state['player']['hp']['current']}/{state['player']['hp']['max']}, gold {state['gold']}, "
+                         f"inventory: {inv}. Location: {state.get('location') or 'unknown'}.")
+        else:
+            lines.append(f"Current location: {state.get('location') or 'unknown'}.")
+        lines.append(f"Known NPCs: {npc_names}.")
         speaker = "CHARACTER" if mode == "character" else "GAME MASTER"
-        user = f"PLAYER:\n{truncate(user_text, 1500)}\n\n{speaker}:\n{truncate(reply, 3000)}\n\nOutput the JSON object now."
-        return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        parts = []
+        for i, (user_text, reply) in enumerate(exchanges, 1):
+            label = f"EXCHANGE {i}\n" if len(exchanges) > 1 else ""
+            parts.append(f"{label}PLAYER:\n{truncate(user_text, 1200)}\n\n{speaker}:\n{truncate(reply, 2500)}")
+        user = "\n\n".join(parts) + "\n\nOutput the JSON object now."
+        return [{"role": "system", "content": "\n".join(lines)}, {"role": "user", "content": user}]
 
     def summary_messages(self, *, previous: str, transcript: str, language: str, max_chars: int = 1500) -> list[dict]:
         lang = LANGUAGE_DIRECTIVES.get(language, LANGUAGE_DIRECTIVES["en"])
@@ -322,21 +350,39 @@ class PromptBuilder:
         return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
+_APPEARANCE_SCHEMA = {
+    "type": "object",
+    "properties": {k: {"type": "string"} for k in ("race", "hair", "eyes", "build", "skin", "outfit", "extra")},
+    "required": ["race", "hair", "eyes", "build", "skin", "outfit", "extra"],
+}
+_ITEM = {"type": "object", "properties": {"name": {"type": "string"}, "qty": {"type": "integer"}}, "required": ["name", "qty"]}
+
 ANALYSIS_SCHEMA = {
     "type": "object",
     "properties": {
         "hp_change": {"type": "integer"},
         "gold_change": {"type": "integer"},
-        "inventory_add": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "qty": {"type": "integer"}}, "required": ["name", "qty"]}},
-        "inventory_remove": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "qty": {"type": "integer"}}, "required": ["name", "qty"]}},
+        "inventory_add": {"type": "array", "items": _ITEM},
+        "inventory_remove": {"type": "array", "items": _ITEM},
         "quests": {"type": "array", "items": {"type": "object", "properties": {"title": {"type": "string"}, "status": {"type": "string"}, "notes": {"type": "string"}}, "required": ["title", "status", "notes"]}},
         "location": {"type": "string"},
         "time": {"type": "string"},
         "new_locations": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "connects_to": {"type": "array", "items": {"type": "string"}}}, "required": ["name", "description", "connects_to"]}},
         "relationship_changes": {"type": "array", "items": {"type": "object", "properties": {"npc": {"type": "string"}, "delta": {"type": "integer"}, "reason": {"type": "string"}}, "required": ["npc", "delta", "reason"]}},
-        "new_npcs": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "personality": {"type": "string"}}, "required": ["name", "description", "personality"]}},
+        "new_npcs": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "personality": {"type": "string"}, "appearance": _APPEARANCE_SCHEMA}, "required": ["name", "description", "personality", "appearance"]}},
         "memories": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "importance": {"type": "integer"}, "characters": {"type": "array", "items": {"type": "string"}}}, "required": ["text", "importance", "characters"]}},
     },
     "required": ["hp_change", "gold_change", "inventory_add", "inventory_remove", "quests", "location", "time",
                  "new_locations", "relationship_changes", "new_npcs", "memories"],
 }
+
+_LITE_KEYS = ("location", "time", "relationship_changes", "new_npcs", "memories")
+ANALYSIS_SCHEMA_LITE = {
+    "type": "object",
+    "properties": {k: ANALYSIS_SCHEMA["properties"][k] for k in _LITE_KEYS},
+    "required": list(_LITE_KEYS),
+}
+
+
+def analysis_schema(tracker: str) -> dict:
+    return ANALYSIS_SCHEMA if tracker == "full" else ANALYSIS_SCHEMA_LITE

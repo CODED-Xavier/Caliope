@@ -6,7 +6,7 @@ import SidePanel from "./components/SidePanel.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import SkillsModal from "./components/SkillsModal.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
-import { MODE_LABELS } from "./utils.js";
+import { KIND_LABELS, MODE_LABELS } from "./utils.js";
 
 function initialTheme() {
   const saved = localStorage.getItem("theme");
@@ -241,7 +241,9 @@ export default function App() {
             <div className="topbar">
               <div className="grow">
                 <div className="top-title">{game.conversation.title}</div>
-                <div className="muted small">{scenario?.name} · {MODE_LABELS[scenario?.mode] || ""}</div>
+                <div className="muted small">{scenario?.name} · {MODE_LABELS[scenario?.mode] || ""}
+                  {game.features?.kind && <span className={`tag kind-${game.features.kind} kind-badge`}>{KIND_LABELS[game.features.kind]}</span>}
+                </div>
               </div>
               {!online && <button className="btn small danger" onClick={() => setModal("settings")}>Model offline</button>}
               <button className="btn small" onClick={undo} disabled={busy} title="Remove the last exchange">↶ Undo</button>

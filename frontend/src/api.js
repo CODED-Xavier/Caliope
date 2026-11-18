@@ -90,6 +90,7 @@ export const api = {
   roll: (expression) => request("POST", "/api/dice/roll", { expression }),
 
   skills: () => request("GET", "/api/skills"),
+  suggestSkills: (text, k = 3) => request("POST", "/api/skills/suggest", { text, k }),
   installSkill: (source) => request("POST", "/api/skills/install", { source }),
   toggleSkill: (name, enabled) => request("PATCH", `/api/skills/${encodeURIComponent(name)}`, { enabled }),
   deleteSkill: (name) => request("DELETE", `/api/skills/${encodeURIComponent(name)}`),

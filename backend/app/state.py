@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import uuid
 
+from .appearance import normalize_appearance
 from .util import as_int, clamp, deep_merge, truncate
 
 DEFAULT_STATE: dict = {
@@ -131,6 +132,7 @@ def normalize_updates(raw) -> dict:
                     "name": truncate(str(npc["name"]).strip(), 60),
                     "description": truncate(str(npc.get("description", "")), 240),
                     "personality": truncate(str(npc.get("personality", "")), 240),
+                    "appearance": normalize_appearance(npc.get("appearance")),
                 }
             )
     for mem in _list(raw.get("memories")):

@@ -13,19 +13,54 @@
     "class": "Fighter",
     "level": 1,
     "background": "Former soldier looking for work.",
-    "stats": {"STR": 16, "DEX": 12, "CON": 14, "INT": 10, "WIS": 11, "CHA": 10},
-    "hp": {"current": 13, "max": 13},
+    "stats": {
+      "STR": 16,
+      "DEX": 12,
+      "CON": 14,
+      "INT": 10,
+      "WIS": 11,
+      "CHA": 10
+    },
+    "hp": {
+      "current": 13,
+      "max": 13
+    },
     "ac": 16,
     "gold": 15,
     "inventory": [
-      {"name": "Longsword", "qty": 1},
-      {"name": "Shield", "qty": 1},
-      {"name": "Chain shirt", "qty": 1},
-      {"name": "Rations", "qty": 3},
-      {"name": "Waterskin", "qty": 1}
+      {
+        "name": "Longsword",
+        "qty": 1
+      },
+      {
+        "name": "Shield",
+        "qty": 1
+      },
+      {
+        "name": "Chain shirt",
+        "qty": 1
+      },
+      {
+        "name": "Rations",
+        "qty": 3
+      },
+      {
+        "name": "Waterskin",
+        "qty": 1
+      }
     ],
     "location": "The Crooked Lantern Inn"
   },
   "npcs": [],
-  "skills": {"mode": "auto", "allow": [], "pinned": []}
+  "skills": {
+    "attached": []
+  },
+  "kind": "adventure",
+  "species": [
+    "Human",
+    "Elf",
+    "Dwarf",
+    "Halfling",
+    "Tiefling"
+  ]
 }

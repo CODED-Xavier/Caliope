@@ -5,8 +5,9 @@ import HelpTip from "./HelpTip.jsx";
 import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
 
 /* ------------------------------------------------------------------ Sheet */
-function SheetTab({ state, onPatch, mode }) {
+function SheetTab({ state, onPatch, mode, kind }) {
   const p = state.player;
+  const numbers = kind !== "roleplay";
   const hp = p.hp;
   const pct = clamp((hp.current / Math.max(1, hp.max)) * 100, 0, 100);
   return (
@@ -16,13 +17,13 @@ function SheetTab({ state, onPatch, mode }) {
         <TextField value={p.race} placeholder="Race" onCommit={(v) => onPatch({ player: { race: v } })} />
         <TextField value={p.class} placeholder="Class" onCommit={(v) => onPatch({ player: { class: v } })} />
       </div>
-      <div className="stat-row">
+      {numbers && <div className="stat-row">
         <label>Level <NumberField value={p.level} min={1} max={30} width={56} onCommit={(v) => onPatch({ player: { level: v } })} /></label>
         <label>AC <NumberField value={p.ac} min={0} max={40} width={56} onCommit={(v) => onPatch({ player: { ac: v } })} /></label>
         <label>Gold <NumberField value={state.gold} min={0} width={80} onCommit={(v) => onPatch({ gold: v })} /></label>
-      </div>
+      </div>}
 
-      <div className="section-title">Hit points</div>
+      {numbers && <><div className="section-title">Hit points</div>
       <div className="hpbar"><div className="hpfill" style={{ width: `${pct}%`, background: pct < 30 ? "var(--bad)" : pct < 60 ? "var(--warn)" : "var(--good)" }} /></div>
       <div className="row gap center">
         <button className="btn small" onClick={() => onPatch({ player: { hp: { current: Math.max(0, hp.current - 1) } } })}>−1</button>
@@ -41,7 +42,7 @@ function SheetTab({ state, onPatch, mode }) {
             <NumberField value={v} min={1} max={30} width={46} onCommit={(n) => onPatch({ player: { stats: { [k]: n } } })} />
           </div>
         ))}
-      </div>
+      </div></>}
 
       <div className="section-title">Scene</div>
       <label className="lbl">Location</label>
@@ -52,7 +53,7 @@ function SheetTab({ state, onPatch, mode }) {
       <TextField multiline rows={3} value={p.description} placeholder="Describe your character…" onCommit={(v) => onPatch({ player: { description: v } })} />
       <label className="lbl">Your notes</label>
       <TextField multiline rows={3} value={state.notes} placeholder="Private notes (the AI does not see these)" onCommit={(v) => onPatch({ notes: v })} />
-      {mode === "character" && <div className="muted small">In character-card games the story focuses on the relationship; HP and gold are not tracked automatically.</div>}
+      {!numbers && <div className="muted small">Roleplay cards focus on characters and relationships, so the numbers (HP, abilities, gold) are hidden. Switch the card type to Adventure to use them.</div>}
     </div>
   );
 }
@@ -129,6 +130,9 @@ function RelBar({ value }) {
   );
 }
 
+const LOOKS = [["race", "Race / species"], ["hair", "Hair"], ["eyes", "Eyes"], ["build", "Build"], ["skin", "Skin"], ["outfit", "Style / outfit"], ["extra", "Other details"]];
+const looksSummary = (app) => ["race", "hair", "eyes"].map((k) => (app || {})[k]).filter(Boolean).join(" · ");
+
 function NpcCard({ npc, onUpdate, onDelete }) {
   const [open, setOpen] = useState(false);
   return (
@@ -139,6 +143,7 @@ function NpcCard({ npc, onUpdate, onDelete }) {
           <div className="small" style={{ color: relationshipColor(npc.relationship) }}>
             {relationshipLabel(npc.relationship)} ({npc.relationship > 0 ? "+" : ""}{npc.relationship})
           </div>
+          {looksSummary(npc.appearance) && <div className="muted tiny">{looksSummary(npc.appearance)}</div>}
         </div>
         <span className="muted">{open ? "▾" : "▸"}</span>
       </div>
@@ -149,6 +154,13 @@ function NpcCard({ npc, onUpdate, onDelete }) {
         <div className="npc-detail">
           <label className="lbl">Description</label>
           <TextField multiline value={npc.description} onCommit={(v) => onUpdate(npc.id, { description: v })} />
+          <label className="lbl">Looks <HelpTip id="appearance" /></label>
+          <div className="looks-grid">
+            {LOOKS.map(([key, label]) => (
+              <TextField key={key} value={(npc.appearance || {})[key] || ""} placeholder={label}
+                onCommit={(v) => onUpdate(npc.id, { appearance: { ...(npc.appearance || {}), [key]: v } })} />
+            ))}
+          </div>
           <label className="lbl">Personality</label>
           <TextField multiline value={npc.personality} onCommit={(v) => onUpdate(npc.id, { personality: v })} />
           <label className="lbl">Speech style</label>
@@ -381,8 +393,10 @@ const TABS = [
 export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave }) {
   const { state, npcs, conversation } = game;
   const mode = conversation.scenario?.mode;
-  const tabs = mode === "character" ? TABS.filter(([k]) => k !== "bag") : TABS;
-  const active = tabs.some(([k]) => k === tab) ? tab : "sheet";
+  const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
+  const allowed = game.features?.panels || TABS.map(([k]) => k);
+  const tabs = TABS.filter(([k]) => allowed.includes(k));
+  const active = tabs.some(([k]) => k === tab) ? tab : tabs[0]?.[0];
   return (
     <aside className="side-panel">
       <div className="tabs">
@@ -394,7 +408,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         <button className="icon-btn close-panel" onClick={onClose} title="Hide panel">✕</button>
       </div>
       <div className="tab-scroll">
-        {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} />}
+        {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} />}
         {active === "bag" && <BagTab state={state} onPatch={onPatch} />}
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} />}
         {active === "map" && <MapTab state={state} />}

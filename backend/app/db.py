@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS npcs (
     description     TEXT NOT NULL DEFAULT '',
     personality     TEXT NOT NULL DEFAULT '',
     speech_style    TEXT NOT NULL DEFAULT '',
+    appearance      TEXT NOT NULL DEFAULT '',
     relationship    INTEGER NOT NULL DEFAULT 0,
     notes           TEXT NOT NULL DEFAULT '',
     active          INTEGER NOT NULL DEFAULT 1,
@@ -139,6 +140,7 @@ class Database:
         """Bring databases created by older versions up to date (adds missing columns)."""
         self._ensure_column("conversations", "pinned_memory", "TEXT NOT NULL DEFAULT ''")
         self._ensure_column("memories", "participants", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column("npcs", "appearance", "TEXT NOT NULL DEFAULT ''")
 
     @contextmanager
     def transaction(self):

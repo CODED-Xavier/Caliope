@@ -21,8 +21,9 @@ export default function SkillsModal({ onClose }) {
   return (
     <Modal title="Skills" onClose={onClose} wide>
       <p className="muted small">
-        Skills are folders with a <code>SKILL.md</code>. The AI picks the ones that match what you are doing, on its own, each turn.
-        The game works the same with none installed. Skill scripts are never run: only their text is used.
+        Skills are folders with a <code>SKILL.md</code>. Install them here, then attach up to 3 to a card in the card editor
+        (there is a "Suggest" button that picks the best fit). The game works the same with none installed.
+        Skill scripts are never run: only their text is used.
       </p>
 
       <h3>Installed ({skills.length})</h3>

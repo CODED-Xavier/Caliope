@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .appearance import normalize_appearance
+from .cards import KINDS, default_kind, normalize_features
 from .db import Database
 from .util import extract_json, now, slugify, truncate
 
@@ -35,30 +37,35 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
                 "description": truncate(str(n.get("description", "")), 600),
                 "personality": truncate(str(n.get("personality", "")), 600),
                 "speech_style": truncate(str(n.get("speech_style", "")), 300),
+                "appearance": normalize_appearance(n.get("appearance")),
                 "relationship": max(-100, min(100, rel)),
                 "active": bool(n.get("active", True)),
             }
         )
 
+    # Skills are card add-ons: up to 3, always part of the prompt. (Older cards stored them as "pinned".)
     skills = raw.get("skills") if isinstance(raw.get("skills"), dict) else {}
-    skills_mode = skills.get("mode") if skills.get("mode") in ("auto", "manual", "off") else "auto"
+    attached = skills.get("attached", skills.get("pinned", []))
+    attached = [str(x) for x in attached][:3] if isinstance(attached, list) else []
+
+    species = raw.get("species", [])
+    species = [str(x).strip()[:40] for x in species[:12] if str(x).strip()] if isinstance(species, list) else []
 
     return {
         "name": truncate(str(raw.get("name") or "Untitled scenario").strip(), 100),
         "mode": mode,
+        "kind": raw.get("kind") if raw.get("kind") in KINDS else default_kind(mode),
+        "features": normalize_features(raw.get("features")),
         "description": truncate(str(raw.get("description", "")), 400),
         "language": raw.get("language") if raw.get("language") in ("en", "pt-BR", "auto") else "",
         "system_rules": str(raw.get("system_rules", "")),
         "world": str(raw.get("world", "")),
         "tone": str(raw.get("tone", "")),
+        "species": species,
         "opening_message": str(raw.get("opening_message", "")),
         "player": raw.get("player") if isinstance(raw.get("player"), dict) else {},
         "npcs": npcs,
-        "skills": {
-            "mode": skills_mode,
-            "allow": [str(s) for s in skills.get("allow", [])] if isinstance(skills.get("allow"), list) else [],
-            "pinned": [str(s) for s in skills.get("pinned", [])] if isinstance(skills.get("pinned"), list) else [],
-        },
+        "skills": {"attached": attached},
     }
 
 
@@ -74,6 +81,7 @@ class ScenarioRepository:
             "slug": row["slug"],
             "name": row["name"],
             "mode": row["mode"],
+            "kind": data.get("kind") or default_kind(row["mode"]),
             "description": data.get("description", ""),
             "npc_count": len(data.get("npcs", [])),
             "created_at": row["created_at"],
@@ -137,13 +145,15 @@ GENERATOR_PROMPT = """You design scenarios for a text roleplaying game. Output O
 Fields:
 - name: short title
 - mode: "{mode}"
+- kind: "{kind}" ("roleplay" = simple, focused on characters and conversation; "adventure" = rules, quests and items)
+- species: list of races or species that exist in this world (for example ["Human", "Elf", "Dwarf"]), or [] if everyone is human
 - description: 1-2 sentence pitch shown in the scenario picker
 - system_rules: the game rules to follow (concise, under 250 words). Use the rules system the idea implies; if none, write simple rules.
 - world: the setting, factions, tone of the world (under 250 words)
 - tone: writing style guidance for the narrator (1-3 sentences)
 - opening_message: the first message the player sees (2-4 short paragraphs, ends with a question or choice for the player)
 - player: {{"name": "", "class": "", "race": "", "level": 1, "stats": {{"STR": 10, "DEX": 10, "CON": 10, "INT": 10, "WIS": 10, "CHA": 10}}, "hp": {{"current": 10, "max": 10}}, "ac": 10, "gold": 0, "inventory": [{{"name": "item", "qty": 1}}], "location": ""}}
-- npcs: list of {{"name", "description", "personality", "speech_style", "relationship": number from -100 to 100}} ({npc_hint})
+- npcs: list of {{"name", "description", "personality", "speech_style", "relationship": number from -100 to 100, "appearance": {{"race": "", "hair": "", "eyes": "", "build": "", "skin": "", "outfit": "", "extra": ""}}}} ({npc_hint}). Give each character a DISTINCT, specific look: avoid cliché combinations such as raven hair with emerald eyes.
 
 {mode_hint}
 {language_line}
@@ -162,18 +172,20 @@ NPC_HINTS = {
 }
 
 
-async def generate_scenario(llm, idea: str, mode: str = "gm_world", language: str = "en") -> dict:
+async def generate_scenario(llm, idea: str, mode: str = "gm_world", language: str = "en", kind: str | None = None) -> dict:
     mode = mode if mode in MODES else "gm_world"
+    kind = kind if kind in KINDS else default_kind(mode)
     language_line = {
         "en": "Write all text in English.",
         "pt-BR": "Write all text in Brazilian Portuguese (pt-BR).",
     }.get(language, "Write in the language of the user's idea.")
     prompt = GENERATOR_PROMPT.format(
-        mode=mode, npc_hint=NPC_HINTS[mode], mode_hint=MODE_HINTS[mode], language_line=language_line, idea=idea.strip()
+        mode=mode, kind=kind, npc_hint=NPC_HINTS[mode], mode_hint=MODE_HINTS[mode], language_line=language_line, idea=idea.strip()
     )
     raw = await llm.chat([{"role": "user", "content": prompt}], max_tokens=2200, temperature=0.9)
     data = extract_json(raw)
     if not data:
         raise ValueError("The model did not return a valid scenario. Try again or simplify the idea.")
     data["mode"] = mode
+    data["kind"] = kind
     return normalize_scenario(data, default_mode=mode)
