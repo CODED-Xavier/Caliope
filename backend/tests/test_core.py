@@ -54,6 +54,7 @@ class FakeLLM:
         self.fail_stream = False
         self.stream_calls = []
         self.stream_kwargs = []
+        self.chat_calls = []
 
     async def stream_chat(self, messages, stop=None, **kw):
         self.stream_calls.append(messages)
@@ -64,6 +65,7 @@ class FakeLLM:
             yield word + " "
 
     async def chat(self, messages, json_schema=None, **kw):
+        self.chat_calls.append((messages, json_schema))
         if json_schema:
             return "```json\n" + json.dumps(self.analysis) + "\n```"
         return self.summary
@@ -90,6 +92,20 @@ def make_services(llm=None, skills_src=True):
             (skills_dir / name).mkdir()
             (skills_dir / name / "SKILL.md").write_text(text, encoding="utf-8")
     return Services(db_path=":memory:", skills_dir=skills_dir, seed_dir=SEED_DIR, llm=llm or FakeLLM())
+
+
+def new_game(s, mode="gm_world", attach=None, features=None, kind=None, **extra):
+    """Start a game from the example card of a mode. By default the full tracker runs every turn."""
+    sc = s.scenarios.get(next(x["id"] for x in s.scenarios.list() if x["mode"] == mode))
+    data = dict(sc["data"])
+    data["features"] = {"tracker": "full", "tracker_interval": 1, **(features or {})}
+    if attach is not None:
+        data["skills"] = {"attached": attach}
+    if kind:
+        data["kind"] = kind
+    data.update(extra)
+    variant = s.scenarios.create({**data, "name": data["name"] + " (test)"})
+    return s.conversations.create(variant)["id"]
 
 
 async def collect(agen):
@@ -260,30 +276,51 @@ class MemoryTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SkillTests(unittest.IsolatedAsyncioTestCase):
-    async def test_auto_selection_and_policies(self):
+    async def test_attached_skills(self):
         s = make_services()
         self.assertEqual({x["name"] for x in s.skills.list()}, {"combat-encounters", "npc-dialogue-voices"})
-        picked = await s.skills.select("I attack the goblin and start a fight!", {"mode": "auto"})
-        self.assertEqual([p["name"] for p in picked], ["combat-encounters"])
-        picked = await s.skills.select("I want to persuade the merchant and negotiate a price", {"mode": "auto"})
-        self.assertEqual([p["name"] for p in picked], ["npc-dialogue-voices"])
-        self.assertEqual(await s.skills.select("I look at the sky and sigh", {"mode": "auto"}), [])
-        self.assertEqual(await s.skills.select("attack fight", {"mode": "off"}), [])
-        self.assertEqual(await s.skills.select("attack fight", {"mode": "manual"}), [])
-        pinned = await s.skills.select("hello", {"mode": "manual", "pinned": ["npc-dialogue-voices"]})
-        self.assertEqual(pinned[0]["reason"], "pinned")
-        allowed = await s.skills.select("attack the goblin in a fight", {"mode": "auto", "allow": ["npc-dialogue-voices"]})
-        self.assertEqual(allowed, [])
+        got = s.skills.attached(["npc-dialogue-voices", "missing", "combat-encounters"])
+        self.assertEqual([g["name"] for g in got], ["npc-dialogue-voices", "combat-encounters"])
+        self.assertEqual(s.skills.attached([]), [])
+        s.skills.set_enabled("npc-dialogue-voices", False)
+        self.assertEqual([g["name"] for g in s.skills.attached(["npc-dialogue-voices", "combat-encounters"])], ["combat-encounters"])
+
+    async def test_attached_text_shares_the_budget(self):
+        s = make_services()
+        s.settings.update({"skills_char_budget": 200})
+        got = s.skills.attached(["combat-encounters", "npc-dialogue-voices"])
+        self.assertTrue(all(len(g["text"]) < 160 for g in got))
+        self.assertIn("shortened", got[0]["text"])
+
+    async def test_a_card_holds_at_most_three_skills(self):
+        from app.scenarios import normalize_scenario
+        self.assertEqual(normalize_scenario({"skills": {"attached": list("abcde")}})["skills"], {"attached": ["a", "b", "c"]})
+        self.assertEqual(normalize_scenario({"skills": {"pinned": ["x"], "mode": "auto"}})["skills"], {"attached": ["x"]})  # older cards
 
     async def test_works_with_no_skills(self):
         s = make_services(skills_src=False)
         self.assertEqual(s.skills.list(), [])
-        self.assertEqual(await s.skills.select("attack!", {"mode": "auto"}), [])
+        self.assertEqual(s.skills.attached(["anything"]), [])
+        self.assertEqual(await s.skills.suggest("a court intrigue"), [])
+
+    async def test_suggest_asks_the_model_once(self):
+        llm = FakeLLM()
+        llm.analysis = {"skills": ["npc-dialogue-voices", "not-installed"]}
+        s = make_services(llm)
+        got = await s.skills.suggest("A court intrigue where the investigator must negotiate and persuade nobles")
+        self.assertEqual([(g["name"], g["source"]) for g in got], [("npc-dialogue-voices", "ai")])
+        self.assertEqual(len(llm.chat_calls), 1)
+        self.assertEqual(await s.skills.suggest("   "), [])
+
+    async def test_suggest_falls_back_to_keywords(self):
+        s = make_services()  # the fake model answers with nothing useful
+        got = await s.skills.suggest("fight and attack enemies in battle")
+        self.assertEqual([(g["name"], g["source"]) for g in got], [("combat-encounters", "keywords")])
 
     async def test_disable_and_uninstall(self):
         s = make_services()
         s.skills.set_enabled("combat-encounters", False)
-        self.assertEqual(await s.skills.select("attack fight battle", {"mode": "auto"}), [])
+        self.assertEqual(s.skills.attached(["combat-encounters"]), [])
         s.skills.uninstall("combat-encounters")
         self.assertEqual(len(s.skills.list()), 1)
 
@@ -358,9 +395,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         for k, v in llm_attrs.items():
             setattr(llm, k, v)
         s = make_services(llm)
-        sc = s.scenarios.get(next(x["id"] for x in s.scenarios.list() if x["mode"] == mode))
-        cid = s.conversations.create(sc)["id"]
-        return s, llm, cid
+        return s, llm, new_game(s, mode)
 
     async def test_full_turn(self):
         s, llm, cid = await self.start(
@@ -372,6 +407,8 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
                 "memories": [{"text": "Captain Doran Hale shared a drink with the investigator", "importance": 4}],
                 "location": "The Barracks",
             })
+        s.conversations.delete(cid)
+        cid = new_game(s, "gm_cast", attach=["combat-encounters"])
         events = await collect(s.engine.send(cid, "I attack the guard captain"))
         types = [e["type"] for e in events]
         self.assertEqual(types[0], "user_message")
@@ -387,12 +424,13 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await s.memory.search(cid, "Doran drink"), await s.memory.search(cid, "Doran drink"))
         self.assertTrue(any("Doran" in m["text"] for m in await s.memory.search(cid, "Doran drink")))
         ctx = next(e for e in events if e["type"] == "context")
-        self.assertEqual(ctx["skills"], ["combat-encounters"])  # auto-picked from "attack"
+        self.assertEqual(ctx["skills"], ["combat-encounters"])  # attached to the card
         system_prompt = llm.stream_calls[0][0]["content"]
         notes = llm.stream_calls[0][-1]["content"]  # changing information rides on the newest player message
-        self.assertIn("Reference material", notes)
         self.assertIn("Relationships with the player", notes)
-        self.assertNotIn("Reference material", system_prompt)
+        self.assertIn("Extra guidance for this card", system_prompt)  # card skills sit in the stable start
+        self.assertIn("Resolve attacks by asking", system_prompt)
+        self.assertNotIn("Extra guidance", notes)
         self.assertIn("Captain Doran Hale", system_prompt)
         msgs = s.conversations.list_messages(cid)
         self.assertEqual([m["role"] for m in msgs], ["assistant", "user", "assistant"])
@@ -494,8 +532,7 @@ class HistoryEditTests(unittest.IsolatedAsyncioTestCase):
         for k, v in llm_attrs.items():
             setattr(llm, k, v)
         s = make_services(llm)
-        sc = s.scenarios.get(next(x["id"] for x in s.scenarios.list() if x["mode"] == "gm_world"))
-        return s, llm, s.conversations.create(sc)["id"]
+        return s, llm, new_game(s, "gm_world")
 
     async def test_edit_in_place(self):
         s, llm, cid = await self.start()
@@ -584,8 +621,7 @@ class SpeedAndMemoryTests(unittest.IsolatedAsyncioTestCase):
         for k, v in llm_attrs.items():
             setattr(llm, k, v)
         s = make_services(llm)
-        sc = s.scenarios.get(next(x["id"] for x in s.scenarios.list() if x["mode"] == mode))
-        return s, llm, s.conversations.create(sc)["id"]
+        return s, llm, new_game(s, mode)
 
     def test_database_migration_adds_new_columns(self):
         import sqlite3
@@ -691,6 +727,102 @@ class SpeedAndMemoryTests(unittest.IsolatedAsyncioTestCase):
         mems = [{"text": "a" * 400}, {"text": "b" * 400}, {"text": "c" * 400}]
         self.assertEqual(len(fit_memories(mems, 900)), 2)
         self.assertEqual(len(fit_memories(mems, 100)), 1)  # always keeps the best one
+
+
+class CardTypeAndAppearanceTests(unittest.IsolatedAsyncioTestCase):
+    def test_kind_defaults_and_profiles(self):
+        from app.cards import resolve_features
+        from app.scenarios import normalize_scenario
+        self.assertEqual(normalize_scenario({"mode": "character"})["kind"], "roleplay")
+        self.assertEqual(normalize_scenario({"mode": "gm_world"})["kind"], "adventure")
+        self.assertEqual(normalize_scenario({"mode": "gm_world", "kind": "roleplay"})["kind"], "roleplay")
+        rp = resolve_features({"kind": "roleplay"})
+        self.assertEqual((rp["tracker"], rp["tracker_interval"]), ("lite", 2))
+        self.assertNotIn("bag", rp["panels"])
+        adv = resolve_features({"kind": "adventure"})
+        self.assertEqual((adv["tracker"], adv["tracker_interval"]), ("full", 1))
+        self.assertIn("map", adv["panels"])
+        # a card only stores what it overrides; invalid values are dropped
+        sc = normalize_scenario({"kind": "roleplay", "features": {"tracker": "full", "tracker_interval": 9, "panels": ["bag", "nope"]}})
+        self.assertEqual(sc["features"], {"tracker": "full", "panels": ["bag"]})
+        self.assertEqual(resolve_features(sc)["tracker"], "full")
+        self.assertEqual(resolve_features(sc, {"state_tracking": False})["tracker"], "off")  # global kill switch
+
+    async def test_roleplay_tracker_runs_every_second_turn_and_reads_both_exchanges(self):
+        llm = FakeLLM()
+        llm.analysis = {"hp_change": -9, "gold_change": 50,
+                        "relationship_changes": [{"npc": "Wren", "delta": 8, "reason": "kind words"}],
+                        "memories": [{"text": "Wren trusts the investigator more now", "importance": 3, "characters": ["Wren"]}]}
+        s = make_services(llm)
+        cid = new_game(s, "gm_cast", features={"tracker": "lite", "tracker_interval": 2})
+        hp = s.conversations.get_state(cid)["player"]["hp"]["current"]
+        first = await collect(s.engine.send(cid, "I smile at Wren"))
+        self.assertNotIn("analysis_start", [e["type"] for e in first])
+        self.assertEqual(llm.chat_calls, [])  # no tracker call on the first turn
+        second = await collect(s.engine.send(cid, "I thank Wren again"))
+        self.assertIn("analysis_start", [e["type"] for e in second])
+        self.assertEqual(len(llm.chat_calls), 1)
+        prompt, schema = llm.chat_calls[0]
+        text = prompt[0]["content"] + prompt[1]["content"]
+        self.assertIn("I smile at Wren", text)   # both exchanges are read
+        self.assertIn("I thank Wren again", text)
+        self.assertEqual(set(schema["properties"]), {"location", "time", "relationship_changes", "new_npcs", "memories"})
+        self.assertNotIn("hp_change", prompt[0]["content"])
+        state = s.conversations.get_state(cid)
+        self.assertEqual((state["player"]["hp"]["current"], state["gold"]), (hp, 30))  # lite never touches the sheet
+        self.assertEqual(s.conversations.find_npc(cid, "Wren")["relationship"], 18)
+        third = await collect(s.engine.send(cid, "Let us go"))
+        self.assertNotIn("analysis_start", [e["type"] for e in third])
+
+    async def test_tracker_off_still_remembers_exchanges(self):
+        s = make_services()
+        cid = new_game(s, "gm_world", features={"tracker": "off"})
+        await collect(s.engine.send(cid, "I wave"))
+        self.assertEqual(s.engine.llm.chat_calls, [])
+        self.assertEqual([m["kind"] for m in s.memory.list(cid)], ["exchange"])
+
+    def test_appearance_helpers(self):
+        from app.appearance import appearance_line, appearance_seed, normalize_appearance
+        self.assertEqual(normalize_appearance({"hair": "  red  ", "eyes": "", "bogus": "x"}), {"hair": "red"})
+        self.assertEqual(normalize_appearance("nope"), {})
+        self.assertEqual(appearance_line({}), "")
+        line = appearance_line({"race": "Elf", "hair": "silver braid", "eyes": "violet", "extra": "a scar"})
+        self.assertEqual(line, "Elf; hair: silver braid; eyes: violet; a scar")
+        a, b = appearance_seed(random.Random(3), []), appearance_seed(random.Random(3), [])
+        self.assertEqual(a, b)
+        self.assertTrue(a.startswith("human,"))
+        self.assertTrue(appearance_seed(random.Random(3), ["Elf", "Dwarf"]).split(",")[0] in ("Elf", "Dwarf"))
+
+    async def test_new_characters_keep_their_looks(self):
+        look = {"race": "Tiefling", "hair": "black curls", "eyes": "gold", "build": "tall", "skin": "red", "outfit": "goth coat", "extra": "dark lipstick"}
+        llm = FakeLLM()
+        llm.analysis = {"new_npcs": [{"name": "Ember", "description": "A singer", "personality": "Dry", "appearance": look}]}
+        s = make_services(llm)
+        cid = new_game(s, "gm_world")
+        await collect(s.engine.send(cid, "I meet the singer"))
+        ember = s.conversations.find_npc(cid, "Ember")
+        self.assertEqual(ember["appearance"], look)
+        await collect(s.engine.send(cid, "I talk to Ember"))
+        self.assertIn("Looks: Tiefling; hair: black curls", llm.stream_calls[-1][0]["content"])  # stable start, always present
+        snap = s.conversations.capture_snapshot(cid)
+        s.conversations.update_npc(ember["id"], appearance={"hair": "shaved"})
+        self.assertEqual(s.conversations.get_npc(ember["id"])["appearance"], {"hair": "shaved"})
+        s.conversations.restore_snapshot(cid, snap)
+        self.assertEqual(s.conversations.get_npc(ember["id"])["appearance"], look)
+
+    async def test_seed_hint_for_new_characters(self):
+        from app.appearance import appearance_seed
+        s = make_services()
+        s.engine.rng = random.Random(11)
+        cid = new_game(s, "gm_world")
+        species = s.conversations.get(cid)["scenario"]["species"]
+        self.assertIn("Elf", species)
+        await collect(s.engine.send(cid, "Look around"))
+        expected = appearance_seed(random.Random(11), species)
+        self.assertIn(f"If you introduce a new named character this turn, give them: {expected}.", s.engine.llm.stream_calls[0][-1]["content"])
+        cid2 = new_game(s, "character")  # one-character cards never get the hint
+        await collect(s.engine.send(cid2, "Hello"))
+        self.assertNotIn("New characters", s.engine.llm.stream_calls[-1][-1]["content"])
 
 
 if __name__ == "__main__":

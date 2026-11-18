@@ -1,49 +1,117 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Modal from "./Modal.jsx";
+import HelpTip from "./HelpTip.jsx";
+import KindPicker from "./KindPicker.jsx";
 import { api } from "../api.js";
-import { MODE_LABELS } from "../utils.js";
+import { KIND_LABELS, MODE_LABELS } from "../utils.js";
+
+const LOOKS = [["race", "Race / species"], ["hair", "Hair"], ["eyes", "Eyes"], ["build", "Build"], ["skin", "Skin"], ["outfit", "Style / outfit"], ["extra", "Other details"]];
+const MAX_SKILLS = 3;
 
 const BLANK = {
-  name: "", mode: "gm_world", description: "", language: "", system_rules: "", world: "", tone: "", opening_message: "",
+  name: "", mode: "gm_world", kind: "roleplay", features: {}, description: "", language: "", system_rules: "", world: "", tone: "", opening_message: "",
+  species: [],
   player: { name: "Adventurer", class: "", race: "", level: 1, stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }, hp: { current: 10, max: 10 }, ac: 10, gold: 0, inventory: [], location: "" },
-  npcs: [], skills: { mode: "auto", allow: [], pinned: [] },
+  npcs: [], skills: { attached: [] },
 };
 
+function SkillPicker({ attached, onChange, cardText }) {
+  const [skills, setSkills] = useState([]);
+  const [filter, setFilter] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => { api.skills().then(setSkills).catch(() => {}); }, []);
+  const shown = useMemo(() => {
+    const f = filter.toLowerCase();
+    return skills.filter((s) => s.enabled && (!f || s.name.toLowerCase().includes(f) || s.description.toLowerCase().includes(f))).slice(0, 40);
+  }, [skills, filter]);
+  const toggle = (name) => {
+    if (attached.includes(name)) onChange(attached.filter((n) => n !== name));
+    else if (attached.length < MAX_SKILLS) onChange([...attached, name]);
+  };
+  const suggest = async () => {
+    setBusy(true); setError(""); setNote("");
+    try {
+      const got = await api.suggestSkills(cardText, MAX_SKILLS);
+      if (got.length === 0) { setNote("No installed skill seems to fit this card."); }
+      else { onChange(got.map((g) => g.name)); setNote(`Suggested by ${got[0].source === "ai" ? "the AI" : "keyword matching"}: ${got.map((g) => g.name).join(", ")}`); }
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <>
+      <div className="section-title">Skills for this card <HelpTip id="card_skills" /> <span className="muted tiny">({attached.length}/{MAX_SKILLS})</span></div>
+      <div className="row gap center">
+        <input className="field grow" placeholder={`Search your ${skills.length} skills…`} value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <button type="button" className="btn small" onClick={suggest} disabled={busy || skills.length === 0}>{busy ? "Asking…" : "✨ Suggest"}</button>
+      </div>
+      {note && <div className="muted small">{note}</div>}
+      {error && <div className="error-text small">{error}</div>}
+      {attached.length > 0 && (
+        <div className="chips">{attached.map((n) => <button type="button" key={n} className="chip removable" onClick={() => toggle(n)} title="Remove">{n} ✕</button>)}</div>
+      )}
+      <div className="skill-pick">
+        {skills.length === 0 && <div className="muted small">No skills installed. The card works fine without them.</div>}
+        {shown.map((s) => (
+          <label key={s.name} className={`skill-opt ${!attached.includes(s.name) && attached.length >= MAX_SKILLS ? "dim" : ""}`}>
+            <input type="checkbox" checked={attached.includes(s.name)} onChange={() => toggle(s.name)} />
+            <span><strong>{s.name}</strong> <span className="muted tiny">{s.description}</span></span>
+          </label>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function Editor({ initial, id, onCancel, onSaved }) {
-  const [d, setD] = useState({ ...BLANK, ...initial });
+  const [d, setD] = useState({ ...BLANK, ...initial, features: initial.features || {}, skills: { attached: initial.skills?.attached || initial.skills?.pinned || [] } });
   const [playerJson, setPlayerJson] = useState(JSON.stringify(initial.player ?? BLANK.player, null, 2));
+  const [speciesText, setSpeciesText] = useState((initial.species || []).join(", "));
   const [idea, setIdea] = useState("");
   const [gen, setGen] = useState(false);
   const [error, setError] = useState("");
   const set = (k, v) => setD((p) => ({ ...p, [k]: v }));
   const setNpc = (i, k, v) => set("npcs", d.npcs.map((n, j) => (j === i ? { ...n, [k]: v } : n)));
+  const setLook = (i, k, v) => set("npcs", d.npcs.map((n, j) => (j === i ? { ...n, appearance: { ...(n.appearance || {}), [k]: v } } : n)));
+  const setFeature = (k, v) => {
+    const f = { ...d.features };
+    if (v === "" || v === undefined) delete f[k]; else f[k] = v;
+    set("features", f);
+  };
+  const cardText = [d.name, d.description, d.world, d.tone, ...d.npcs.map((n) => `${n.name} ${n.personality || ""}`)].join(". ");
 
   const generate = async () => {
     if (!idea.trim()) return;
     setGen(true); setError("");
     try {
-      const r = await api.generateScenario({ idea, mode: d.mode, language: d.language || "en" });
-      setD({ ...BLANK, ...r.data }); setPlayerJson(JSON.stringify(r.data.player ?? {}, null, 2));
+      const r = await api.generateScenario({ idea, mode: d.mode, kind: d.kind, language: d.language || "en" });
+      setD({ ...BLANK, ...r.data, features: r.data.features || {}, skills: { attached: [] } });
+      setPlayerJson(JSON.stringify(r.data.player ?? {}, null, 2));
+      setSpeciesText((r.data.species || []).join(", "));
     } catch (e) { setError(e.message); } finally { setGen(false); }
   };
 
   const save = async () => {
     setError("");
     let player;
-    try { player = JSON.parse(playerJson || "{}"); } catch { setError("The player template is not valid JSON."); return; }
-    if (!d.name.trim()) { setError("Give the scenario a name."); return; }
-    const data = { ...d, player };
+    try { player = JSON.parse(playerJson || "{}"); } catch { setError("The starting character sheet is not valid JSON."); return; }
+    if (!d.name.trim()) { setError("Give the card a name."); return; }
+    const species = speciesText.split(",").map((x) => x.trim()).filter(Boolean);
+    const data = { ...d, player, species };
     try { const saved = id ? await api.updateScenario(id, data) : await api.createScenario(data); onSaved(saved); } catch (e) { setError(e.message); }
   };
 
   return (
     <>
+      <div className="section-title">Card type <HelpTip id="card_kind" /></div>
+      <KindPicker value={d.kind} onChange={(k) => set("kind", k)} />
+
       <div className="card">
         <div className="lbl">✨ Generate from an idea (the AI drafts everything; you can edit it below)</div>
-        <textarea className="field" rows={2} value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="e.g. A cyberpunk heist in a flooded city where I play a retired hacker" />
+        <textarea className="field" rows={2} value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="e.g. A fantasy academy where four students keep a dangerous secret" />
         <div className="row gap center">
           <button className="btn" onClick={generate} disabled={gen || !idea.trim()}>{gen ? "Generating… (can take a minute)" : "Generate"}</button>
-          <span className="muted tiny">Uses the mode selected below.</span>
+          <span className="muted tiny">Uses the card type and mode selected here.</span>
         </div>
       </div>
 
@@ -51,7 +119,7 @@ function Editor({ initial, id, onCancel, onSaved }) {
       <input className="field" value={d.name} onChange={(e) => set("name", e.target.value)} />
       <div className="row gap">
         <div className="grow">
-          <label className="lbl">Mode</label>
+          <label className="lbl">Who the AI plays</label>
           <select className="field" value={d.mode} onChange={(e) => set("mode", e.target.value)}>
             {Object.entries(MODE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
@@ -65,14 +133,6 @@ function Editor({ initial, id, onCancel, onSaved }) {
             <option value="auto">Same as I write</option>
           </select>
         </div>
-        <div className="grow">
-          <label className="lbl">Skills</label>
-          <select className="field" value={d.skills?.mode || "auto"} onChange={(e) => set("skills", { ...(d.skills || {}), mode: e.target.value })}>
-            <option value="auto">Automatic</option>
-            <option value="manual">Only pinned</option>
-            <option value="off">Off</option>
-          </select>
-        </div>
       </div>
       <p className="muted tiny">
         {d.mode === "gm_world" && "The AI is the Game Master and invents places and characters as you play."}
@@ -83,6 +143,8 @@ function Editor({ initial, id, onCancel, onSaved }) {
       <input className="field" value={d.description} onChange={(e) => set("description", e.target.value)} />
       <label className="lbl">World / setting</label>
       <textarea className="field" rows={4} value={d.world} onChange={(e) => set("world", e.target.value)} />
+      <label className="lbl">Races or species in this world <HelpTip id="species" /></label>
+      <input className="field" placeholder="Elf, Dwarf, Tiefling (empty = everyone is human)" value={speciesText} onChange={(e) => setSpeciesText(e.target.value)} />
       {d.mode !== "character" && (<>
         <label className="lbl">Game rules</label>
         <textarea className="field" rows={5} value={d.system_rules} onChange={(e) => set("system_rules", e.target.value)} />
@@ -101,12 +163,44 @@ function Editor({ initial, id, onCancel, onSaved }) {
             <input className="field num" style={{ width: 64 }} value={n.relationship ?? 0} onChange={(e) => setNpc(i, "relationship", parseInt(e.target.value, 10) || 0)} />
             <button className="icon-btn" onClick={() => set("npcs", d.npcs.filter((_, j) => j !== i))}>✕</button>
           </div>
-          <textarea className="field" rows={2} placeholder="Description / appearance / history" value={n.description || ""} onChange={(e) => setNpc(i, "description", e.target.value)} />
+          <textarea className="field" rows={2} placeholder="Description / history" value={n.description || ""} onChange={(e) => setNpc(i, "description", e.target.value)} />
           <textarea className="field" rows={2} placeholder="Personality" value={n.personality || ""} onChange={(e) => setNpc(i, "personality", e.target.value)} />
           <input className="field" placeholder="Speech style (how they talk)" value={n.speech_style || ""} onChange={(e) => setNpc(i, "speech_style", e.target.value)} />
+          <div className="lbl">Looks <HelpTip id="appearance" /></div>
+          <div className="looks-grid">
+            {LOOKS.map(([key, label]) => (
+              <input key={key} className="field" placeholder={label} value={(n.appearance || {})[key] || ""} onChange={(e) => setLook(i, key, e.target.value)} />
+            ))}
+          </div>
         </div>
       ))}
-      <button className="btn small" onClick={() => set("npcs", [...d.npcs, { name: "", description: "", personality: "", speech_style: "", relationship: 0 }])}>＋ Add character</button>
+      <button className="btn small" onClick={() => set("npcs", [...d.npcs, { name: "", description: "", personality: "", speech_style: "", relationship: 0, appearance: {} }])}>＋ Add character</button>
+
+      <SkillPicker attached={d.skills.attached} onChange={(a) => set("skills", { attached: a })} cardText={cardText} />
+
+      <details>
+        <summary className="muted small">Advanced: what the AI tracks on this card</summary>
+        <div className="set-row">
+          <div className="set-label">What the AI tracks <HelpTip id="tracker" /><div className="muted tiny">Empty = the default of the card type</div></div>
+          <div className="set-control">
+            <select className="field" value={d.features.tracker || ""} onChange={(e) => setFeature("tracker", e.target.value)}>
+              <option value="">Default for {KIND_LABELS[d.kind]}</option>
+              <option value="off">Nothing</option>
+              <option value="lite">Light (relationships, characters, memories)</option>
+              <option value="full">Full (also HP, gold, items, quests)</option>
+            </select>
+          </div>
+        </div>
+        <div className="set-row">
+          <div className="set-label">Track every N replies <HelpTip id="tracker_interval" /></div>
+          <div className="set-control">
+            <select className="field" value={d.features.tracker_interval || ""} onChange={(e) => setFeature("tracker_interval", e.target.value ? parseInt(e.target.value, 10) : "")}>
+              <option value="">Default for {KIND_LABELS[d.kind]}</option>
+              {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n === 1 ? "Every reply" : `Every ${n} replies`}</option>)}
+            </select>
+          </div>
+        </div>
+      </details>
 
       <details>
         <summary className="muted small">Starting character sheet (advanced, JSON)</summary>
@@ -116,7 +210,7 @@ function Editor({ initial, id, onCancel, onSaved }) {
       {error && <div className="error-text small">{error}</div>}
       <div className="row gap end">
         <button className="btn" onClick={onCancel}>Back</button>
-        <button className="btn primary" onClick={save}>Save scenario</button>
+        <button className="btn primary" onClick={save}>Save card</button>
       </div>
     </>
   );
@@ -140,6 +234,12 @@ export default function ScenarioModal({ onClose, onStart }) {
   const edit = async (id) => {
     try { const full = await api.scenario(id); setEditing({ id, initial: full.data }); setView("edit"); } catch (e) { setError(e.message); }
   };
+  const create = async () => {
+    let kind = "roleplay";
+    try { kind = (await api.settings()).default_card_kind || "roleplay"; } catch { /* keep default */ }
+    setEditing({ id: null, initial: { ...BLANK, kind } });
+    setView("edit");
+  };
   const start = async () => {
     setStarting(true); setError("");
     try { await onStart(sel.id, playerName.trim() || undefined); } catch (e) { setError(e.message); setStarting(false); }
@@ -147,7 +247,7 @@ export default function ScenarioModal({ onClose, onStart }) {
 
   if (view === "edit") {
     return (
-      <Modal title={editing?.id ? "Edit scenario" : "New scenario"} onClose={onClose} wide>
+      <Modal title={editing?.id ? "Edit card" : "New card"} onClose={onClose} wide>
         <Editor initial={editing?.initial ?? BLANK} id={editing?.id} onCancel={() => setView("pick")} onSaved={(saved) => { setView("pick"); load(saved.id); }} />
       </Modal>
     );
@@ -157,7 +257,7 @@ export default function ScenarioModal({ onClose, onStart }) {
     <Modal title="New game" onClose={onClose} wide footer={
       <>
         {error && <span className="error-text small grow">{error}</span>}
-        <input className="field" style={{ maxWidth: 220 }} placeholder="Your character's name (optional)" value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
+        <input className="field" style={{ maxWidth: 260 }} placeholder="Your character's name (optional)" value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
         <button className="btn primary" disabled={!sel || starting} onClick={start}>{starting ? "Starting…" : "Start game"}</button>
       </>
     }>
@@ -167,15 +267,15 @@ export default function ScenarioModal({ onClose, onStart }) {
             <div className="row gap center">
               <div className="scn-name grow">{s.name}</div>
               <button className="icon-btn" title="Edit" onClick={(e) => { e.stopPropagation(); edit(s.id); }}>✎</button>
-              <button className="icon-btn" title="Delete" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete scenario "${s.name}"? Your saved games stay.`)) api.deleteScenario(s.id).then(() => load()).catch((er) => setError(er.message)); }}>🗑</button>
+              <button className="icon-btn" title="Delete" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete card "${s.name}"? Your saved games stay.`)) api.deleteScenario(s.id).then(() => load()).catch((er) => setError(er.message)); }}>🗑</button>
             </div>
-            <div className="tag">{MODE_LABELS[s.mode]}</div>
+            <div><span className={`tag kind-${s.kind}`}>{KIND_LABELS[s.kind] || "Adventure"}</span><span className="tag">{MODE_LABELS[s.mode]}</span></div>
             <div className="muted small">{s.description}</div>
           </div>
         ))}
-        <div className="scn new" onClick={() => { setEditing({ id: null, initial: BLANK }); setView("edit"); }}>
+        <div className="scn new" onClick={create}>
           <div className="scn-plus">＋</div>
-          <div>Create a scenario</div>
+          <div>Create a card</div>
           <div className="muted small">Write your own or let the AI draft one from an idea</div>
         </div>
       </div>

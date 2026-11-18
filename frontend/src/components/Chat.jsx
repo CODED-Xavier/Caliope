@@ -98,11 +98,8 @@ const Message = memo(function Message({ m, isLast, isLastAssistant, onRegenerate
               {" "}· prompt ~{m.meta.timing.prompt_tokens} tokens
             </div>
           )}
-          {isLastAssistant && lastContext && (lastContext.skills.length > 0 || lastContext.memories.length > 0) && (
-            <div className="muted small ctx">
-              {lastContext.skills.length > 0 && <>🧩 {lastContext.skills.join(", ")} </>}
-              {lastContext.memories.length > 0 && <>🧠 {lastContext.memories.length} memor{lastContext.memories.length === 1 ? "y" : "ies"} recalled</>}
-            </div>
+          {isLastAssistant && lastContext && lastContext.memories.length > 0 && (
+            <div className="muted small ctx">🧠 {lastContext.memories.length} memor{lastContext.memories.length === 1 ? "y" : "ies"} recalled</div>
           )}
           {actions}
         </>
@@ -166,11 +163,8 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
               {stream.text ? <Markdown text={stream.text} /> : null}
               {stream.phase === "writing" && <span className="cursor">▍</span>}
               {PHASES[stream.phase] && <div className="muted small phase"><span className="spinner" /> {PHASES[stream.phase]}</div>}
-              {stream.context && (stream.context.skills.length > 0 || stream.context.memories.length > 0) && (
-                <div className="muted small ctx">
-                  {stream.context.skills.length > 0 && <>🧩 {stream.context.skills.join(", ")} </>}
-                  {stream.context.memories.length > 0 && <>🧠 {stream.context.memories.length} memories </>}
-                </div>
+              {stream.context && stream.context.memories.length > 0 && (
+                <div className="muted small ctx">🧠 {stream.context.memories.length} memories recalled</div>
               )}
             </div>
           )}

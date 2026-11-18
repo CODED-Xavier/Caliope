@@ -10,16 +10,81 @@
     "name": "Investigator",
     "class": "Investigator",
     "level": 1,
-    "hp": {"current": 10, "max": 10},
+    "hp": {
+      "current": 10,
+      "max": 10
+    },
     "ac": 11,
     "gold": 30,
-    "inventory": [{"name": "Royal seal", "qty": 1}, {"name": "Dagger", "qty": 1}, {"name": "Notebook", "qty": 1}],
+    "inventory": [
+      {
+        "name": "Royal seal",
+        "qty": 1
+      },
+      {
+        "name": "Dagger",
+        "qty": 1
+      },
+      {
+        "name": "Notebook",
+        "qty": 1
+      }
+    ],
     "location": "Palace of Aldermere"
   },
   "npcs": [
-    {"name": "Lady Seraphine Vael", "description": "The king's chancellor, elegant and calm, in her fifties.", "personality": "Calculating, polite, never answers directly. Protects the realm, or so she says.", "speech_style": "Formal, measured, uses questions to deflect.", "relationship": -10},
-    {"name": "Captain Doran Hale", "description": "Head of the palace guard, broad and scarred.", "personality": "Blunt, loyal to the king, distrusts courtiers and outsiders.", "speech_style": "Short sentences, soldier slang.", "relationship": 0},
-    {"name": "Wren", "description": "A young palace scribe who sees everything.", "personality": "Nervous, curious, secretly sells information.", "speech_style": "Quick, whispers, trails off when scared.", "relationship": 10}
+    {
+      "name": "Lady Seraphine Vael",
+      "description": "The king's chancellor, elegant and calm, in her fifties.",
+      "personality": "Calculating, polite, never answers directly. Protects the realm, or so she says.",
+      "speech_style": "Formal, measured, uses questions to deflect.",
+      "relationship": -10,
+      "appearance": {
+        "race": "Human",
+        "hair": "silver-streaked brown hair pinned in a tight bun",
+        "eyes": "grey",
+        "build": "tall and slim",
+        "skin": "pale",
+        "outfit": "high-collared dark blue court gowns",
+        "extra": "a thin silver chain of office"
+      }
+    },
+    {
+      "name": "Captain Doran Hale",
+      "description": "Head of the palace guard, broad and scarred.",
+      "personality": "Blunt, loyal to the king, distrusts courtiers and outsiders.",
+      "speech_style": "Short sentences, soldier slang.",
+      "relationship": 0,
+      "appearance": {
+        "race": "Human",
+        "hair": "cropped grey hair",
+        "eyes": "dark brown",
+        "build": "broad-shouldered and heavyset",
+        "skin": "weathered tan",
+        "outfit": "scuffed guard armor",
+        "extra": "a scar across the chin"
+      }
+    },
+    {
+      "name": "Wren",
+      "description": "A young palace scribe who sees everything.",
+      "personality": "Nervous, curious, secretly sells information.",
+      "speech_style": "Quick, whispers, trails off when scared.",
+      "relationship": 10,
+      "appearance": {
+        "race": "Human",
+        "hair": "messy sandy hair",
+        "eyes": "hazel",
+        "build": "small and wiry",
+        "skin": "freckled",
+        "outfit": "ink-stained scribe's robe",
+        "extra": "chews the end of her quill"
+      }
+    }
   ],
-  "skills": {"mode": "auto", "allow": [], "pinned": []}
+  "skills": {
+    "attached": []
+  },
+  "kind": "roleplay",
+  "species": []
 }

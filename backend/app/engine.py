@@ -9,17 +9,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import re
 import time
 from contextlib import aclosing
 from typing import AsyncIterator
 
+from .appearance import appearance_seed
+from .cards import resolve_features
 from .config import SettingsStore
 from .conversations import ConversationRepository, NotFound
 from .dice import DiceError, DiceRoller
 from .llm import LLMError
 from .memory import MemoryManager
-from .prompts import ANALYSIS_SCHEMA, PromptBuilder, reply_token_limit
+from .prompts import PromptBuilder, analysis_schema, reply_token_limit
 from .skills import SkillManager
 from .state import apply_state_updates, normalize_updates
 from .util import clamp, estimate_tokens, extract_json, truncate
@@ -68,6 +71,7 @@ class ChatEngine:
         self.skills = skills
         self.dice = dice
         self.prompts = PromptBuilder()
+        self.rng = random.Random()
         self._locks: dict[int, asyncio.Lock] = {}
 
     def _lock(self, conv_id: int) -> asyncio.Lock:
@@ -255,13 +259,18 @@ class ChatEngine:
         query = user_msg["content"] + (" " + previous_text[-300:] if previous_text else "")
         active = scene_names(npcs, user_msg["content"], previous_text)
         memories = await self.memory.search(conv_id, query, active_names=active)
-        skills = await self.skills.select(query, scenario.get("skills"))
+        skills = self.skills.attached((scenario.get("skills") or {}).get("attached", []))
+        features = resolve_features(scenario, settings)
+        hint = ""
+        if features["appearance_hints"] and scenario.get("mode") != "character":
+            hint = appearance_seed(self.rng, scenario.get("species") or [])
 
         messages, debug = self.prompts.build(
             scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=memories,
             skills=skills, history=history, settings=settings, pinned=conv.get("pinned_memory", ""),
+            appearance_hint=hint,
         )
-        yield {"type": "context", "debug": debug, "skills": [s["name"] for s in skills if s["name"] in debug["skills"]],
+        yield {"type": "context", "debug": debug, "skills": [s["name"] for s in skills],
                "memories": [m["text"] for m in memories][: debug["memories"]]}
 
         player_name = state["player"].get("name") or "Player"
@@ -315,17 +324,20 @@ class ChatEngine:
         assistant_msg = self.repo.add_message(conv_id, "assistant", reply, meta)
         yield {"type": "assistant_message", "message": self.repo.get_message(assistant_msg["id"])}
 
-        if settings["state_tracking"]:
-            yield {"type": "analysis_start"}
-            t0 = time.perf_counter()
-            result = await self._analyze(conv_id, scenario, user_msg["content"], reply, assistant_msg["id"], settings)
-            timing["tracker_s"] = round(time.perf_counter() - t0, 1)
-            if result is None:
-                await self._remember_exchange(conv_id, user_msg["content"], reply, assistant_msg["id"])
-            else:
-                yield {"type": "state", **result}
-        else:
+        tracker = features["tracker"]
+        if tracker == "off":
             await self._remember_exchange(conv_id, user_msg["content"], reply, assistant_msg["id"])
+        else:
+            count, exchanges = self._tracking_context(conv_id, features["tracker_interval"])
+            if count % features["tracker_interval"] == 0:  # the tracker runs every N replies and reads all N exchanges
+                yield {"type": "analysis_start"}
+                t0 = time.perf_counter()
+                result = await self._analyze(conv_id, scenario, exchanges, assistant_msg["id"], settings, tracker)
+                timing["tracker_s"] = round(time.perf_counter() - t0, 1)
+                if result is None:
+                    await self._remember_exchange(conv_id, user_msg["content"], reply, assistant_msg["id"])
+                else:
+                    yield {"type": "state", **result}
 
         if settings["auto_summary"]:
             t0 = time.perf_counter()
@@ -339,17 +351,34 @@ class ChatEngine:
             yield {"type": "timing", "timing": timing}
         yield {"type": "done"}
 
+    def _tracking_context(self, conv_id: int, interval: int) -> tuple[int, list[tuple[str, str]]]:
+        """(number of finished replies so far, the last `interval` exchanges as (player text, reply) pairs)."""
+        msgs = [m for m in self.repo.list_messages(conv_id) if not m["meta"].get("opening") and not m["meta"].get("interrupted")]
+        count = sum(1 for m in msgs if m["role"] == "assistant")
+        pairs: list[tuple[str, str]] = []
+        i = len(msgs) - 1
+        while i >= 1 and len(pairs) < interval:
+            if msgs[i]["role"] == "assistant" and msgs[i - 1]["role"] == "user":
+                pairs.append((msgs[i - 1]["content"], msgs[i]["content"]))
+                i -= 2
+            else:
+                i -= 1
+        pairs.reverse()
+        return count, pairs
+
     async def _remember_exchange(self, conv_id: int, user_text: str, reply: str, message_id: int) -> None:
         text = f"Player: {truncate(user_text, 200)} | Response: {truncate(reply, 300)}"
         await self.memory.add(conv_id, text, kind="exchange", importance=2, message_id=message_id)
 
-    async def _analyze(self, conv_id: int, scenario: dict, user_text: str, reply: str, message_id: int,
-                       settings: dict) -> dict | None:
+    async def _analyze(self, conv_id: int, scenario: dict, exchanges: list[tuple[str, str]], message_id: int,
+                       settings: dict, tracker: str = "full") -> dict | None:
+        user_text, reply = exchanges[-1]
         state = self.repo.get_state(conv_id)
         npcs = self.repo.list_npcs(conv_id)
-        prompt = self.prompts.analysis_messages(scenario=scenario, state=state, npcs=npcs, user_text=user_text, reply=reply)
+        prompt = self.prompts.analysis_messages(scenario=scenario, state=state, npcs=npcs, exchanges=exchanges, tracker=tracker)
         try:
-            raw = await self.llm.chat(prompt, json_schema=ANALYSIS_SCHEMA, temperature=0.2, max_tokens=700)
+            raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker), temperature=0.2,
+                                      max_tokens=700 if tracker == "full" else 450)
         except LLMError as exc:
             log.warning("State analysis failed: %s", exc)
             return None
@@ -359,10 +388,13 @@ class ChatEngine:
             return None
         updates = normalize_updates(data)
         mode = scenario.get("mode", "gm_world")
-        if mode == "character":  # character cards track the relationship, not a stat block
+        if tracker != "full" or mode == "character":
+            # Lite tracking and character cards never touch the sheet, even if the model returns such fields.
             for key in ("hp_change", "gold_change"):
                 updates[key] = 0
             updates["inventory_add"] = updates["inventory_remove"] = updates["quests"] = []
+            updates["new_locations"] = []
+        if mode == "character":
             updates["new_npcs"] = []
 
         new_state, changes = apply_state_updates(state, updates)
@@ -370,7 +402,8 @@ class ChatEngine:
 
         for npc in updates["new_npcs"]:
             if not self.repo.find_npc(conv_id, npc["name"]):
-                self.repo.add_npc(conv_id, npc["name"], description=npc["description"], personality=npc["personality"])
+                self.repo.add_npc(conv_id, npc["name"], description=npc["description"], personality=npc["personality"],
+                                  appearance=npc.get("appearance"))
                 changes.append(f"New character: {npc['name']}")
 
         max_step = int(settings["relationship_max_step"])

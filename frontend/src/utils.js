@@ -31,3 +31,9 @@ export function timeAgo(ts) {
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   return `${Math.floor(s / 86400)} d ago`;
 }
+
+export const KIND_LABELS = { roleplay: "Roleplay", adventure: "Adventure" };
+export const KIND_INFO = {
+  roleplay: { icon: "🎭", title: "Roleplay", text: "Characters, relationships and conversation. Simple and fast." },
+  adventure: { icon: "⚔️", title: "Adventure", text: "Rules, items, quests and map. More to track, slower." },
+};

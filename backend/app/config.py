@@ -42,11 +42,9 @@ DEFAULT_SETTINGS: dict = {
     "memory_char_budget": 900,    # characters of recalled facts added to each turn
     "memory_min_similarity": 0.40,
     "show_timing": True,
-    # --- Skills ---
-    "skills_top_k": 2,
-    "skills_min_score": 0.6,        # keyword matching threshold
-    "skills_min_similarity": 0.45,  # embedding matching threshold
-    "skills_char_budget": 3500,     # max characters of skill text injected per turn
+    # --- Cards and skills ---
+    "default_card_kind": "roleplay",  # type used for new cards: roleplay | adventure
+    "skills_char_budget": 3500,       # max characters of attached skill text shared by one card's skills
 }
 
 

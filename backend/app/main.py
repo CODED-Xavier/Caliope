@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from .cards import resolve_features
 from .config import BASE_DIR
 from .conversations import NotFound
 from .dice import DiceError
@@ -125,7 +126,7 @@ async def generate(body: dict[str, Any] = Body(...)):
     idea = str(body.get("idea", "")).strip()
     if not idea:
         raise ValueError("Describe the scenario idea.")
-    data = await generate_scenario(svc().llm, idea, body.get("mode", "gm_world"), body.get("language", "en"))
+    data = await generate_scenario(svc().llm, idea, body.get("mode", "gm_world"), body.get("language", "en"), body.get("kind"))
     return {"data": data}  # not saved yet: edit it, then POST /api/scenarios
 
 
@@ -183,6 +184,7 @@ def full_conversation(conv_id: int) -> dict:
         "npcs": s.conversations.list_npcs(conv_id),
         "memory_count": s.memory.count(conv_id),
         "pinned_limit": int(s.settings.get("pinned_memory_limit")),
+        "features": resolve_features(s.conversations.get(conv_id)["scenario"], s.settings.all()),
     }
 
 
@@ -277,6 +279,7 @@ async def create_npc(conv_id: int, body: dict[str, Any] = Body(...)):
     return svc().conversations.add_npc(
         conv_id, name, description=body.get("description", ""), personality=body.get("personality", ""),
         speech_style=body.get("speech_style", ""), relationship=int(body.get("relationship", 0)), notes=body.get("notes", ""),
+        appearance=body.get("appearance"),
     )
 
 
@@ -358,11 +361,10 @@ async def install_skill_zip(request: Request):
     return {"installed": names, "skills": svc().skills.list()}
 
 
-@app.get("/api/skills/select")
-async def preview_skill_selection(q: str = Query(...)):
-    """Debug helper: which skills would be injected for this message?"""
-    picked = await svc().skills.select(q, {"mode": "auto"})
-    return [{k: v for k, v in s.items() if k != "text"} for s in picked]
+@app.post("/api/skills/suggest")
+async def suggest_skills(body: dict[str, Any] = Body(...)):
+    """Ask the model, one time, which installed skills fit a card (it never runs during play)."""
+    return await svc().skills.suggest(str(body.get("text", "")), int(body.get("k", 3)))
 
 
 @app.patch("/api/skills/{name}")

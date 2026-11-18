@@ -181,3 +181,18 @@ textarea.field { resize: vertical; }
 .helptip-pop strong { font-size: 13px; }
 .section-title .helptip { margin-left: 4px; }
 .timing { margin-top: 6px; font-family: var(--sans); }
+
+/* card types */
+.kind-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0; }
+.kind { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 12px; background: var(--panel); border: 2px solid var(--border); border-radius: 12px; }
+.kind:hover { border-color: var(--muted); }
+.kind.active { border-color: var(--accent); background: var(--accent-soft); }
+.kind-icon { font-size: 22px; } .kind-title { font-weight: 600; font-family: var(--serif); font-size: 15px; }
+.tag.kind-roleplay { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.tag.kind-adventure { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.looks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.skill-pick { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 6px; background: var(--panel); }
+.skill-opt { display: flex; gap: 8px; align-items: flex-start; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+.skill-opt:hover { background: var(--bg2); } .skill-opt.dim { opacity: 0.45; }
+.chip.removable { cursor: pointer; } .chip.removable:hover { border-color: var(--bad); color: var(--bad); }
+.kind-badge { margin-left: 6px; }

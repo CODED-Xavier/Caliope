@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Modal from "./Modal.jsx";
 import HelpTip from "./HelpTip.jsx";
+import KindPicker from "./KindPicker.jsx";
 import { api } from "../api.js";
 
 function Row({ label, help, hint, children }) {
@@ -52,6 +53,10 @@ export default function SettingsModal({ onClose, onSaved }) {
         {health?.llm?.ok ? `Connected to ${health.llm.base_url}` : (health?.llm?.error || "Checking connection…")}
         <button className="btn small" onClick={loadModels}>Refresh</button>
       </div>
+
+      <h3>Play style <HelpTip id="default_card_kind" /></h3>
+      <KindPicker value={s.default_card_kind} onChange={(k) => set("default_card_kind", k)} />
+      <p className="muted tiny">The type new cards start with. Every card can change its own type and details in the card editor.</p>
 
       <h3>Model</h3>
       <Row label="Server address" help="llm_base_url" hint="LM Studio default: http://localhost:1234/v1">
@@ -118,7 +123,6 @@ export default function SettingsModal({ onClose, onSaved }) {
           <Row label="Facts recalled per turn" help="memory_top_k"><input className="field num" value={s.memory_top_k} onChange={num("memory_top_k", int)} /></Row>
           <Row label="Space for recalled facts (characters)" help="memory_char_budget"><input className="field num" value={s.memory_char_budget} onChange={num("memory_char_budget", int)} /></Row>
           <Row label="Memory box size (characters)" help="pinned_memory_limit"><input className="field num" value={s.pinned_memory_limit} onChange={num("pinned_memory_limit", int)} /></Row>
-          <Row label="Skills per message" help="skills_top_k"><input className="field num" value={s.skills_top_k} onChange={num("skills_top_k", int)} /></Row>
           <Row label="Max relationship change per turn" help="relationship_max_step"><input className="field num" value={s.relationship_max_step} onChange={num("relationship_max_step", int)} /></Row>
           <Row label="top_p" help="top_p"><input className="field num" value={s.top_p} onChange={num("top_p")} /></Row>
           <Row label="top_k" help="top_k"><input className="field num" value={s.top_k} onChange={num("top_k", int)} /></Row>
