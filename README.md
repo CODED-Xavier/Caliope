@@ -220,6 +220,7 @@ the AI writes a short description of the place and the free **Pollinations.ai** 
 
 **Models window (🧠 Models in the sidebar).** Like LM Studio's model page, inside the app:
 - *My models*: every .gguf on this PC (LM Studio's folder included). **Load** / **Unload** in the built-in engine, **Use for memory** for embedding models, **Deactivate** to hide a model from the lists without deleting it, 🗑 to delete it (asks first; only inside the model folders).
+- *Browse this PC*: use models you already have (LM Studio's, or any folder) without downloading them again. **Browse…** opens Windows' file picker (pick any .gguf; its folder is added), or paste a folder's address. Nothing is copied, and LM Studio doesn't need to be open. A moved LM Studio models folder is found automatically.
 - *Find more*: searches Hugging Face for GGUF models; open a result to see each size (Q4_K_M, Q4_K_S…) with a short note on quality and whether it fits an 8 GB card.
 - *Downloads*: progress and speed; Cancel pauses (Download again resumes), and every file is checked against Hugging Face's published checksum. New models go to LM Studio's folder, so both programs share them.
 

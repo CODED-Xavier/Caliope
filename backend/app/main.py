@@ -28,7 +28,7 @@ from .jukebox import MOODS as MUSIC_MOODS
 from .jukebox import MusicError
 from .rulebooks import RulebookError, ocr_available
 from .runtime import ENGINE_KEYS, EngineError
-from .modelhub import download_root
+from .modelhub import download_root, pick_model_file
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import is_pollinations, polite_fetch
 from .playerlore import parse_suggestions, suggest_prompt
@@ -1039,7 +1039,36 @@ async def engine_download():
 @app.get("/api/models/library")
 async def models_local():
     return {"models": await asyncio.to_thread(svc().models.local), "downloads": svc().models.list_downloads(),
-            "engine": svc().runtime.status(with_log=False), "folder": str(download_root())}
+            "engine": svc().runtime.status(with_log=False), "folder": str(download_root()),
+            "folders": await asyncio.to_thread(svc().models.folders)}
+
+
+_PICKER = asyncio.Lock()
+
+
+@app.post("/api/models/folders")
+async def models_add_folder(body: dict = Body(...)):
+    """Use models that are already on this PC (e.g. LM Studio's) without downloading them again."""
+    added = await asyncio.to_thread(svc().models.add_folder, str(body.get("path", "")))
+    return {"added": added, **(await models_local())}
+
+
+@app.post("/api/models/folders/remove")
+async def models_remove_folder(body: dict = Body(...)):
+    svc().models.remove_folder(str(body.get("path", "")))
+    return await models_local()
+
+
+@app.post("/api/models/browse")
+async def models_browse():
+    """Opens Windows' file picker on this PC; the folder of the chosen model is added."""
+    if _PICKER.locked():
+        raise HTTPException(409, "The file picker is already open (it may be behind this window).")
+    async with _PICKER:
+        picked = await asyncio.to_thread(pick_model_file)
+    if not picked:
+        return {"added": "", **(await models_local())}
+    return await models_add_folder({"path": picked})
 
 
 @app.get("/api/models/search")

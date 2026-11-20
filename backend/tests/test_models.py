@@ -162,3 +162,46 @@ class LocalTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FolderTests(Base):
+    def setUp(self):
+        super().setUp()
+        self._lm = modelhub.lmstudio_folder
+        modelhub.lmstudio_folder = lambda: None
+
+    def tearDown(self):
+        modelhub.lmstudio_folder = self._lm
+        super().tearDown()
+
+    def test_add_folder_lists_its_models(self):
+        other = self.tmp / "D" / "lmstudio-models" / "bartowski"
+        other.mkdir(parents=True)
+        (other / "Stheno-Q4_K_S.gguf").write_bytes(BLOB)
+        self.assertEqual(self.hub.local(), [])
+        added = self.hub.add_folder(f'"{other / "Stheno-Q4_K_S.gguf"}"')  # a pasted file path, with quotes
+        self.assertEqual(added, str(other.resolve()))
+        self.assertEqual([m["name"] for m in self.hub.local()], ["Stheno-Q4_K_S.gguf"])
+        self.assertTrue(any(f["added"] and f["path"] == added for f in self.hub.folders()))
+        self.hub.add_folder(str(other))  # adding twice keeps one entry
+        self.assertEqual(self.hub.added_folders(), [added])
+        self.hub.remove_folder(added)
+        self.assertEqual(self.hub.local(), [])
+        self.assertTrue((other / "Stheno-Q4_K_S.gguf").exists())  # removing a folder never deletes files
+
+    def test_bad_folders(self):
+        with self.assertRaises(ModelError):
+            self.hub.add_folder(str(self.tmp / "missing"))
+        empty = self.tmp / "empty"
+        empty.mkdir()
+        with self.assertRaises(ModelError):
+            self.hub.add_folder(str(empty))
+        with self.assertRaises(ModelError):
+            self.hub.add_folder(str(Path.home()))
+
+    def test_lmstudio_moved_folder(self):
+        moved = self.tmp / "E" / "models"
+        moved.mkdir(parents=True)
+        (moved / "x-Q4_K_M.gguf").write_bytes(BLOB)
+        modelhub.lmstudio_folder = lambda: moved
+        self.assertEqual([m["name"] for m in self.hub.local()], ["x-Q4_K_M.gguf"])

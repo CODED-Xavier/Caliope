@@ -43,6 +43,7 @@ DEFAULT_SETTINGS: dict = {
     # --- AI engine: LM Studio (default) or the built-in llama.cpp engine ---
     "ai_engine": "lmstudio",      # lmstudio | builtin
     "engine_model_path": "",      # .gguf file for the story model
+    "model_folders": "",          # extra folders with .gguf models (one per line), added in the Models window
     "engine_embedding_path": "",  # optional .gguf embedding model (memory search by meaning)
     "engine_port": 8091,
     "engine_gpu_layers": "auto",  # auto | all | a number (lower it when video memory runs out)

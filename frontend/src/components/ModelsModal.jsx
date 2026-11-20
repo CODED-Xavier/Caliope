@@ -45,7 +45,7 @@ export default function ModelsModal({ onClose }) {
       </div>
 
       <div className="tabs models-tabs">
-        {[["mine", "My models"], ["find", "Find more"], ["dl", `Downloads${active ? ` (${active})` : ""}`]].map(([k, label]) => (
+        {[["mine", "My models"], ["files", "Browse this PC"], ["find", "Find more"], ["dl", `Downloads${active ? ` (${active})` : ""}`]].map(([k, label]) => (
           <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
@@ -53,7 +53,7 @@ export default function ModelsModal({ onClose }) {
 
       {tab === "mine" && (
         <div>
-          {data && !data.models.length && <p className="muted">No models yet. Use <b>Find more</b> to download one (for example Stheno, about 4.7 GB).</p>}
+          {data && !data.models.length && <p className="muted">No models yet. Already have one (LM Studio)? Use <b>Browse this PC</b>. Or use <b>Find more</b> to download one (for example Stheno, about 4.7 GB).</p>}
           {(data?.models || []).map((m) => (
             <div key={m.path} className={`card model-row ${m.disabled ? "off" : ""}`}>
               <div className="grow">
@@ -91,6 +91,8 @@ export default function ModelsModal({ onClose }) {
           {data && <p className="muted tiny">Models are kept in {data.folder} (LM Studio sees them too). Deactivated models stay on disk but leave the model lists.</p>}
         </div>
       )}
+
+      {tab === "files" && <FolderPicker data={data} setData={setData} setErr={setErr} onAdded={() => setTab("mine")} />}
 
       {tab === "find" && <Finder onDownloaded={() => setTab("dl")} setErr={setErr} />}
 
@@ -186,6 +188,51 @@ function Finder({ onDownloaded, setErr }) {
         </div>
       ))}
       <p className="muted tiny">Downloads come from huggingface.co and are checked against the checksum it publishes. Some models need a Hugging Face login; those are skipped.</p>
+    </div>
+  );
+}
+
+
+function FolderPicker({ data, setData, setErr, onAdded }) {
+  const [path, setPath] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const run = async (fn) => {
+    setBusy(true); setErr(""); setNote("");
+    try {
+      const res = await fn();
+      setData(res);
+      if (res.added) { setNote(`Added ${res.added}`); setPath(""); onAdded(); }
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div>
+      <p className="muted small">
+        Already have models (for example from LM Studio)? Point the app at them and use them without downloading again.
+        Nothing is copied or moved, and LM Studio doesn't need to be open: the app's own engine runs them.
+      </p>
+      <div className="row gap">
+        <button className="btn primary" disabled={busy} onClick={() => run(api.browseModel)}>📂 Browse…</button>
+        <span className="muted tiny">pick any .gguf file; its whole folder is added</span>
+      </div>
+      <div className="row gap" style={{ marginTop: 10 }}>
+        <input className="grow" value={path} placeholder="or paste a folder's address, e.g. D:\AI\models"
+          onChange={(e) => setPath(e.target.value)} onKeyDown={(e) => e.key === "Enter" && path.trim() && run(() => api.addModelFolder(path))} />
+        <button className="btn" disabled={busy || !path.trim()} onClick={() => run(() => api.addModelFolder(path))}>Add</button>
+      </div>
+      {note && <p className="small">{note}</p>}
+      <h4 style={{ marginTop: 16 }}>Folders the app looks in</h4>
+      {(data?.folders || []).map((f) => (
+        <div key={f.path} className="card model-row">
+          <div className="grow">
+            <div className="tiny" style={{ wordBreak: "break-all" }}>{f.path}</div>
+            <div className="muted tiny">{f.added ? (f.exists ? "added by you" : "added by you · not found (drive unplugged?)") : "found automatically"}</div>
+          </div>
+          {f.added && <button className="btn small ghost" disabled={busy} title="Stop looking here (the files stay on disk)"
+            onClick={() => run(() => api.removeModelFolder(f.path))}>Remove</button>}
+        </div>
+      ))}
+      {data && !(data.folders || []).length && <p className="muted tiny">No model folders yet.</p>}
     </div>
   );
 }

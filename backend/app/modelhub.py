@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import re
 import shutil
@@ -48,8 +49,46 @@ class ModelError(ValueError):
     pass
 
 
-def model_roots() -> list[Path]:
-    return list(runtime.MODEL_DIRS)
+def lmstudio_folder() -> Path | None:
+    """LM Studio's models folder when it was moved in LM Studio's settings (e.g. to another drive)."""
+    try:
+        data = json.loads((Path.home() / ".lmstudio" / "settings.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    folder = data.get("downloadsFolder") if isinstance(data, dict) else None
+    return Path(folder) if isinstance(folder, str) and folder.strip() else None
+
+
+def model_roots(extra: list[str] | tuple = ()) -> list[Path]:
+    roots = list(runtime.MODEL_DIRS)
+    lm = lmstudio_folder()
+    if lm:
+        roots.append(lm)
+    roots += [Path(p) for p in extra]
+    out, seen = [], set()
+    for r in roots:
+        key = str(r).lower().rstrip("\\/")
+        if key not in seen:
+            seen.add(key)
+            out.append(r)
+    return out
+
+
+def pick_model_file() -> str:
+    """Open Windows' own file picker on this PC and return the chosen .gguf ('' when cancelled)."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except ImportError as exc:  # Python without Tk
+        raise ModelError("The file picker is not available here. Paste the folder's address instead.") from exc
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)  # above the game window
+    try:
+        return filedialog.askopenfilename(parent=root, title="Pick a model file (.gguf)",
+                                          filetypes=[("Models", "*.gguf"), ("All files", "*.*")]) or ""
+    finally:
+        root.destroy()
 
 
 def download_root() -> Path:
@@ -72,12 +111,12 @@ def quant_note(q: str) -> str:
     return QUANT_NOTE.get(q, "")
 
 
-def inside_roots(path: Path) -> bool:
+def inside_roots(path: Path, roots: list[Path] | None = None) -> bool:
     try:
         rp = path.resolve()
     except OSError:
         return False
-    return any(r.exists() and r.resolve() in rp.parents for r in model_roots())
+    return any(r.exists() and r.resolve() in rp.parents for r in (roots if roots is not None else model_roots()))
 
 
 class ModelHub:
@@ -92,6 +131,43 @@ class ModelHub:
         self._tasks: dict[str, asyncio.Task] = {}
 
     # ------------------------------------------------------------------ on this PC
+    def added_folders(self) -> list[str]:
+        return [x.strip() for x in str(self._get().get("model_folders") or "").splitlines() if x.strip()]
+
+    def roots(self) -> list[Path]:
+        return model_roots(self.added_folders())
+
+    def folders(self) -> list[dict]:
+        """Where the app looks for models: its own and LM Studio's folders, plus the ones you added."""
+        added = {a.lower().rstrip("\\/") for a in self.added_folders()}
+        out = []
+        for r in self.roots():
+            mine = str(r).lower().rstrip("\\/") in added
+            if r.exists() or mine:
+                out.append({"path": str(r), "added": mine, "exists": r.is_dir()})
+        return out
+
+    def add_folder(self, path: str) -> str:
+        p = Path(str(path or "").strip().strip('"')).expanduser()
+        if p.suffix.lower() == ".gguf" and p.is_file():
+            p = p.parent  # a model file: use the folder it is in
+        if not str(path or "").strip() or not p.is_dir():
+            raise ModelError(f"Folder not found: {path}")
+        p = p.resolve()
+        if p.parent == p or p == Path.home().resolve():
+            raise ModelError("Pick the folder that has your models, not a whole drive or your user folder (searching it would be very slow).")
+        if not any(True for _ in p.rglob("*.gguf")):
+            raise ModelError(f"No .gguf model files were found in {p}.")
+        current = self.added_folders()
+        if str(p).lower() not in {c.lower().rstrip("\\/") for c in current} and not any(
+                str(r).lower().rstrip("\\/") == str(p).lower() for r in model_roots()):
+            self._update({"model_folders": "\n".join(current + [str(p)])})
+        return str(p)
+
+    def remove_folder(self, path: str) -> None:
+        key = str(path or "").lower().rstrip("\\/")
+        self._update({"model_folders": "\n".join(a for a in self.added_folders() if a.lower().rstrip("\\/") != key)})
+
     def disabled(self) -> set[str]:
         return {r["path"] for r in self.db.query("SELECT path FROM model_prefs WHERE disabled = 1")}
 
@@ -101,7 +177,7 @@ class ModelHub:
         st = self.engine.status(with_log=False)
         running = st["state"] in ("ready", "starting")
         out = []
-        for m in runtime.find_models(model_roots()):
+        for m in runtime.find_models(self.roots()):
             split = SPLIT_RE.search(m["name"])
             if split and split.group(1) != "00001":
                 continue  # later parts of a split model are shown as one model
@@ -121,7 +197,7 @@ class ModelHub:
 
     async def delete(self, path: str) -> None:
         p = Path(path)
-        if p.suffix.lower() != ".gguf" or not p.is_file() or not inside_roots(p):
+        if p.suffix.lower() != ".gguf" or not p.is_file() or not inside_roots(p, self.roots()):
             raise ModelError("Only .gguf files inside the model folders can be deleted here.")
         s = self._get()
         if path in (s.get("engine_model_path"), s.get("engine_embedding_path")):
@@ -138,7 +214,7 @@ class ModelHub:
             f.unlink()
         self.set_disabled(path, False)
         folder = p.parent  # tidy up empty author/repo folders
-        roots = {r.resolve() for r in model_roots() if r.exists()}
+        roots = {r.resolve() for r in self.roots() if r.exists()}
         while folder.resolve() not in roots and folder.exists() and not any(folder.iterdir()):
             folder.rmdir()
             folder = folder.parent
@@ -176,7 +252,7 @@ class ModelHub:
             g = groups.setdefault(key, {"name": Path(key).name if split else Path(path).name, "parts": [], "size": 0})
             g["parts"].append({"path": path, "size": size, "sha256": sha})
             g["size"] += size
-        installed = {m["name"] for m in runtime.find_models(model_roots())}
+        installed = {m["name"] for m in runtime.find_models(self.roots())}
         out = []
         for g in groups.values():
             g["parts"].sort(key=lambda x: x["path"])

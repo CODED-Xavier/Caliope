@@ -56,7 +56,7 @@ def main() -> int:
         "--add-data", f"{FRONTEND / 'dist'}{SEP}frontend_dist",
         "--add-data", f"{BACKEND / 'app' / 'seed'}{SEP}app/seed",
         "--collect-submodules", "app", "--collect-submodules", "uvicorn",
-        "--collect-all", "pypdfium2", "--hidden-import", "pytesseract",
+        "--collect-all", "pypdfium2", "--hidden-import", "pytesseract", "--hidden-import", "tkinter.filedialog",
         *(["--icon", str(icon)] if icon.is_file() else []),
     ])
     built = WORK / "dist" / "LocalRPG"
