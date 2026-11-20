@@ -5,11 +5,12 @@ import json
 
 from .appearance import normalize_appearance
 from .db import Database
-from .scenarios import normalize_scenario
+from .scenarios import normalize_portraits, normalize_scenario
 from .state import new_state
-from .util import clamp, now
+from .portraits import process_reply
+from .util import clamp, now, render_macros
 
-NPC_COLUMNS = ("name", "description", "personality", "speech_style", "appearance", "relationship", "notes", "active", "is_main")
+NPC_COLUMNS = ("name", "description", "personality", "speech_style", "appearance", "portraits", "in_prompt", "met", "relationship", "notes", "active", "is_main")
 
 
 class NotFound(Exception):
@@ -42,11 +43,18 @@ class ConversationRepository:
                     personality=npc.get("personality", ""),
                     speech_style=npc.get("speech_style", ""),
                     appearance=npc.get("appearance"),
+                    portraits=npc.get("portraits"),
+                    in_prompt=npc.get("in_prompt", True),
+                    met=npc.get("met", True),
                     relationship=npc.get("relationship", 0),
                     is_main=1 if (data["mode"] == "character" and i == 0) else 0,
                 )
             if data.get("opening_message"):
-                self.add_message(conv_id, "assistant", data["opening_message"], {"opening": True})
+                opening = render_macros(data["opening_message"], player_name or state["player"].get("name") or "the player", snapshot["name"])
+                opening, extra, met = process_reply(opening, self.list_npcs(conv_id))
+                for npc_id in met:
+                    self.update_npc(npc_id, met=True)
+                self.add_message(conv_id, "assistant", opening, {"opening": True, **extra})
         return self.get(conv_id)
 
     def get(self, conv_id: int) -> dict:
@@ -183,8 +191,14 @@ class ConversationRepository:
             row["appearance"] = json.loads(row.get("appearance") or "{}")
         except ValueError:
             row["appearance"] = {}
+        try:
+            row["portraits"] = normalize_portraits(json.loads(row.get("portraits") or "{}"))
+        except ValueError:
+            row["portraits"] = normalize_portraits({})
         row["active"] = bool(row["active"])
         row["is_main"] = bool(row["is_main"])
+        row["in_prompt"] = bool(row.get("in_prompt", 1))
+        row["met"] = bool(row.get("met", 1))
         return row
 
     def get_npc(self, npc_id: int) -> dict:
@@ -208,15 +222,17 @@ class ConversationRepository:
         return None
 
     def add_npc(self, conv_id: int, name: str, description: str = "", personality: str = "", speech_style: str = "",
-                relationship: int = 0, is_main: int = 0, notes: str = "", appearance: dict | None = None) -> dict:
+                relationship: int = 0, is_main: int = 0, notes: str = "", appearance: dict | None = None,
+                portraits: dict | None = None, in_prompt: bool = True, met: bool = True) -> dict:
         existing = self.db.query_one("SELECT * FROM npcs WHERE conversation_id = ? AND name = ? COLLATE NOCASE", (conv_id, name))
         if existing:
             return self._npc(existing)
         cur = self.db.execute(
-            "INSERT INTO npcs(conversation_id, name, description, personality, speech_style, appearance, relationship, notes, active, is_main, created_at) "
-            "VALUES(?,?,?,?,?,?,?,?,1,?,?)",
+            "INSERT INTO npcs(conversation_id, name, description, personality, speech_style, appearance, portraits, in_prompt, met, "
+            "relationship, notes, active, is_main, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
             (conv_id, name.strip(), description, personality, speech_style,
-             json.dumps(normalize_appearance(appearance), ensure_ascii=False), int(clamp(relationship, -100, 100)), notes, int(is_main), now()),
+             json.dumps(normalize_appearance(appearance), ensure_ascii=False), json.dumps(normalize_portraits(portraits), ensure_ascii=False),
+             1 if in_prompt else 0, 1 if met else 0, int(clamp(relationship, -100, 100)), notes, int(is_main), now()),
         )
         return self.get_npc(cur.lastrowid)
 
@@ -230,7 +246,9 @@ class ConversationRepository:
                 value = int(clamp(int(value), -100, 100))
             if key == "appearance":
                 value = json.dumps(normalize_appearance(value), ensure_ascii=False)
-            if key in ("active", "is_main"):
+            if key == "portraits":
+                value = json.dumps(normalize_portraits(value), ensure_ascii=False)
+            if key in ("active", "is_main", "in_prompt", "met"):
                 value = 1 if value else 0
             sets.append(f"{key} = ?")
             params.append(value)
@@ -272,15 +290,18 @@ class ConversationRepository:
             for npc_id, n in saved.items():
                 if npc_id in current:
                     self.db.execute(
-                        "UPDATE npcs SET description=?, personality=?, speech_style=?, appearance=?, relationship=?, notes=?, active=?, is_main=? WHERE id=?",
+                        "UPDATE npcs SET description=?, personality=?, speech_style=?, appearance=?, portraits=?, in_prompt=?, met=?, "
+                        "relationship=?, notes=?, active=?, is_main=? WHERE id=?",
                         (n["description"], n["personality"], n["speech_style"], json.dumps(n.get("appearance") or {}, ensure_ascii=False),
+                         json.dumps(n.get("portraits") or {}, ensure_ascii=False), int(n.get("in_prompt", True)), int(n.get("met", True)),
                          n["relationship"], n["notes"], int(n["active"]), int(n["is_main"]), npc_id),
                     )
                 else:
                     self.db.execute(
-                        "INSERT INTO npcs(id, conversation_id, name, description, personality, speech_style, appearance, relationship, notes, active, is_main, created_at) "
-                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "INSERT INTO npcs(id, conversation_id, name, description, personality, speech_style, appearance, portraits, in_prompt, met, "
+                        "relationship, notes, active, is_main, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (npc_id, conv_id, n["name"], n["description"], n["personality"], n["speech_style"],
-                         json.dumps(n.get("appearance") or {}, ensure_ascii=False), n["relationship"], n["notes"],
+                         json.dumps(n.get("appearance") or {}, ensure_ascii=False), json.dumps(n.get("portraits") or {}, ensure_ascii=False),
+                         int(n.get("in_prompt", True)), int(n.get("met", True)), n["relationship"], n["notes"],
                          int(n["active"]), int(n["is_main"]), n["created_at"]),
                     )

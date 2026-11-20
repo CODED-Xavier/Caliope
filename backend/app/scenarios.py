@@ -14,9 +14,98 @@ from pathlib import Path
 from .appearance import normalize_appearance
 from .cards import KINDS, default_kind, normalize_features
 from .db import Database
+from .status import split_template
 from .util import extract_json, now, slugify, truncate
 
 MODES = ("gm_world", "gm_cast", "character")
+
+
+def _clip(value, limit: int) -> str:
+    return str(value or "").replace("\r\n", "\n")[:limit]
+
+
+def _url(value) -> str:
+    v = str(value or "").strip()
+    return v if v.startswith(("http://", "https://", "/")) and len(v) < 600 else ""
+
+
+def normalize_portraits(raw) -> dict:
+    """{"default": url, "moods": [{"n": 2, "label": "Happy", "url": url}, ...]} (at most 12 moods)."""
+    if not isinstance(raw, dict):
+        return {"default": "", "moods": []}
+    moods = []
+    for m in raw.get("moods", [])[:12] if isinstance(raw.get("moods"), list) else []:
+        if isinstance(m, dict) and _url(m.get("url")) and str(m.get("label", "")).strip():
+            try:
+                n = int(m["n"]) if m.get("n") not in (None, "") else None
+            except (TypeError, ValueError):
+                n = None
+            moods.append({"n": n, "label": str(m["label"]).strip()[:40], "url": _url(m["url"])})
+    return {"default": _url(raw.get("default")), "moods": moods}
+
+
+def normalize_lorebook(raw) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    entries = []
+    for i, e in enumerate(raw.get("entries", [])[:300] if isinstance(raw.get("entries"), list) else []):
+        if not isinstance(e, dict) or not str(e.get("content", "")).strip():
+            continue
+
+        def keys(v):
+            return [str(k).strip()[:60] for k in v[:30] if str(k).strip()] if isinstance(v, list) else []
+
+        def num(v, default=0):
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                return default
+
+        entries.append({
+            "id": num(e.get("id"), i + 1),
+            "name": _clip(e.get("name") or e.get("comment") or f"Entry {i + 1}", 80),
+            "keys": keys(e.get("keys")),
+            "secondary_keys": keys(e.get("secondary_keys")),
+            "content": _clip(e.get("content"), 6000),
+            "enabled": bool(e.get("enabled", True)),
+            "constant": bool(e.get("constant", False)),
+            "selective": bool(e.get("selective", False)),
+            "case_sensitive": bool(e.get("case_sensitive", False)),
+            "priority": num(e.get("priority"), 0),
+            "insertion_order": num(e.get("insertion_order"), 100),
+        })
+    return {
+        "name": _clip(raw.get("name"), 100),
+        "description": _clip(raw.get("description"), 400),
+        "scan_depth": max(1, min(20, int(raw.get("scan_depth", 4) or 4))),
+        "token_budget": max(100, min(4000, int(raw.get("token_budget", 800) or 800))),
+        "entries": entries,
+    }
+
+
+def normalize_information(raw) -> dict:
+    """The long texts of a card (what a character card calls description, scenario, post-history...)."""
+    raw = raw if isinstance(raw, dict) else {}
+    post = _clip(raw.get("post_history"), 8000)
+    has_template = split_template(post)[1] is not None
+    try:
+        every = int(raw.get("status_every")) if raw.get("status_every") not in (None, "") else (3 if has_template else 0)
+    except (TypeError, ValueError):
+        every = 3 if has_template else 0
+    tags = raw.get("tags", [])
+    return {
+        "description": _clip(raw.get("description"), 20000),
+        "scenario": _clip(raw.get("scenario"), 4000),
+        "personality": _clip(raw.get("personality"), 4000),
+        "system_prompt": _clip(raw.get("system_prompt"), 8000),
+        "post_history": post,
+        "post_history_position": "start" if raw.get("post_history_position") == "start" else "end",
+        "example_messages": _clip(raw.get("example_messages"), 8000),
+        "creator_notes": _clip(raw.get("creator_notes"), 4000),
+        "tags": [str(t).strip()[:30] for t in tags[:20] if str(t).strip()] if isinstance(tags, list) else [],
+        "creator": _clip(raw.get("creator"), 100),
+        "version": _clip(raw.get("version"), 20),
+        "status_every": max(0, min(10, every)),
+    }
 
 
 def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
@@ -38,6 +127,9 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
                 "personality": truncate(str(n.get("personality", "")), 600),
                 "speech_style": truncate(str(n.get("speech_style", "")), 300),
                 "appearance": normalize_appearance(n.get("appearance")),
+                "portraits": normalize_portraits(n.get("portraits")),
+                "in_prompt": bool(n.get("in_prompt", True)),
+                "met": bool(n.get("met", True)),
                 "relationship": max(-100, min(100, rel)),
                 "active": bool(n.get("active", True)),
             }
@@ -62,6 +154,9 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "world": str(raw.get("world", "")),
         "tone": str(raw.get("tone", "")),
         "species": species,
+        "information": normalize_information(raw.get("information")),
+        "lorebook": normalize_lorebook(raw.get("lorebook")),
+        "alternate_openings": [_clip(x, 6000) for x in raw.get("alternate_openings", [])[:10] if str(x).strip()] if isinstance(raw.get("alternate_openings"), list) else [],
         "opening_message": str(raw.get("opening_message", "")),
         "player": raw.get("player") if isinstance(raw.get("player"), dict) else {},
         "npcs": npcs,

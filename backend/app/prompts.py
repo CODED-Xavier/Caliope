@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from .appearance import appearance_line
-from .util import estimate_tokens, truncate
+from .portraits import portrait_instructions
+from .status import split_template
+from .util import estimate_tokens, render_macros, truncate
 
 LANGUAGE_DIRECTIVES = {
     "en": "Write everything in English.",
@@ -152,7 +154,8 @@ class PromptBuilder:
 
     def build(self, *, scenario: dict, state: dict, npcs: list[dict], summary: str, memories: list[dict],
               skills: list[dict], history: list[dict], settings: dict, pinned: str = "",
-              appearance_hint: str = "") -> tuple[list[dict], dict]:
+              appearance_hint: str = "", lore: tuple[list[dict], list[dict]] = ([], []),
+              status_due: bool | None = None, player_name: str = "") -> tuple[list[dict], dict]:
         """Return (messages, debug_info). History items need id, role, content and meta."""
         ctx = int(settings["context_window"])
         reserve = reply_token_limit(settings) + 150
@@ -165,7 +168,13 @@ class PromptBuilder:
         if opening:
             history = [h for h in history if h is not opening]
 
-        sections = self._stable_sections(scenario, npcs, summary, pinned, language, settings, mode, opening, skills)
+        # Characters only listed in the lorebook ("in_prompt" off) reach the model through their lorebook entry.
+        card_name = scenario.get("name") or ""
+        main = next((n for n in npcs if n.get("is_main")), None)
+        macro = lambda t: render_macros(t or "", player_name or "the player", main["name"] if main else card_name)
+        prompt_npcs = [n for n in npcs if n.get("in_prompt", True)]
+        sections = self._stable_sections(scenario, prompt_npcs, summary, pinned, language, settings, mode, opening, skills)
+        sections.update(self._card_sections(scenario, npcs, lore[0], macro))
         dropped: list[str] = []
         cap = int(ctx * 0.55)
         if estimate_tokens(self._join(sections)) > cap and "opening" in sections:
@@ -177,7 +186,9 @@ class PromptBuilder:
         system_text = self._join(sections)
 
         used_memories = fit_memories(memories, mem_budget)
-        volatile = self._volatile(state, npcs, used_memories, mode, appearance_hint)
+        met = [n for n in npcs if n.get("met", True)]
+        extra = self._card_volatile(scenario, lore[1], status_due, macro)
+        volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra)
         budget = ctx - reserve - estimate_tokens(system_text) - estimate_tokens(volatile)
 
         kept: list[dict] = []
@@ -196,7 +207,7 @@ class PromptBuilder:
             fresh = [m for m in used_memories if m.get("message_id") is None or m["message_id"] < first_id]
             if len(fresh) != len(used_memories):
                 used_memories = fresh
-                volatile = self._volatile(state, npcs, used_memories, mode, appearance_hint)
+                volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra)
 
         # Many chat templates require the first turn after the system prompt to come from the user.
         while kept and kept[0]["role"] == "assistant" and len(kept) > 1:
@@ -230,6 +241,8 @@ class PromptBuilder:
             "dropped_sections": dropped,
             "skills": [s["name"] for s in skills],
             "memories": len(used_memories),
+            "lore_entries": [e["name"] or (e["keys"][:1] or ["?"])[0] for e in lore[0] + lore[1]],
+            "status_due": bool(status_due),
         }
         return messages, debug
 
@@ -275,7 +288,57 @@ class PromptBuilder:
         return sec
 
     @staticmethod
-    def _volatile(state, npcs, memories, mode, appearance_hint: str = "") -> str:
+    def _card_sections(scenario: dict, npcs: list[dict], always_lore: list[dict], macro) -> dict[str, str]:
+        """Stable parts that come from an imported card: its long texts, always-on lore, portrait rules."""
+        info = scenario.get("information") or {}
+        sec: dict[str, str] = {}
+        if info.get("system_prompt"):
+            sec["card_system"] = "## Card instructions\n" + macro(info["system_prompt"]).strip()
+        if info.get("description"):
+            sec["card_description"] = "## Card\n" + macro(info["description"]).strip()
+        if info.get("personality"):
+            sec["card_personality"] = "## Personality\n" + macro(info["personality"]).strip()
+        if info.get("scenario"):
+            sec["card_scenario"] = "## Scenario\n" + macro(info["scenario"]).strip()
+        if always_lore:
+            sec["lore_always"] = "## World info\n" + "\n\n".join(macro(e["content"]).strip() for e in always_lore)
+        if info.get("example_messages"):
+            examples = macro(info["example_messages"]).replace("<START>", "").strip()
+            sec["card_examples"] = "## Example of the writing style (not part of the story)\n" + truncate(examples, 3000)
+        rules = []
+        features = scenario.get("features") or {}
+        if info and features.get("relationships", "app") == "app":
+            rules.append("Relationships use the app's scale from -100 to +100 shown in the GM notes. Ignore any other "
+                         "affinity scale the card mentions (for example -3 to +3) and never write affinity scores yourself.")
+        if info.get("status_every"):
+            rules.append("Only write the INFO status block when the GM notes ask for it.")
+        pics = portrait_instructions(npcs)
+        if pics:
+            rules.append("Use the portrait format below instead of any image-link format the card describes.")
+            sec["portraits"] = pics
+        if rules:
+            sec["card_overrides"] = "## App rules (they win over the card)\n" + "\n".join(f"- {r}" for r in rules)
+        return sec
+
+    @staticmethod
+    def _card_volatile(scenario: dict, triggered: list[dict], status_due: bool | None, macro) -> str:
+        """Per-turn parts from a card: lorebook entries whose keywords came up, the card's reminders, the status block."""
+        info = scenario.get("information") or {}
+        parts: list[str] = []
+        if triggered:
+            parts.append("## World info (relevant right now)\n" + "\n\n".join(macro(e["content"]).strip() for e in triggered))
+        rules, template = split_template(info.get("post_history") or "")
+        if rules.strip():
+            parts.append("## Card reminders\n" + macro(rules).strip())
+        if template and status_due is not None:
+            if status_due:
+                parts.append("## Status block\nEnd THIS reply with the status block, exactly in this format:\n" + macro(template))
+            else:
+                parts.append("## Status block\nDo not write the INFO status block in this reply.")
+        return "\n\n".join(parts)
+
+    @staticmethod
+    def _volatile(state, npcs, memories, mode, appearance_hint: str = "", extra: str = "") -> str:
         parts: list[str] = []
         if mode != "character":
             parts.append("## Current game state\n" + describe_state(state))
@@ -288,6 +351,8 @@ class PromptBuilder:
             parts.append("## Relevant memories\n" + "\n".join(f"- {m['text']}" for m in memories))
         if appearance_hint:
             parts.append(f"## New characters\nIf you introduce a new named character this turn, give them: {appearance_hint}.")
+        if extra:  # card reminders go last, closest to the player's message, as cards expect
+            parts.append(extra)
         return "\n\n".join(parts)
 
     # ----------------------------------------------------- analysis / summarizing

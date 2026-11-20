@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS npcs (
     personality     TEXT NOT NULL DEFAULT '',
     speech_style    TEXT NOT NULL DEFAULT '',
     appearance      TEXT NOT NULL DEFAULT '',
+    portraits       TEXT NOT NULL DEFAULT '',
+    in_prompt       INTEGER NOT NULL DEFAULT 1,
+    met             INTEGER NOT NULL DEFAULT 1,
     relationship    INTEGER NOT NULL DEFAULT 0,
     notes           TEXT NOT NULL DEFAULT '',
     active          INTEGER NOT NULL DEFAULT 1,
@@ -141,6 +144,9 @@ class Database:
         self._ensure_column("conversations", "pinned_memory", "TEXT NOT NULL DEFAULT ''")
         self._ensure_column("memories", "participants", "TEXT NOT NULL DEFAULT ''")
         self._ensure_column("npcs", "appearance", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column("npcs", "portraits", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column("npcs", "in_prompt", "INTEGER NOT NULL DEFAULT 1")
+        self._ensure_column("npcs", "met", "INTEGER NOT NULL DEFAULT 1")
 
     @contextmanager
     def transaction(self):

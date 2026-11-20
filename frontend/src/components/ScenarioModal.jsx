@@ -63,11 +63,147 @@ function SkillPicker({ attached, onChange, cardText }) {
   );
 }
 
+/* ------------------------------------------------------------ card import */
+function ImportView({ onCancel, onImported }) {
+  const [card, setCard] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [name, setName] = useState("");
+  const [skip, setSkip] = useState([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const readFile = async (file) => {
+    setError(""); setPreview(null);
+    if (!file) return;
+    try {
+      const obj = JSON.parse(await file.text());
+      const r = await api.previewCard(obj);
+      setCard(obj); setPreview(r); setName(r.scenario.name); setSkip([]);
+    } catch (e) {
+      setError(e instanceof SyntaxError ? "This file is not valid JSON. Character cards saved as PNG images are not supported yet: export the card as JSON." : e.message);
+    }
+  };
+  const save = async () => {
+    setBusy(true); setError("");
+    try { onImported(await api.importCard(card, skip, name)); } catch (e) { setError(e.message); setBusy(false); }
+  };
+  const sc = preview?.scenario;
+  const sm = preview?.summary;
+  const toggle = (n) => setSkip(skip.includes(n) ? skip.filter((x) => x !== n) : [...skip, n]);
+
+  return (
+    <>
+      <p className="muted small">Import a character card in JSON format (Character Card V2, the format used by SillyTavern and most card sites), or a card exported from this app.</p>
+      <input type="file" accept=".json,application/json" onChange={(e) => readFile(e.target.files?.[0])} />
+      {error && <div className="error-text small">{error}</div>}
+      {preview && (
+        <>
+          <label className="lbl">Name</label>
+          <input className="field" value={name} onChange={(e) => setName(e.target.value)} />
+          <div className="import-facts">
+            <span className="tag">{MODE_LABELS[sc.mode]}</span>
+            <span className="tag">{sm.lorebook_entries} lorebook entries</span>
+            <span className="tag">{sm.characters} characters</span>
+            <span className="tag">{sm.characters_with_portraits} with portraits</span>
+            <span className="tag" title="Description + reminders + examples, sent every turn">~{sm.fixed_tokens} fixed tokens</span>
+          </div>
+          {preview.warnings.length > 0 && <ul className="import-notes small">{preview.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
+          {sc.npcs.length > 0 && (
+            <>
+              <div className="section-title">Characters to import <span className="muted tiny">(untick to leave out)</span></div>
+              <div className="import-cast">
+                {sc.npcs.map((n) => (
+                  <label key={n.name} className="check small">
+                    <input type="checkbox" checked={!skip.includes(n.name)} onChange={() => toggle(n.name)} />
+                    {n.name}{n.portraits?.moods?.length ? <span className="muted tiny"> · {n.portraits.moods.length} portraits</span> : null}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+          <div className="muted tiny">After importing you can edit everything with ✎, including the card texts and the lorebook.</div>
+        </>
+      )}
+      <div className="row gap end">
+        <button className="btn" onClick={onCancel}>Back</button>
+        <button className="btn primary" onClick={save} disabled={!preview || busy || !name.trim()}>{busy ? "Importing…" : "Import card"}</button>
+      </div>
+    </>
+  );
+}
+
+/* ---------------------------------------------------------- card texts / lorebook */
+const INFO_FIELDS = [
+  ["description", "Description", 6], ["scenario", "Scenario", 3], ["personality", "Personality", 3],
+  ["system_prompt", "Extra instructions (system prompt)", 3], ["post_history", "Reminders (sent after the story; may contain the INFO template)", 6],
+  ["example_messages", "Example messages (writing style)", 4],
+];
+
+function InformationEditor({ info, onChange }) {
+  const i = info || {};
+  const set = (k, v) => onChange({ ...i, [k]: v });
+  const used = INFO_FIELDS.filter(([k]) => (i[k] || "").trim());
+  return (
+    <details>
+      <summary className="muted small">Card texts <HelpTip id="card_information" /> {used.length > 0 && <span className="tiny">({used.length} filled)</span>}</summary>
+      {INFO_FIELDS.map(([k, label, rows]) => (
+        <React.Fragment key={k}>
+          <label className="lbl">{label} <span className="muted tiny">~{Math.ceil((i[k] || "").length / 4)} tokens</span></label>
+          <textarea className="field" rows={rows} value={i[k] || ""} onChange={(e) => set(k, e.target.value)} />
+        </React.Fragment>
+      ))}
+      <div className="set-row">
+        <div className="set-label">Status block every N replies <HelpTip id="status_every" /></div>
+        <div className="set-control">
+          <select className="field" value={i.status_every ?? 0} onChange={(e) => set("status_every", parseInt(e.target.value, 10))}>
+            {[0, 1, 2, 3, 4, 5, 6, 8, 10].map((n) => <option key={n} value={n}>{n === 0 ? "Never" : n === 1 ? "Every reply" : `Every ${n} replies`}</option>)}
+          </select>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+const keysText = (keys) => (keys || []).join(", ");
+const parseKeys = (t) => t.split(",").map((x) => x.trim()).filter(Boolean);
+
+function LorebookEditor({ book, onChange }) {
+  const b = { scan_depth: 4, token_budget: 800, entries: [], ...(book || {}) };
+  const [filter, setFilter] = useState("");
+  const setEntry = (idx, patch) => onChange({ ...b, entries: b.entries.map((e, j) => (j === idx ? { ...e, ...patch } : e)) });
+  const add = () => onChange({ ...b, entries: [...b.entries, { id: Date.now(), name: "", keys: [], secondary_keys: [], content: "", enabled: true, constant: false, selective: false, case_sensitive: false, priority: 0, insertion_order: b.entries.length }] });
+  const f = filter.toLowerCase();
+  return (
+    <details>
+      <summary className="muted small">Lorebook <HelpTip id="lorebook" /> <span className="tiny">({b.entries.length} entries)</span></summary>
+      <div className="row gap center">
+        <input className="field grow" placeholder="Search entries…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <label className="small">Scan last <input className="field num" style={{ width: 48 }} value={b.scan_depth} onChange={(e) => onChange({ ...b, scan_depth: parseInt(e.target.value, 10) || 1 })} /> messages</label>
+      </div>
+      {b.entries.map((e, idx) => (!f || `${e.name} ${keysText(e.keys)} ${e.content}`.toLowerCase().includes(f)) && (
+        <div className={`card lore-entry ${e.enabled ? "" : "dim"}`} key={e.id ?? idx}>
+          <div className="row gap center">
+            <input className="field grow" placeholder="Entry name" value={e.name || ""} onChange={(ev) => setEntry(idx, { name: ev.target.value })} />
+            <label className="check small"><input type="checkbox" checked={e.enabled} onChange={(ev) => setEntry(idx, { enabled: ev.target.checked })} />On</label>
+            <label className="check small" title="Always included, keywords or not"><input type="checkbox" checked={e.constant} onChange={(ev) => setEntry(idx, { constant: ev.target.checked })} />Always</label>
+            <button className="icon-btn" title="Delete entry" onClick={() => onChange({ ...b, entries: b.entries.filter((_, j) => j !== idx) })}>✕</button>
+          </div>
+          <input className="field" placeholder="Keywords, separated by commas" defaultValue={keysText(e.keys)} onBlur={(ev) => setEntry(idx, { keys: parseKeys(ev.target.value) })} />
+          <textarea className="field" rows={3} value={e.content} onChange={(ev) => setEntry(idx, { content: ev.target.value })} />
+          <div className="muted tiny">~{Math.ceil((e.content || "").length / 4)} tokens when triggered</div>
+        </div>
+      ))}
+      <button className="btn small" onClick={add}>＋ Add entry</button>
+    </details>
+  );
+}
+
 function Editor({ initial, id, onCancel, onSaved }) {
   const [d, setD] = useState({ ...BLANK, ...initial, features: initial.features || {}, skills: { attached: initial.skills?.attached || initial.skills?.pinned || [] } });
   const [playerJson, setPlayerJson] = useState(JSON.stringify(initial.player ?? BLANK.player, null, 2));
   const [speciesText, setSpeciesText] = useState((initial.species || []).join(", "));
   const [idea, setIdea] = useState("");
+  const [npcFilter, setNpcFilter] = useState("");
   const [gen, setGen] = useState(false);
   const [error, setError] = useState("");
   const set = (k, v) => setD((p) => ({ ...p, [k]: v }));
@@ -154,8 +290,9 @@ function Editor({ initial, id, onCancel, onSaved }) {
       <label className="lbl">Opening message</label>
       <textarea className="field" rows={4} value={d.opening_message} onChange={(e) => set("opening_message", e.target.value)} />
 
-      <div className="section-title">{d.mode === "character" ? "The character" : "Characters (NPCs)"}</div>
-      {d.npcs.map((n, i) => (
+      <div className="section-title">{d.mode === "character" ? "The character" : "Characters (NPCs)"} <span className="muted tiny">({d.npcs.length})</span></div>
+      {d.npcs.length > 8 && <div className="row gap center"><input className="field grow" placeholder="Find a character…" value={npcFilter} onChange={(e) => setNpcFilter(e.target.value)} /></div>}
+      {d.npcs.map((n, i) => (npcFilter && !n.name.toLowerCase().includes(npcFilter.toLowerCase())) ? null : (
         <div className="card" key={i}>
           <div className="row gap center">
             <input className="field grow" placeholder="Name" value={n.name} onChange={(e) => setNpc(i, "name", e.target.value)} />
@@ -172,9 +309,20 @@ function Editor({ initial, id, onCancel, onSaved }) {
               <input key={key} className="field" placeholder={label} value={(n.appearance || {})[key] || ""} onChange={(e) => setLook(i, key, e.target.value)} />
             ))}
           </div>
+          <div className="row gap center">
+            <input className="field grow" placeholder="Portrait link (https://…)" value={n.portraits?.default || ""}
+              onChange={(e) => setNpc(i, "portraits", { moods: [], ...(n.portraits || {}), default: e.target.value })} />
+            {n.portraits?.moods?.length > 0 && <span className="muted tiny">+{n.portraits.moods.length} moods</span>}
+            <HelpTip id="portraits" />
+          </div>
+          <label className="check small"><input type="checkbox" checked={n.in_prompt !== false} onChange={(e) => setNpc(i, "in_prompt", e.target.checked)} />
+            Profile always in the prompt <HelpTip id="in_prompt" /></label>
         </div>
       ))}
       <button className="btn small" onClick={() => set("npcs", [...d.npcs, { name: "", description: "", personality: "", speech_style: "", relationship: 0, appearance: {} }])}>＋ Add character</button>
+
+      <InformationEditor info={d.information} onChange={(v) => set("information", v)} />
+      <LorebookEditor book={d.lorebook} onChange={(v) => set("lorebook", v)} />
 
       <SkillPicker attached={d.skills.attached} onChange={(a) => set("skills", { attached: a })} cardText={cardText} />
 
@@ -220,7 +368,7 @@ export default function ScenarioModal({ onClose, onStart }) {
   const [list, setList] = useState([]);
   const [selected, setSelected] = useState(null);
   const [playerName, setPlayerName] = useState("");
-  const [view, setView] = useState("pick"); // pick | edit
+  const [view, setView] = useState("pick"); // pick | edit | import
   const [editing, setEditing] = useState(null); // {id, initial}
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
@@ -245,6 +393,14 @@ export default function ScenarioModal({ onClose, onStart }) {
     try { await onStart(sel.id, playerName.trim() || undefined); } catch (e) { setError(e.message); setStarting(false); }
   };
 
+  if (view === "import") {
+    return (
+      <Modal title="Import a card" onClose={onClose} wide>
+        <ImportView onCancel={() => setView("pick")} onImported={(saved) => { setView("pick"); load(saved.id); }} />
+      </Modal>
+    );
+  }
+
   if (view === "edit") {
     return (
       <Modal title={editing?.id ? "Edit card" : "New card"} onClose={onClose} wide>
@@ -266,6 +422,7 @@ export default function ScenarioModal({ onClose, onStart }) {
           <div key={s.id} className={`scn ${s.id === selected ? "active" : ""}`} onClick={() => setSelected(s.id)}>
             <div className="row gap center">
               <div className="scn-name grow">{s.name}</div>
+              <a className="icon-btn" title="Export as a character card (JSON)" href={api.exportCardUrl(s.id)} download onClick={(e) => e.stopPropagation()}>⤓</a>
               <button className="icon-btn" title="Edit" onClick={(e) => { e.stopPropagation(); edit(s.id); }}>✎</button>
               <button className="icon-btn" title="Delete" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete card "${s.name}"? Your saved games stay.`)) api.deleteScenario(s.id).then(() => load()).catch((er) => setError(er.message)); }}>🗑</button>
             </div>
@@ -277,6 +434,11 @@ export default function ScenarioModal({ onClose, onStart }) {
           <div className="scn-plus">＋</div>
           <div>Create a card</div>
           <div className="muted small">Write your own or let the AI draft one from an idea</div>
+        </div>
+        <div className="scn new" onClick={() => setView("import")}>
+          <div className="scn-plus">⇪</div>
+          <div>Import a card</div>
+          <div className="muted small">Character Card JSON (SillyTavern format), with lorebook and portraits</div>
         </div>
       </div>
     </Modal>

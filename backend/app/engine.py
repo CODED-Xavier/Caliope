@@ -21,10 +21,13 @@ from .config import SettingsStore
 from .conversations import ConversationRepository, NotFound
 from .dice import DiceError, DiceRoller
 from .llm import LLMError
+from .lorebook import select_entries
 from .memory import MemoryManager
+from .portraits import process_reply
 from .prompts import PromptBuilder, analysis_schema, reply_token_limit
 from .skills import SkillManager
 from .state import apply_state_updates, normalize_updates
+from .status import split_template
 from .util import clamp, estimate_tokens, extract_json, truncate
 
 log = logging.getLogger("rpg.engine")
@@ -55,6 +58,20 @@ def trim_incomplete(text: str) -> str:
     if ends and ends[-1].end() >= len(t) * 0.4:
         return t[: ends[-1].end()].rstrip()
     return t
+
+
+def with_latest_status(history: list[dict]) -> list[dict]:
+    """The model sees only the newest status block (older ones would waste hundreds of tokens)."""
+    out = [dict(h) for h in history]
+    for h in reversed(out):
+        if h["role"] == "assistant" and h.get("meta", {}).get("status"):
+            h["content"] = f"{h['content']}\n\n{h['meta']['status']}"
+            break
+    return out
+
+
+CONTINUE_PROMPT = ("[Continue your last reply exactly where it stopped. Do not repeat or summarize what you already "
+                   "wrote, do not start over, and do not act for the player. Stop when it is the player's turn again.]")
 
 
 class BusyError(Exception):
@@ -134,6 +151,66 @@ class ChatEngine:
             async with aclosing(self._reply(conv_id, last)) as turn:
                 async for event in turn:
                     yield event
+
+    async def continue_reply(self, conv_id: int) -> AsyncIterator[dict]:
+        """Keep writing the last reply from where it stopped (the new text is added to the same message)."""
+        try:
+            self.repo.get(conv_id)
+        except NotFound as exc:
+            yield {"type": "error", "message": str(exc)}
+            return
+        lock = self._lock(conv_id)
+        if lock.locked():
+            yield {"type": "error", "message": "This conversation is still busy with the previous turn."}
+            return
+        async with lock:
+            last = self.repo.last_message(conv_id)
+            if not last or last["role"] != "assistant" or last["meta"].get("opening"):
+                yield {"type": "error", "message": "Only the last reply can be continued."}
+                return
+            settings = self.settings.all()
+            conv = self.repo.get(conv_id)
+            scenario = conv["scenario"]
+            state = self.repo.get_state(conv_id)
+            npcs = self.repo.list_npcs(conv_id)
+            history = self.repo.list_messages(conv_id, after_id=conv["summary_upto"])
+            recent = [m["content"] for m in reversed(history)]
+            lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
+            messages, _debug = self.prompts.build(
+                scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=[],
+                skills=self.skills.attached((scenario.get("skills") or {}).get("attached", [])),
+                history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""),
+                lore=lore, player_name=state["player"].get("name") or "",
+            )
+            messages.append({"role": "user", "content": CONTINUE_PROMPT})
+            yield {"type": "continue_start", "message_id": last["id"]}
+            partial: list[str] = []
+            error: str | None = None
+            try:
+                async with aclosing(self.llm.stream_chat(messages, max_tokens=reply_token_limit(settings))) as pieces:
+                    async for piece in pieces:
+                        partial.append(piece)
+                        yield {"type": "token", "text": piece}
+            except LLMError as exc:
+                error = str(exc)
+            # Keep whatever was written, even after an error or Stop (finally runs when the stream is closed).
+            finally:
+                added = trim_incomplete("".join(partial)) if error is None else "".join(partial).strip()
+                if added:
+                    joined = last["content"].rstrip() + ("\n\n" if added[:1].isupper() or added[:1] in "\"*[" else " ") + added
+                    text, extra, met = process_reply(joined, npcs)
+                    for npc_id in met:
+                        self.repo.update_npc(npc_id, met=True)
+                    self.repo.update_message(last["id"], text)
+                    self.repo.update_message_meta(last["id"], {**extra, "continued": True})
+            if error:
+                yield {"type": "error", "message": error}
+                return
+            if not added:
+                yield {"type": "error", "message": "The model had nothing to add."}
+                return
+            yield {"type": "message_updated", "message": self.repo.get_message(last["id"])}
+            yield {"type": "done"}
 
     # ------------------------------------------------------- editing history
     def is_busy(self, conv_id: int) -> bool:
@@ -265,10 +342,13 @@ class ChatEngine:
         if features["appearance_hints"] and scenario.get("mode") != "character":
             hint = appearance_seed(self.rng, scenario.get("species") or [])
 
+        recent = [m["content"] for m in reversed(history)]  # newest first, for the lorebook keyword scan
+        lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
         messages, debug = self.prompts.build(
             scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=memories,
-            skills=skills, history=history, settings=settings, pinned=conv.get("pinned_memory", ""),
-            appearance_hint=hint,
+            skills=skills, history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""),
+            appearance_hint=hint, lore=lore, status_due=self._status_due(conv_id, scenario),
+            player_name=state["player"].get("name") or "",
         )
         yield {"type": "context", "debug": debug, "skills": [s["name"] for s in skills],
                "memories": [m["text"] for m in memories][: debug["memories"]]}
@@ -317,8 +397,11 @@ class ChatEngine:
                 "stable_tokens": debug["stable_tokens"],
                 "volatile_tokens": debug["volatile_tokens"],
             }
+        reply, extra, met = process_reply(reply, npcs)
+        for npc_id in met:
+            self.repo.update_npc(npc_id, met=True)
         snapshot = self.repo.capture_snapshot(conv_id)
-        meta = {"snapshot": snapshot}
+        meta = {"snapshot": snapshot, **extra}
         if timing:
             meta["timing"] = timing
         assistant_msg = self.repo.add_message(conv_id, "assistant", reply, meta)
@@ -350,6 +433,16 @@ class ChatEngine:
             self.repo.update_message_meta(assistant_msg["id"], {"timing": timing})
             yield {"type": "timing", "timing": timing}
         yield {"type": "done"}
+
+    def _status_due(self, conv_id: int, scenario: dict) -> bool | None:
+        """None when the card has no status block; otherwise whether this reply should write one."""
+        info = scenario.get("information") or {}
+        every = int(info.get("status_every") or 0)
+        if not every or not split_template(info.get("post_history") or "")[1]:
+            return None
+        done = sum(1 for m in self.repo.list_messages(conv_id)
+                   if m["role"] == "assistant" and not m["meta"].get("opening") and not m["meta"].get("interrupted"))
+        return (done + 1) % every == 0
 
     def _tracking_context(self, conv_id: int, interval: int) -> tuple[int, list[tuple[str, str]]]:
         """(number of finished replies so far, the last `interval` exchanges as (player text, reply) pairs)."""

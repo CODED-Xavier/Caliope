@@ -5,16 +5,17 @@ import asyncio
 import json
 import logging
 from contextlib import aclosing, asynccontextmanager
+from pathlib import Path
 from typing import Any, AsyncIterator
 
 from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-from .cards import resolve_features
-from .config import BASE_DIR
+from .cardio import export_card, parse_card
+from .config import DB_PATH
 from .conversations import NotFound
+from .images import ImageError, get_image
 from .dice import DiceError
 from .engine import BusyError
 from .llm import LLMError
@@ -158,6 +159,51 @@ async def delete_scenario(scenario_id: int):
     return {"deleted": True}
 
 
+# ------------------------------------------------------------------ card import / export
+@app.post("/api/cards/preview")
+async def preview_card(body: dict[str, Any] = Body(...)):
+    """Read a card file (Character Card V2/V1 or one exported by this app) without saving it."""
+    return parse_card(body.get("card"))
+
+
+@app.post("/api/cards/import")
+async def import_card(body: dict[str, Any] = Body(...)):
+    """Save an imported card. `skip` lists character names to leave out; `name` renames the card."""
+    result = parse_card(body.get("card"))
+    data = result["scenario"]
+    skip = {str(n).lower() for n in body.get("skip", []) if n}
+    if skip:
+        data["npcs"] = [n for n in data["npcs"] if n["name"].lower() not in skip]
+    if str(body.get("name", "")).strip():
+        data["name"] = str(body["name"]).strip()
+    return svc().scenarios.create(data)
+
+
+@app.get("/api/scenarios/{scenario_id}/export")
+async def export_scenario(scenario_id: int):
+    scenario = svc().scenarios.get(scenario_id)
+    if not scenario:
+        raise NotFound(f"Scenario {scenario_id} not found")
+    data = {**scenario["data"], "name": scenario["name"]}
+    filename = "".join(c if c.isalnum() or c in "-_ " else "_" for c in scenario["name"]).strip() or "card"
+    return JSONResponse(export_card(data), headers={"Content-Disposition": f'attachment; filename="{filename}.json"'})
+
+
+PORTRAIT_DIR = Path(DB_PATH).parent / "portraits"
+
+
+@app.get("/api/portrait")
+async def portrait(url: str = Query(...)):
+    """A character picture, downloaded once from its link and then served from this PC."""
+    try:
+        path = await get_image(url, PORTRAIT_DIR)
+    except ImageError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:  # network problems: the picture just doesn't show
+        raise HTTPException(status_code=502, detail=f"Could not download the picture: {exc}") from exc
+    return FileResponse(path, headers={"Cache-Control": "public, max-age=604800"})
+
+
 # ------------------------------------------------------------------ conversations
 @app.get("/api/conversations")
 async def list_conversations():
@@ -221,6 +267,11 @@ async def chat(conv_id: int, body: dict[str, Any] = Body(...)):
 async def regenerate(conv_id: int):
     svc().conversations.get(conv_id)
     return stream_response(svc().engine.regenerate(conv_id))
+
+
+@app.post("/api/conversations/{conv_id}/continue")
+async def continue_reply(conv_id: int):
+    return stream_response(svc().engine.continue_reply(conv_id))
 
 
 @app.post("/api/conversations/{conv_id}/undo")
@@ -377,10 +428,3 @@ async def toggle_skill(name: str, body: dict[str, Any] = Body(...)):
 async def delete_skill(name: str):
     svc().skills.uninstall(name)
     return svc().skills.list()
-
-
-# ------------------------------------------------------- built frontend (optional)
-# After `npm run build` in the frontend folder, the app is served at http://127.0.0.1:8000/
-_DIST = BASE_DIR.parent / "frontend" / "dist"
-if _DIST.is_dir():
-    app.mount("/", StaticFiles(directory=str(_DIST), html=True), name="web")

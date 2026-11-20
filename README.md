@@ -1,4 +1,4 @@
-# Local RPG Chat (v0.2: backend + web interface)
+# Local RPG Chat (v0.6: character card import)
 
 A chatbot for RPG and roleplay that runs 100% on your PC: no token limits, no subscription.
 It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
@@ -75,6 +75,18 @@ Put that exact model name in the `model` setting (`PUT /api/settings {"model": "
 | `embedding_model` | Embedding model id, enables semantic memory/skill search |
 | `extra_instructions` | Text added to every prompt (your own style rules) |
 | `state_tracking` | Extra call after each turn to update the sheet and memories |
+
+## 4b. Importing character cards (v0.6)
+
+New game → **Import a card** → choose a `.json` file (Character Card V2, the SillyTavern format, or a card exported from this app with ⤓).
+
+- **Card texts** (description, scenario, personality, reminders, example messages) are kept in their own fields. Edit them with ✎ → *Card texts*. `{{user}}` becomes your character's name.
+- **Lorebook**: entries are added to the AI's notes only when one of their keywords appears in the last few messages. Entries marked *Always* are always included.
+- **Characters** listed in the lorebook (`- Name (…): … Base URL: …`) become NPCs with portraits. Their profile reaches the AI through the lorebook, so 30+ characters do not fill the prompt. The People tab shows the ones you have met; the rest are under *Not met yet*.
+- **Portraits**: the AI writes `[[show: Name | Mood]]` and the app shows a big picture above that part of the reply (max 2 per reply). Garbled image links from the AI are fixed by name and mood. Each picture is downloaded once and kept in `backend/data/portraits`.
+- **Status block**: if the card asks for an `INFO` block, it is hidden from the story, shown in the **Status** tab and requested only every N replies (3 by default).
+- **Relationships** always use the app's -100 to +100 scale, even if the card describes another one.
+- **Continue ▸** under the last reply makes the AI keep writing the same reply.
 
 ## 5. Tests
 
