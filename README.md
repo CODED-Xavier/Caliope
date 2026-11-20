@@ -1,4 +1,4 @@
-# Local RPG Chat (v0.6: character card import)
+# Local RPG Chat (v0.7: start screens and writing rules)
 
 A chatbot for RPG and roleplay that runs 100% on your PC: no token limits, no subscription.
 It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
@@ -87,6 +87,29 @@ New game → **Import a card** → choose a `.json` file (Character Card V2, the
 - **Status block**: if the card asks for an `INFO` block, it is hidden from the story, shown in the **Status** tab and requested only every N replies (3 by default).
 - **Relationships** always use the app's -100 to +100 scale, even if the card describes another one.
 - **Continue ▸** under the last reply makes the AI keep writing the same reply.
+
+## 4c. Playing (v0.7)
+
+**How to write** (shown under the message box):
+
+| You write | Meaning |
+|---|---|
+| `"Hello there."` | Your character speaks |
+| `*I draw my sword*` | Your character acts |
+| `'He is lying.'` | Your character thinks: only the GM knows it, characters never do. The GM may give subtle hints from it. |
+| `/how much gold do I have?` | A message to the GM outside the story |
+| `/roll 1d20+3` | Rolls dice |
+| no marks | The GM decides |
+
+Thoughts are never read by the tracker and never stored as memories.
+
+- **Start screen**: after picking a card, *Create your sheet* (adventure) or *Who are you?* (roleplay). Or choose *Let the story ask me* for cards that create the character in the chat. *✨ Fill the empty fields* suggests a background, looks and personality.
+- **✨ Write with AI** in the card editor drafts the teaser, world, rules, tone or opening from the rest of the card.
+- The GM keeps track of the **time of day and weather** (also on the Sheet tab).
+- **Scrolling**: the view stops at the start of each new reply. *↓ Latest* jumps to the end. To follow the text as it is written, turn it on in **Aa**.
+- **Aa** menu: text size, wider column, compact mode. Drag the left edge of the side panel to resize it.
+- **🔍** (or Ctrl+F) searches the story. **⤓** exports it as a Markdown file.
+- **⑂ Save point** on any message starts a new game from that moment (sheet, characters and memories as they were). The original game is not changed.
 
 ## 5. Tests
 

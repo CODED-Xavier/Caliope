@@ -15,6 +15,8 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from .cardio import export_card, parse_card
 from .config import DB_PATH
 from .conversations import NotFound
+from .drafts import draft_card_field, draft_player
+from .exporting import export_markdown
 from .images import ImageError, get_image
 from .dice import DiceError
 from .engine import BusyError
@@ -159,6 +161,25 @@ async def delete_scenario(scenario_id: int):
     return {"deleted": True}
 
 
+# ------------------------------------------------------------------ AI drafts
+@app.post("/api/drafts/card-field")
+async def draft_field(body: dict[str, Any] = Body(...)):
+    """Let the AI write one field of a card (opening, world, rules, tone, teaser) from the rest of the card."""
+    card = body.get("card") if isinstance(body.get("card"), dict) else {}
+    text = await draft_card_field(svc().llm, str(body.get("field", "")), card, str(body.get("hint", "")),
+                                  card.get("language") or svc().settings.all().get("response_language", "en"))
+    return {"text": text}
+
+
+@app.post("/api/drafts/player")
+async def draft_player_route(body: dict[str, Any] = Body(...)):
+    """Suggest background, looks and personality for the player's character on the start screen."""
+    scenario = svc().scenarios.get(int(body.get("scenario_id", 0))) if body.get("scenario_id") else None
+    card = {**(scenario["data"] if scenario else {}), "name": scenario["name"] if scenario else ""}
+    player = body.get("player") if isinstance(body.get("player"), dict) else {}
+    return await draft_player(svc().llm, card, player, card.get("language") or svc().settings.all().get("response_language", "en"))
+
+
 # ------------------------------------------------------------------ card import / export
 @app.post("/api/cards/preview")
 async def preview_card(body: dict[str, Any] = Body(...)):
@@ -217,7 +238,9 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
         scenario = svc().scenarios.get(int(body["scenario_id"]))
         if not scenario:
             raise NotFound("Scenario not found")
-    conv = svc().conversations.create(scenario, title=str(body.get("title", "")), player_name=body.get("player_name"))
+    player = body.get("player") if isinstance(body.get("player"), dict) else None
+    conv = svc().conversations.create(scenario, title=str(body.get("title", "")), player_name=body.get("player_name"),
+                                      player=player, setup=str(body.get("setup") or ""))
     return full_conversation(conv["id"])
 
 
@@ -267,6 +290,23 @@ async def chat(conv_id: int, body: dict[str, Any] = Body(...)):
 async def regenerate(conv_id: int):
     svc().conversations.get(conv_id)
     return stream_response(svc().engine.regenerate(conv_id))
+
+
+@app.post("/api/conversations/{conv_id}/fork")
+async def fork_conversation(conv_id: int, body: dict[str, Any] = Body(...)):
+    """Save point: copy the game up to a message into a new game."""
+    return full_conversation(svc().engine.fork(conv_id, int(body["message_id"])))
+
+
+@app.get("/api/conversations/{conv_id}/export")
+async def export_conversation(conv_id: int):
+    """The whole story as a Markdown file (status blocks and portrait tags left out)."""
+    from fastapi.responses import PlainTextResponse
+    text = export_markdown(svc().conversations.get(conv_id), svc().conversations.list_messages(conv_id),
+                           svc().conversations.get_state(conv_id))
+    name = "".join(c if c.isalnum() or c in "-_ " else "_" for c in svc().conversations.get(conv_id)["title"]).strip()[:60] or "story"
+    return PlainTextResponse(text, media_type="text/markdown",
+                             headers={"Content-Disposition": f'attachment; filename="{name}.md"'})
 
 
 @app.post("/api/conversations/{conv_id}/continue")

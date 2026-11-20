@@ -30,11 +30,13 @@ DEFAULT_STATE: dict = {
     "quests": [],         # [{"id": str, "title": str, "status": "active|completed|failed", "notes": str}]
     "location": "",
     "time": "",
+    "weather": "",
     "locations": [],      # [{"name": str, "description": str, "connections": [str], "visited": bool}]
     "notes": "",
+    "setup": "",          # "app": the player made their character on the start screen; "card": the card asks in the story
 }
 
-TOP_LEVEL_FROM_PLAYER = ("gold", "inventory", "quests", "location", "time", "locations")
+TOP_LEVEL_FROM_PLAYER = ("gold", "inventory", "quests", "location", "time", "weather", "locations")
 QUEST_STATUSES = ("active", "completed", "failed")
 MAX_ITEMS = 8
 
@@ -73,7 +75,7 @@ def normalize_state(state: dict) -> dict:
     return new_state(
         {**merged["player"], **{k: merged[k] for k in TOP_LEVEL_FROM_PLAYER}},
         None,
-    ) | {"notes": str(merged.get("notes", ""))}
+    ) | {"notes": str(merged.get("notes", "")), "setup": merged.get("setup") if merged.get("setup") in ("app", "card") else ""}
 
 
 # ---------------------------------------------------------------- model updates
@@ -92,6 +94,7 @@ def normalize_updates(raw) -> dict:
         "quests": [],
         "location": truncate(str(raw.get("location") or "").strip(), 80),
         "time": truncate(str(raw.get("time") or "").strip(), 60),
+        "weather": truncate(str(raw.get("weather") or "").strip(), 60),
         "new_locations": [],
         "relationship_changes": [],
         "new_npcs": [],
@@ -201,6 +204,10 @@ def apply_state_updates(state: dict, updates: dict) -> tuple[dict, list[str]]:
         _add_location(state, updates["location"], "", [], [], visited=True)
     if updates.get("time"):
         state["time"] = updates["time"]
+    if updates.get("weather"):
+        if updates["weather"] != state.get("weather"):
+            changes.append(f"Weather: {updates['weather']}")
+        state["weather"] = updates["weather"]
 
     # After the current location exists, so "connects_to" can point at it.
     for loc in updates.get("new_locations", []):

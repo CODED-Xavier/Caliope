@@ -79,8 +79,16 @@ function SheetTab({ state, onPatch, mode, kind }) {
       <div className="section-title">Scene</div>
       <label className="lbl">Location</label>
       <TextField value={state.location} placeholder="Where are you?" onCommit={(v) => onPatch({ location: v })} />
-      <label className="lbl">Time</label>
-      <TextField value={state.time} placeholder="Time of day" onCommit={(v) => onPatch({ time: v })} />
+      <div className="row gap">
+        <div className="grow"><label className="lbl">Time</label>
+          <TextField value={state.time} placeholder="Time of day" onCommit={(v) => onPatch({ time: v })} /></div>
+        <div className="grow"><label className="lbl">Weather</label>
+          <TextField value={state.weather || ""} placeholder="Weather" onCommit={(v) => onPatch({ weather: v })} /></div>
+      </div>
+      {p.background !== undefined && <><label className="lbl">Background</label>
+      <TextField multiline rows={2} value={p.background} placeholder="Where you come from" onCommit={(v) => onPatch({ player: { background: v } })} /></>}
+      <label className="lbl">Personality</label>
+      <TextField value={p.traits || ""} placeholder="Personality" onCommit={(v) => onPatch({ player: { traits: v } })} />
       <label className="lbl">Appearance / background</label>
       <TextField multiline rows={3} value={p.description} placeholder="Describe your character…" onCommit={(v) => onPatch({ player: { description: v } })} />
       <label className="lbl">Your notes</label>
