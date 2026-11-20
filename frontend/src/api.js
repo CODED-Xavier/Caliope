@@ -75,6 +75,16 @@ export const api = {
   combatDefaults: (id, system) => request("GET", `/api/conversations/${id}/combat/defaults?system=${system}`),
   combatSuggest: (id, system) => request("POST", `/api/conversations/${id}/combat/suggest`, { system }),
   combatEdit: (id, cid, patch) => request("PATCH", `/api/conversations/${id}/combat/${cid}`, patch),
+  music: () => request("GET", "/api/music"),
+  async uploadMusic(file, name, tags = []) {
+    const qs = new URLSearchParams({ name, tags: tags.join(",") });
+    const res = await fetch(`/api/music/upload?${qs}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    return res.json();
+  },
+  addMusicLink: (body) => request("POST", "/api/music", body),
+  updateMusic: (id, body) => request("PATCH", `/api/music/${id}`, body),
+  deleteMusic: (id) => request("DELETE", `/api/music/${id}`),
   maps: () => request("GET", "/api/maps"),
   generateMap: (body) => request("POST", "/api/maps/generate", body),
   createMap: (body) => request("POST", "/api/maps", body),

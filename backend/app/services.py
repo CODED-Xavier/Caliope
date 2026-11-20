@@ -10,6 +10,7 @@ from .dice import DiceRoller
 from .engine import ChatEngine
 from .llm import LLMClient
 from .combat import CombatEngine
+from .jukebox import MusicLibrary
 from .maps import MapRepository
 from .memory import MemoryManager
 from .rulebooks import RulebookRepository
@@ -32,6 +33,7 @@ class Services:
         self.rulebooks = RulebookRepository(self.db, self.llm, self.settings.all)
         self.combat = CombatEngine(self.dice)
         self.maps = MapRepository(self.db)
+        self.music = MusicLibrary(self.db, Path(db_path).parent / "music")
         self.engine = ChatEngine(self.conversations, self.settings, self.llm, self.memory, self.skills, self.dice,
                                  rulebooks=self.rulebooks)
 

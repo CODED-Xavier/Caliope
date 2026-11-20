@@ -6,6 +6,7 @@ import SidePanel from "./components/SidePanel.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import SkillsModal from "./components/SkillsModal.jsx";
 import RulebooksModal from "./components/RulebooksModal.jsx";
+import { JukeboxModal, JukeboxPlayer } from "./components/Jukebox.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
 import { KIND_LABELS, MODE_LABELS } from "./utils.js";
 
@@ -70,6 +71,8 @@ export default function App() {
   const [view, setViewState] = useState(loadView);
   const [viewOpen, setViewOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [tracks, setTracks] = useState([]);
+  useEffect(() => { api.music().then((r) => setTracks(r.tracks)).catch(() => {}); }, []);
   const setView = (v) => { setViewState(v); try { localStorage.setItem("view", JSON.stringify(v)); } catch { /* private mode */ } };
 
   const abortRef = useRef(null);
@@ -346,6 +349,7 @@ export default function App() {
               {!online && <button className="btn small danger" onClick={() => setModal("settings")}>Model offline</button>}
               <button className="icon-btn" title="Search this story (Ctrl+F)" onClick={() => setSearchOpen(!searchOpen)}>🔍</button>
               <a className="icon-btn" title="Export this story as a text file (Markdown)" href={api.exportChatUrl(game.conversation.id)} download>⤓</a>
+              <JukeboxPlayer game={game} tracks={tracks} onOpenLibrary={() => setModal("jukebox")} />
               <div className="view-wrap">
                 <button className="btn small view-btn" title="Text size, column width, scrolling" onClick={() => setViewOpen(!viewOpen)}>Aa</button>
                 {viewOpen && <ViewMenu view={view} setView={setView} onClose={() => setViewOpen(false)} />}
@@ -379,6 +383,7 @@ export default function App() {
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={refreshHealth} />}
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}
       {modal === "rulebooks" && <RulebooksModal onClose={() => setModal(null)} />}
+      {modal === "jukebox" && <JukeboxModal onClose={() => setModal(null)} onChanged={setTracks} />}
     </div>
   );
 }

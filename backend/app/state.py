@@ -33,12 +33,13 @@ DEFAULT_STATE: dict = {
     "location": "",
     "time": "",
     "weather": "",
+    "scene_mood": "",     # for the Jukebox: calm, tavern, tension, combat... (see app/jukebox.py)
     "locations": [],      # [{"name": str, "description": str, "connections": [str], "visited": bool}]
     "notes": "",
     "setup": "",          # "app": the player made their character on the start screen; "card": the card asks in the story
 }
 
-TOP_LEVEL_FROM_PLAYER = ("gold", "inventory", "quests", "location", "time", "weather", "locations")
+TOP_LEVEL_FROM_PLAYER = ("gold", "inventory", "quests", "location", "time", "weather", "scene_mood", "locations")
 QUEST_STATUSES = ("active", "completed", "failed")
 MAX_ITEMS = 8
 
@@ -99,6 +100,7 @@ def normalize_updates(raw) -> dict:
         "location": truncate(str(raw.get("location") or "").strip(), 80),
         "time": truncate(str(raw.get("time") or "").strip(), 60),
         "weather": truncate(str(raw.get("weather") or "").strip(), 60),
+        "scene_mood": str(raw.get("scene_mood") or "").strip().lower(),
         "new_locations": [],
         "relationship_changes": [],
         "new_npcs": [],
@@ -208,6 +210,10 @@ def apply_state_updates(state: dict, updates: dict) -> tuple[dict, list[str]]:
         _add_location(state, updates["location"], "", [], [], visited=True)
     if updates.get("time"):
         state["time"] = updates["time"]
+    if updates.get("scene_mood"):
+        from .jukebox import MOODS
+        if updates["scene_mood"] in MOODS:
+            state["scene_mood"] = updates["scene_mood"]
     if updates.get("weather"):
         if updates["weather"] != state.get("weather"):
             changes.append(f"Weather: {updates['weather']}")

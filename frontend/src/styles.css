@@ -341,3 +341,14 @@ body.resizing { user-select: none; cursor: col-resize; }
 .msg.user .bubble.combat-card { max-width: 100%; text-align: left; background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--bad); font-size: 14px; }
 .msg.user .bubble.combat-card .md p { margin: 0 0 8px; }
 .mood-slot.add-mood { cursor: pointer; border-style: dashed; color: var(--muted); font: inherit; }
+
+/* ---------- v0.12.0: jukebox ---------- */
+.jukebox { display: flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px 1px 4px; background: var(--panel); max-width: 380px; }
+.jukebox input[type=range] { width: 0; opacity: 0; accent-color: var(--accent); transition: width .2s, opacity .2s; }
+.jukebox:hover input[type=range], .jukebox:focus-within input[type=range] { width: 70px; opacity: 1; }
+.jukebox .icon-btn { font-size: 14px; }
+.jb-title { background: none; border: none; color: var(--text); cursor: pointer; font: inherit; font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+.jb-mood { color: var(--muted); }
+.jb-auto { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); cursor: pointer; }
+.track .conds { margin: 6px 0; }
+.modal .row > select.field:not(.grow) { width: auto; flex: 0 0 auto; }

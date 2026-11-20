@@ -1,4 +1,4 @@
-# Local RPG Chat (v0.11: combat)
+# Local RPG Chat (v0.12: jukebox)
 
 A chatbot for RPG and roleplay that runs 100% on your PC: no token limits, no subscription.
 It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
@@ -172,6 +172,22 @@ then 💥 the damage. The GM then narrates the actions in the same order.
 **d20 rules:** attack = d20 + bonus vs AC; natural 20 always hits and doubles the damage dice; natural 1 always misses.
 **Dice pool rules:** each d10 of 6+ is a success, each pair of 10s adds 2; attacks are contested by the defender's
 pool, and damage = margin + weapon bonus.
+
+## 4g. Jukebox (v0.12)
+
+Background music that follows the story. Click **🎵 Music** in the top bar to open the library.
+
+1. Pick the moods for the songs you are about to add (calm, tavern, exploration, town, forest, dungeon, mystery,
+   tension, combat, boss, victory, sad, romantic, horror, epic), then **Add songs from this PC** (MP3, OGG, WAV,
+   FLAC, M4A, up to 40 MB each), or paste a **direct audio link**. YouTube/Spotify pages cannot be played.
+2. Change a song's moods any time by clicking the chips. **Only for cards** limits a song to some cards; those songs
+   are preferred in that card's games.
+3. In the top bar: ▶/⏸, ⏭ next, the song and the current mood, volume (hover the player) and **Auto**.
+
+With **Auto** on, the tracker names the mood of each scene and the player fades into a matching song. Fights play
+**combat** music (**boss** music when the enemy sounds like a boss), and a won fight plays a **victory** song once.
+When no song has a mood, a close one is used (tavern → town → calm…). Browsers only start sound after your first
+click, so press ▶ once per session. Songs from your PC are copied into `backend/data/music`.
 
 ## 5. Tests
 

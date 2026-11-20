@@ -766,7 +766,7 @@ class CardTypeAndAppearanceTests(unittest.IsolatedAsyncioTestCase):
         text = prompt[0]["content"] + prompt[1]["content"]
         self.assertIn("I smile at Wren", text)   # both exchanges are read
         self.assertIn("I thank Wren again", text)
-        self.assertEqual(set(schema["properties"]), {"location", "time", "weather", "relationship_changes", "new_npcs", "memories"})
+        self.assertEqual(set(schema["properties"]), {"location", "time", "weather", "scene_mood", "relationship_changes", "new_npcs", "memories"})
         self.assertNotIn("hp_change", prompt[0]["content"])
         state = s.conversations.get_state(cid)
         self.assertEqual((state["player"]["hp"]["current"], state["gold"]), (hp, 30))  # lite never touches the sheet
