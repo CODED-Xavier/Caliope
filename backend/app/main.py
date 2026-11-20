@@ -488,3 +488,23 @@ async def toggle_skill(name: str, body: dict[str, Any] = Body(...)):
 async def delete_skill(name: str):
     svc().skills.uninstall(name)
     return svc().skills.list()
+
+
+# ------------------------------------------------------------------ the interface
+# After the interface is built (Play.bat does it), the backend serves it too, so one address does everything.
+FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+
+
+@app.get("/{path:path}", include_in_schema=False)
+async def interface(path: str):
+    if path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not found")
+    index = FRONTEND_DIST / "index.html"
+    if not index.is_file():
+        return JSONResponse({"detail": "The interface is not built yet. Run Play.bat (or build-frontend.bat)."}, status_code=404)
+    target = (FRONTEND_DIST / path).resolve()
+    if path and target.is_file() and FRONTEND_DIST.resolve() in target.parents:
+        cache = "public, max-age=31536000, immutable" if path.startswith("assets/") else "no-cache"
+        return FileResponse(target, headers={"Cache-Control": cache})
+    return FileResponse(index, headers={"Cache-Control": "no-cache"})  # the app handles its own pages
+
