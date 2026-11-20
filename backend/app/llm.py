@@ -85,6 +85,9 @@ class LLMClient:
         self._get = get_settings
         self._client = None
         self._auto_model: str | None = None
+        self._embed_cache: dict[tuple[str, str], list[float]] = {}  # the same query is often embedded twice a turn
+        self.last_usage: dict | None = None   # real token counts of the last streamed reply (when the server reports them)
+        self._no_usage = False
 
     # ---------------------------------------------------------------- plumbing
     async def _http(self):
@@ -99,17 +102,29 @@ class LLMClient:
             await self._client.aclose()
             self._client = None
 
+    def _builtin(self) -> bool:
+        return self._get().get("ai_engine") == "builtin"
+
     def _base(self) -> str:
-        return str(self._get()["llm_base_url"]).rstrip("/")
+        s = self._get()
+        if s.get("ai_engine") == "builtin":
+            return f"http://127.0.0.1:{int(s.get('engine_port', 8091))}/v1"
+        return str(s["llm_base_url"]).rstrip("/")
+
+    def _embed_base(self) -> str:
+        """The built-in engine runs the embedding model as a second server on the next port."""
+        s = self._get()
+        if s.get("ai_engine") == "builtin":
+            return f"http://127.0.0.1:{int(s.get('engine_port', 8091)) + 1}/v1"
+        return self._base()
 
     def _headers(self) -> dict:
         return {"Authorization": f"Bearer {self._get().get('api_key') or 'none'}"}
 
     def _unreachable(self, exc: Exception) -> LLMError:
-        return LLMError(
-            f"Cannot reach the model server at {self._base()}. "
-            f"Is LM Studio's local server running? ({exc.__class__.__name__}: {exc})"
-        )
+        hint = ("Is the built-in engine started? (Settings > AI engine)" if self._builtin()
+                else "Is LM Studio's local server running?")
+        return LLMError(f"Cannot reach the model server at {self._base()}. {hint} ({exc.__class__.__name__}: {exc})")
 
     # ------------------------------------------------------------------ models
     async def list_models(self) -> list[str]:
@@ -132,6 +147,8 @@ class LLMClient:
             return {"ok": False, "base_url": self._base(), "error": str(exc), "models": []}
 
     async def _resolve_model(self) -> str:
+        if self._builtin():
+            return "local"  # the built-in engine serves exactly one model and ignores the name
         configured = self._get().get("model") or ""
         if configured:
             return configured
@@ -172,35 +189,45 @@ class LLMClient:
         client = await self._http()
         model = await self._resolve_model()
         payload = self._payload(messages, model, True, stop, overrides)
+        if not self._no_usage:
+            payload["stream_options"] = {"include_usage": True}  # the real prompt size, to measure tokens exactly
+        self.last_usage = None
         think = ThinkFilter()
         try:
-            async with client.stream(
-                "POST", f"{self._base()}/chat/completions", json=payload, headers=self._headers()
-            ) as resp:
-                if resp.status_code != 200:
-                    body = (await resp.aread()).decode("utf-8", "replace")
-                    self._auto_model = None
-                    raise LLMError(f"Model server returned {resp.status_code}: {body[:500]}")
-                async for line in resp.aiter_lines():
-                    if not line.startswith("data:"):
+            for attempt in range(2):
+                async with client.stream("POST", f"{self._base()}/chat/completions", json=payload, headers=self._headers()) as resp:
+                    if resp.status_code == 400 and "stream_options" in payload and attempt == 0:
+                        await resp.aread()
+                        self._no_usage = True  # an older server that does not know stream_options: ask again without it
+                        payload.pop("stream_options")
                         continue
-                    data = line[5:].strip()
-                    if data == "[DONE]":
-                        break
-                    try:
-                        obj = json.loads(data)
-                    except ValueError:
-                        continue
-                    if "error" in obj:
-                        raise LLMError(str(obj["error"])[:500])
-                    choices = obj.get("choices") or []
-                    if not choices:
-                        continue
-                    piece = (choices[0].get("delta") or {}).get("content")
-                    if piece:
-                        visible = think.feed(piece)
-                        if visible:
-                            yield visible
+                    if resp.status_code != 200:
+                        body = (await resp.aread()).decode("utf-8", "replace")
+                        self._auto_model = None
+                        raise LLMError(f"Model server returned {resp.status_code}: {body[:500]}")
+                    async for line in resp.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            obj = json.loads(data)
+                        except ValueError:
+                            continue
+                        if "error" in obj:
+                            raise LLMError(str(obj["error"])[:500])
+                        if isinstance(obj.get("usage"), dict):
+                            self.last_usage = obj["usage"]
+                        choices = obj.get("choices") or []
+                        if not choices:
+                            continue
+                        piece = (choices[0].get("delta") or {}).get("content")
+                        if piece:
+                            visible = think.feed(piece)
+                            if visible:
+                                yield visible
+                break
         except httpx.HTTPError as exc:
             raise self._unreachable(exc) from exc
         tail = think.flush()
@@ -219,6 +246,8 @@ class LLMClient:
                 "type": "json_schema",
                 "json_schema": {"name": "result", "schema": json_schema},
             }
+            if self._builtin():  # llama.cpp's documented form; harmless next to the OpenAI form
+                payload["response_format"]["schema"] = json_schema
         url = f"{self._base()}/chat/completions"
         try:
             resp = await client.post(url, json=payload, headers=self._headers())
@@ -240,16 +269,20 @@ class LLMClient:
     # -------------------------------------------------------------- embeddings
     async def embed(self, texts: list[str]) -> list[list[float]] | None:
         """Return one vector per text, or None if embeddings are unavailable."""
-        model = self._get().get("embedding_model") or ""
+        from .config import embedding_key
+
+        model = embedding_key(self._get())
         if not model or not texts:
             return None
+        if len(texts) == 1 and (model, texts[0]) in self._embed_cache:
+            return [self._embed_cache[(model, texts[0])]]
         import httpx
 
         client = await self._http()
         try:
             resp = await client.post(
-                f"{self._base()}/embeddings",
-                json={"model": model, "input": texts},
+                f"{self._embed_base()}/embeddings",
+                json={"model": model.removeprefix("gguf:"), "input": texts},
                 headers=self._headers(),
                 timeout=60.0,
             )
@@ -257,7 +290,12 @@ class LLMClient:
                 log.warning("Embedding request failed: %s %s", resp.status_code, resp.text[:200])
                 return None
             data = sorted(resp.json()["data"], key=lambda d: d.get("index", 0))
-            return [d["embedding"] for d in data]
+            out = [d["embedding"] for d in data]
+            if len(texts) == 1 and out:
+                if len(self._embed_cache) >= 64:
+                    self._embed_cache.pop(next(iter(self._embed_cache)))
+                self._embed_cache[(model, texts[0])] = out[0]
+            return out
         except (httpx.HTTPError, KeyError, ValueError) as exc:
             log.warning("Embedding request failed: %s", exc)
             return None

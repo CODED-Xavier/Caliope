@@ -1,13 +1,71 @@
 """SQLite database wrapper. Everything the app remembers lives in one local file."""
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
+import zlib
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS model_prefs (
+    path        TEXT PRIMARY KEY,
+    disabled    INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS tracks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    url         TEXT NOT NULL DEFAULT '',
+    file        TEXT NOT NULL DEFAULT '',
+    tags        TEXT NOT NULL DEFAULT '[]',
+    cards       TEXT NOT NULL DEFAULT '[]',
+    created_at  REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS maps (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    tiles       TEXT NOT NULL DEFAULT '[]',
+    background  TEXT NOT NULL DEFAULT '',
+    created_at  REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS rulebooks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    system      TEXT NOT NULL DEFAULT 'other',
+    source      TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'processing',
+    progress    REAL NOT NULL DEFAULT 0,
+    message     TEXT NOT NULL DEFAULT '',
+    info        TEXT NOT NULL DEFAULT '{}',
+    house_rules TEXT NOT NULL DEFAULT '',
+    created_at  REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS rule_chunks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id     INTEGER NOT NULL REFERENCES rulebooks(id) ON DELETE CASCADE,
+    seq         INTEGER NOT NULL DEFAULT 0,
+    heading     TEXT NOT NULL DEFAULT '',
+    page        INTEGER NOT NULL DEFAULT 0,
+    text        TEXT NOT NULL,
+    embedding   BLOB,
+    embed_model TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_rule_chunks_book ON rule_chunks(book_id, seq);
+CREATE VIRTUAL TABLE IF NOT EXISTS rule_chunks_fts USING fts5(
+    heading, text, content='rule_chunks', content_rowid='id', tokenize='porter unicode61 remove_diacritics 2'
+);
+CREATE TRIGGER IF NOT EXISTS rule_chunks_ai AFTER INSERT ON rule_chunks BEGIN
+    INSERT INTO rule_chunks_fts(rowid, heading, text) VALUES (new.id, new.heading, new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS rule_chunks_ad AFTER DELETE ON rule_chunks BEGIN
+    INSERT INTO rule_chunks_fts(rule_chunks_fts, rowid, heading, text) VALUES ('delete', old.id, old.heading, old.text);
+END;
+
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -114,6 +172,19 @@ CREATE TABLE IF NOT EXISTS skill_embeddings (
 """
 
 
+def pack_snapshot(snap) -> bytes | None:
+    return zlib.compress(json.dumps(snap, ensure_ascii=False).encode("utf-8"), 6) if snap else None
+
+
+def unpack_snapshot(blob) -> dict | None:
+    if not blob:
+        return None
+    try:
+        return json.loads(zlib.decompress(blob).decode("utf-8"))
+    except (zlib.error, ValueError):
+        return None
+
+
 class Database:
     """Thin, thread-safe wrapper around one SQLite connection."""
 
@@ -131,6 +202,7 @@ class Database:
             self.conn.execute("PRAGMA foreign_keys = ON")
             if path != ":memory:":
                 self.conn.execute("PRAGMA journal_mode = WAL")
+                self.conn.execute("PRAGMA synchronous = NORMAL")  # safe with WAL, much faster writes
             self.conn.executescript(SCHEMA)
             self._migrate()
 
@@ -142,11 +214,37 @@ class Database:
     def _migrate(self) -> None:
         """Bring databases created by older versions up to date (adds missing columns)."""
         self._ensure_column("conversations", "pinned_memory", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column("conversations", "player_lore", "TEXT NOT NULL DEFAULT '[]'")
         self._ensure_column("memories", "participants", "TEXT NOT NULL DEFAULT ''")
         self._ensure_column("npcs", "appearance", "TEXT NOT NULL DEFAULT ''")
         self._ensure_column("npcs", "portraits", "TEXT NOT NULL DEFAULT ''")
         self._ensure_column("npcs", "in_prompt", "INTEGER NOT NULL DEFAULT 1")
         self._ensure_column("npcs", "met", "INTEGER NOT NULL DEFAULT 1")
+        self._ensure_column("messages", "snapshot", "BLOB")
+        self._move_snapshots()
+
+    def _move_snapshots(self) -> None:
+        """Older versions kept the undo data (a full copy of the sheet and characters) inside each message's
+        meta, so every read of the chat had to parse all of it. It now lives compressed in its own column."""
+        while True:
+            rows = self.conn.execute(
+                "SELECT id, meta FROM messages WHERE meta LIKE '%\"snapshot\"%' LIMIT 200").fetchall()
+            moved = 0
+            self.conn.execute("BEGIN")
+            for row in rows:
+                try:
+                    meta = json.loads(row["meta"] or "{}")
+                except ValueError:
+                    continue
+                snap = meta.pop("snapshot", None)
+                if snap is None:
+                    continue
+                self.conn.execute("UPDATE messages SET meta = ?, snapshot = ? WHERE id = ?",
+                                  (json.dumps(meta, ensure_ascii=False), pack_snapshot(snap), row["id"]))
+                moved += 1
+            self.conn.execute("COMMIT")
+            if moved == 0:
+                break
 
     @contextmanager
     def transaction(self):

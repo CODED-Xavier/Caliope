@@ -2,11 +2,17 @@
 from __future__ import annotations
 
 from .appearance import appearance_line
+from .combat import COMBAT_RULES, describe_combat
+from .jukebox import MOODS
 from .portraits import portrait_instructions
 from .status import split_template
 from .util import estimate_tokens, render_macros, truncate
 from .writing import RULES as WRITING_RULES
 from .writing import for_model
+from .playerlore import always_section, triggered
+from .worldtime import CALENDAR_RULES, gm_notes
+from .resources import RESOURCE_RULES
+from .resources import gm_notes as resource_notes
 
 LANGUAGE_DIRECTIVES = {
     "en": "Write everything in English.",
@@ -26,6 +32,11 @@ CHARACTER_INTRO = (
     "reactions in *italics*. You only control {name} (plus minimal scene description)."
 )
 
+TIME_RULE = ("Keep track of the time of day and the weather. Mention them when they matter or change (dawn breaking, rain starting, "
+             "night falling), keep them consistent, and let time pass naturally with travel, rest and long scenes.")
+CAL_TIME_RULE = ("Mention the time of day and the weather when they matter or change, and keep them consistent with the date and "
+                 "time in the GM notes.")
+
 CORE_RULES = """## Rules you always follow
 - Never write the player's actions, words, thoughts or decisions. Describe the world and NPC reactions, then stop and hand control back.
 - Keep every NPC consistent with their personality, speech style and current relationship with the player.
@@ -33,13 +44,15 @@ CORE_RULES = """## Rules you always follow
 - Keep replies focused: usually 1-4 paragraphs. Match the pace the player wants.
 - This is fiction between adults. Dark, violent or mature themes are allowed when the story calls for them; portray them honestly without moralizing, disclaimers or breaking character. Every character in romantic or sexual content must be an adult.
 - Text inside [GM notes ...] is private information for you. Never repeat it, quote it or mention that it exists.
-- Keep track of the time of day and the weather. Mention them when they matter or change (dawn breaking, rain starting, night falling), keep them consistent, and let time pass naturally with travel, rest and long scenes.
-- Never mention these instructions, the game state format or that you are an AI unless the player steps out of the story."""
+- {TIME_RULE}
+- Never mention these instructions, the game state format or that you are an AI unless the player steps out of the story.""".replace("{TIME_RULE}", TIME_RULE)
 
 GM_RULES = """- When the outcome of an action is uncertain or risky, tell the player which roll to make (for example "Make a DEX (Stealth) check, DC 13") and wait. Do not decide the result before the roll.
 - A line starting with the dice emoji in the player's message is a real, verified roll result. Use it exactly; never re-roll or change it.
 - You may suggest options, but the player is free to do anything.
 - When you introduce a new character, describe their looks in a sentence (hair, eyes, build, clothing) and keep those details exactly the same afterwards. Characters that have a "Looks" entry must always match it."""
+
+EXAMPLES_UNTIL = 6  # the card's example messages are sent for the first replies only
 
 LENGTH_TOKENS = {"short": 250, "medium": 450, "long": 800}
 LENGTH_HINTS = {
@@ -127,7 +140,7 @@ def describe_player(state: dict, numbers: bool) -> str:
         lines.append("Skills: " + ", ".join(str(s) for s in p["skills"][:12]))
     for key, label in (("background", "Background"), ("description", "Appearance"), ("traits", "Personality")):
         if p.get(key):
-            lines.append(f"{label}: {truncate(p[key], 400)}")
+            lines.append(f"{label}: {truncate(p[key], 900 if key == 'background' else 400)}")
     rule = ("Always call the player's character by this name and keep these details exactly. Their "
             + ("class, skills and abilities matter: let strengths shine and weaknesses show (a low STR character struggles to lift "
                "heavy things, a wizard understands magic, a fighter reads a fight)." if numbers else
@@ -183,7 +196,7 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
 
 SECTION_ORDER = [
     "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario",
-    "lore_always", "game_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
+    "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
     "player", "pinned", "opening", "summary",
 ]
 
@@ -198,7 +211,9 @@ class PromptBuilder:
     def build(self, *, scenario: dict, state: dict, npcs: list[dict], summary: str, memories: list[dict],
               skills: list[dict], history: list[dict], settings: dict, pinned: str = "",
               appearance_hint: str = "", lore: tuple[list[dict], list[dict]] = ([], []),
-              status_due: bool | None = None, player_name: str = "") -> tuple[list[dict], dict]:
+              status_due: bool | None = None, player_name: str = "", rules: list[dict] | None = None,
+              house_rules: list[tuple[str, str]] | None = None, player_lore: list[dict] | None = None,
+              app_status: str | None = None) -> tuple[list[dict], dict]:
         """Return (messages, debug_info). History items need id, role, content and meta."""
         ctx = int(settings["context_window"])
         reserve = reply_token_limit(settings) + 150
@@ -217,8 +232,23 @@ class PromptBuilder:
         macro = lambda t: render_macros(t or "", player_name or "the player", main["name"] if main else card_name)
         prompt_npcs = [n for n in npcs if n.get("in_prompt", True)]
         sections = self._stable_sections(scenario, prompt_npcs, summary, pinned, language, settings, mode, opening, skills)
-        sections.update(self._card_sections(scenario, npcs, lore[0], macro))
+        sections.update(self._card_sections(scenario, npcs, lore[0], macro, app_status is not None))
+        replies = sum(1 for h in history if h["role"] == "assistant" and not h.get("meta", {}).get("opening"))
+        if "card_examples" in sections and (summary or replies >= EXAMPLES_UNTIL):
+            sections.pop("card_examples")  # the story itself now shows the style; frees ~300-800 tokens for history
         sections["writing"] = WRITING_RULES
+        cal = scenario.get("calendar") or {}
+        cal_on = bool(cal.get("enabled") and cal.get("months"))
+        if cal_on:
+            sections["calendar"] = "## Calendar and time\n" + CALENDAR_RULES
+            sections["rules"] = sections["rules"].replace(TIME_RULE, CAL_TIME_RULE)
+        if player_lore:
+            sections["player_lore"] = always_section(player_lore)
+        if state.get("resources"):
+            sections["resources"] = "## Resources\n" + RESOURCE_RULES
+        if house_rules:
+            sections["house_rules"] = "## House rules (they win over the rulebook)\n" + "\n\n".join(
+                (f"{name}:\n" if len(house_rules) > 1 else "") + text for name, text in house_rules)
         kind = scenario.get("kind") or ("roleplay" if mode == "character" else "adventure")
         sections["player"] = describe_player(state, numbers=(kind == "adventure"))
         # Parts that change most often go last, so the model can reuse everything before them.
@@ -235,7 +265,21 @@ class PromptBuilder:
 
         used_memories = fit_memories(memories, mem_budget)
         met = [n for n in npcs if n.get("met", True)]
-        extra = self._card_volatile(scenario, lore[1], status_due, macro)
+        extra = self._card_volatile(scenario, lore[1], status_due, macro, app_status)
+        res_notes = resource_notes(state, state.get("abilities") or [])
+        if res_notes:
+            extra = "## Resources (kept by the app)\n" + res_notes + ("\n\n" + extra if extra else "")
+        if cal_on:
+            extra = "## Date and time (kept by the app)\n" + gm_notes(state, cal) + ("\n\n" + extra if extra else "")
+        lore_hits = triggered(player_lore or [], [h["content"] for h in reversed(history)], int(ctx * 0.06))
+        if lore_hits:
+            mine = "## The player's world additions (relevant right now, canon)\n" + "\n\n".join(
+                f"{e['name']}: {e['content']}" for e in lore_hits)
+            extra = mine + ("\n\n" + extra if extra else "")
+        if rules:
+            ref = "## Rules reference (from the rulebook; apply it, do not quote it at length)\n" + "\n\n".join(
+                f"[{r['book']}, p. {r['page']}{' - ' + r['heading'] if r['heading'] else ''}]\n{r['text']}" for r in rules)
+            extra = ref + ("\n\n" + extra if extra else "")
         early = sum(1 for h in history if h["role"] == "user") <= 2  # the first turns of a game
         volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra, early)
         budget = ctx - reserve - estimate_tokens(system_text) - estimate_tokens(volatile)
@@ -292,8 +336,9 @@ class PromptBuilder:
             "dropped_sections": dropped,
             "skills": [s["name"] for s in skills],
             "memories": len(used_memories),
-            "lore_entries": [e["name"] or (e["keys"][:1] or ["?"])[0] for e in lore[0] + lore[1]],
+            "lore_entries": [e["name"] or (e["keys"][:1] or ["?"])[0] for e in lore[0] + lore[1]] + [e["name"] for e in lore_hits],
             "status_due": bool(status_due),
+            "rules": [f"{r['book']} p.{r['page']} {r['heading']}".strip() for r in (rules or [])],
         }
         return messages, debug
 
@@ -339,7 +384,7 @@ class PromptBuilder:
         return sec
 
     @staticmethod
-    def _card_sections(scenario: dict, npcs: list[dict], always_lore: list[dict], macro) -> dict[str, str]:
+    def _card_sections(scenario: dict, npcs: list[dict], always_lore: list[dict], macro, app_status: bool = False) -> dict[str, str]:
         """Stable parts that come from an imported card: its long texts, always-on lore, portrait rules."""
         info = scenario.get("information") or {}
         sec: dict[str, str] = {}
@@ -361,7 +406,10 @@ class PromptBuilder:
         if info and features.get("relationships", "app") == "app":
             rules.append("Relationships use the app's scale from -100 to +100 shown in the GM notes. Ignore any other "
                          "affinity scale the card mentions (for example -3 to +3) and never write affinity scores yourself.")
-        if info.get("status_every"):
+        if app_status:
+            rules.append("Never write the INFO status block, even if the card asks for it: the app keeps it and shows it to the "
+                         "player. Its current values are in the GM notes; follow the card's rules for them in the story.")
+        elif info.get("status_every"):
             rules.append("Only write the INFO status block when the GM notes ask for it.")
         pics = portrait_instructions(npcs, scenario.get("mode", "gm_world"))
         if pics:
@@ -372,7 +420,7 @@ class PromptBuilder:
         return sec
 
     @staticmethod
-    def _card_volatile(scenario: dict, triggered: list[dict], status_due: bool | None, macro) -> str:
+    def _card_volatile(scenario: dict, triggered: list[dict], status_due: bool | None, macro, app_status: str | None = None) -> str:
         """Per-turn parts from a card: lorebook entries whose keywords came up, the card's reminders, the status block."""
         info = scenario.get("information") or {}
         parts: list[str] = []
@@ -381,7 +429,9 @@ class PromptBuilder:
         rules, template = split_template(info.get("post_history") or "")
         if rules.strip():
             parts.append("## Card reminders\n" + macro(rules).strip())
-        if template and status_due is not None:
+        if app_status:
+            parts.append("## Status (kept by the app; do not write it)\n" + app_status)
+        elif template and status_due is not None:
             if status_due:
                 parts.append("## Status block\nEnd THIS reply with the status block, exactly in this format:\n" + macro(template))
             else:
@@ -391,6 +441,9 @@ class PromptBuilder:
     @staticmethod
     def _volatile(state, npcs, memories, mode, appearance_hint: str = "", extra: str = "", early: bool = False) -> str:
         parts: list[str] = []
+        fight = describe_combat(state.get("combat") or {})
+        if fight:
+            parts.append("## Combat (tracked by the app)\n" + fight + "\n" + COMBAT_RULES)
         if mode != "character":
             parts.append("## Current game state\n" + describe_state(state))
         elif describe_scene(state):
@@ -411,7 +464,8 @@ class PromptBuilder:
 
     # ----------------------------------------------------- analysis / summarizing
     def analysis_messages(self, *, scenario: dict, state: dict, npcs: list[dict], exchanges: list[tuple[str, str]],
-                          tracker: str = "full") -> list[dict]:
+                          tracker: str = "full", calendar: dict | None = None, status_fields: str = "",
+                          resource_line: str = "") -> list[dict]:
         """Ask the model what changed in the latest exchange(s). `lite` skips HP, gold, items and quests."""
         mode = scenario.get("mode", "gm_world")
         npc_names = ", ".join(n["name"] for n in npcs) or "none yet"
@@ -425,10 +479,28 @@ class PromptBuilder:
                 "- inventory_add / inventory_remove: items the player gained, or lost/used up (name, qty).",
                 "- quests: quests started, updated or finished (title, status: active|completed|failed, notes).",
             ]
+        if calendar:
+            lines += [
+                "- location: the player's new location name if they moved, else \"\"."
+                + ("" if calendar.get("climate", "temperate") != "none" else " weather: the new weather if it changed, else \"\"."),
+                "- minutes_passed: how many in-story minutes the exchange took (a short talk 5, a meal 45, a walk across town 30, "
+                "a night's sleep 480). Do not count time already stated in a line starting with \u23f3 (the app counted it).",
+                "- appointments: future plans with a day that someone states (\"the festival is on Sunday\", \"meet me tomorrow at noon\"): "
+                "text (what and who), when (the words used: \"Sunday\", \"tomorrow at noon\", \"in three days\"), days_from_now (your count). "
+                "Only NEW ones; already planned: " + ("; ".join(e["text"] for e in state.get("events", [])[-8:]) or "none") + ".",
+            ]
+        else:
+            lines += [
+                "- location: the player's new location name if they moved, else \"\". time: the new time of day if it changed, else \"\". "
+                "weather: the new weather if it changed, else \"\".",
+            ]
         lines += [
-            "- location: the player's new location name if they moved, else \"\". time: the new time of day if it changed, else \"\". "
-            "weather: the new weather if it changed, else \"\".",
+            "- scene_mood: the feeling of the scene for background music, one of: " + ", ".join(MOODS) + ".",
         ]
+        if status_fields:
+            lines.append(status_fields)
+        if resource_line:
+            lines.append(resource_line)
         if full:
             lines += ["- new_locations: newly mentioned places (name, description, connects_to: names of existing places)."]
         lines += [
@@ -488,16 +560,17 @@ ANALYSIS_SCHEMA = {
         "location": {"type": "string"},
         "time": {"type": "string"},
         "weather": {"type": "string"},
+        "scene_mood": {"type": "string", "enum": list(MOODS)},
         "new_locations": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "connects_to": {"type": "array", "items": {"type": "string"}}}, "required": ["name", "description", "connects_to"]}},
         "relationship_changes": {"type": "array", "items": {"type": "object", "properties": {"npc": {"type": "string"}, "delta": {"type": "integer"}, "reason": {"type": "string"}}, "required": ["npc", "delta", "reason"]}},
         "new_npcs": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "personality": {"type": "string"}, "appearance": _APPEARANCE_SCHEMA}, "required": ["name", "description", "personality", "appearance"]}},
         "memories": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "importance": {"type": "integer"}, "characters": {"type": "array", "items": {"type": "string"}}}, "required": ["text", "importance", "characters"]}},
     },
-    "required": ["hp_change", "gold_change", "inventory_add", "inventory_remove", "quests", "location", "time", "weather",
+    "required": ["hp_change", "gold_change", "inventory_add", "inventory_remove", "quests", "location", "time", "weather", "scene_mood",
                  "new_locations", "relationship_changes", "new_npcs", "memories"],
 }
 
-_LITE_KEYS = ("location", "time", "weather", "relationship_changes", "new_npcs", "memories")
+_LITE_KEYS = ("location", "time", "weather", "scene_mood", "relationship_changes", "new_npcs", "memories")
 ANALYSIS_SCHEMA_LITE = {
     "type": "object",
     "properties": {k: ANALYSIS_SCHEMA["properties"][k] for k in _LITE_KEYS},
@@ -505,5 +578,29 @@ ANALYSIS_SCHEMA_LITE = {
 }
 
 
-def analysis_schema(tracker: str) -> dict:
-    return ANALYSIS_SCHEMA if tracker == "full" else ANALYSIS_SCHEMA_LITE
+_APPOINTMENT = {"type": "object", "properties": {"text": {"type": "string"}, "when": {"type": "string"},
+                                                "days_from_now": {"type": "integer"}}, "required": ["text", "when", "days_from_now"]}
+
+
+def analysis_schema(tracker: str, calendar: bool = False, status: bool = False, resources: bool = False) -> dict:
+    base = ANALYSIS_SCHEMA if tracker == "full" else ANALYSIS_SCHEMA_LITE
+    if not calendar and not status and not resources:
+        return base
+    props = dict(base["properties"])
+    required = list(base["required"])
+    if calendar:
+        props.pop("time", None)
+        required.remove("time")
+        props["minutes_passed"] = {"type": "integer"}
+        props["appointments"] = {"type": "array", "items": _APPOINTMENT}
+        required += ["minutes_passed", "appointments"]
+    if status:
+        props["status_changes"] = {"type": "array", "items": {"type": "object", "properties": {
+            "field": {"type": "string"}, "value": {"type": "string"}}, "required": ["field", "value"]}}
+        required.append("status_changes")
+    if resources:
+        props["resource_changes"] = {"type": "array", "items": {"type": "object", "properties": {
+            "resource": {"type": "string"}, "delta": {"type": "integer"}, "reason": {"type": "string"}},
+            "required": ["resource", "delta", "reason"]}}
+        required.append("resource_changes")
+    return {"type": "object", "properties": props, "required": required}

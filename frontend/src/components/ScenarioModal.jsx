@@ -7,6 +7,8 @@ import MoodEditor from "./MoodEditor.jsx";
 import { portraitSrc } from "../portraits.js";
 import { api } from "../api.js";
 import { KIND_LABELS, MODE_LABELS } from "../utils.js";
+import { CalendarEditor } from "./Calendar.jsx";
+import PowersEditor from "./Powers.jsx";
 
 const LOOKS = [["race", "Race / species"], ["hair", "Hair"], ["eyes", "Eyes"], ["build", "Build"], ["skin", "Skin"], ["outfit", "Style / outfit"], ["extra", "Other details"]];
 const MAX_SKILLS = 3;
@@ -132,6 +134,26 @@ function ImportView({ onCancel, onImported }) {
         <button className="btn primary" onClick={save} disabled={!preview || busy || !name.trim()}>{busy ? "Importing…" : "Import card"}</button>
       </div>
     </>
+  );
+}
+
+/* ---------------------------------------------------------- rulebooks for a card */
+function RulebookPicker({ attached, onChange }) {
+  const [books, setBooks] = useState(null);
+  useEffect(() => { api.rulebooks().then((r) => setBooks(r.books)).catch(() => setBooks([])); }, []);
+  if (!books) return null;
+  const toggle = (id) => onChange(attached.includes(id) ? attached.filter((x) => x !== id) : [...attached, id]);
+  return (
+    <details open={attached.length > 0}>
+      <summary className="muted small">Rulebooks <HelpTip id="rulebooks" /> {attached.length > 0 && <span className="tiny">({attached.length} attached)</span>}</summary>
+      {books.length === 0 && <div className="muted small">No rulebooks imported yet. Use 📚 Rules in the sidebar to import one.</div>}
+      {books.map((b) => (
+        <label key={b.id} className={`check small ${b.status !== "ready" ? "dim" : ""}`}>
+          <input type="checkbox" checked={attached.includes(b.id)} onChange={() => toggle(b.id)} disabled={b.status !== "ready" && !attached.includes(b.id)} />
+          {b.name} <span className="muted tiny">{b.status === "ready" ? `${b.sections} sections` : b.status}</span>
+        </label>
+      ))}
+    </details>
   );
 }
 
@@ -330,8 +352,8 @@ function Editor({ initial, id, onCancel, onSaved }) {
               <input key={key} className="field" placeholder={label} value={(n.appearance || {})[key] || ""} onChange={(e) => setLook(i, key, e.target.value)} />
             ))}
           </div>
-          <details className="npc-pics">
-            <summary className="small">Pictures and moods {(n.portraits?.default || n.portraits?.moods?.length) ? <span className="muted tiny">({(n.portraits.moods || []).length} moods)</span> : <span className="muted tiny">(none)</span>} <HelpTip id="portraits" /></summary>
+          <details className="npc-pics" open={d.npcs.length <= 6}>
+            <summary className="small">🖼 Pictures and moods (one picture per mood) {(n.portraits?.default || n.portraits?.moods?.length) ? <span className="muted tiny">({(n.portraits.moods || []).length} moods)</span> : <span className="muted tiny">(none)</span>} <HelpTip id="portraits" /></summary>
             <MoodEditor portraits={n.portraits} compact onChange={(v) => setNpc(i, "portraits", v)} />
           </details>
           <label className="check small"><input type="checkbox" checked={n.in_prompt !== false} onChange={(e) => setNpc(i, "in_prompt", e.target.checked)} />
@@ -340,8 +362,15 @@ function Editor({ initial, id, onCancel, onSaved }) {
       ))}
       <button className="btn small" onClick={() => set("npcs", [...d.npcs, { name: "", description: "", personality: "", speech_style: "", relationship: 0, appearance: {} }])}>＋ Add character</button>
 
+      <RulebookPicker attached={d.rulebooks || []} onChange={(v) => set("rulebooks", v)} />
       <InformationEditor info={d.information} onChange={(v) => set("information", v)} />
       <LorebookEditor book={d.lorebook} onChange={(v) => set("lorebook", v)} />
+      <CalendarEditor value={d.calendar} onChange={(v) => set("calendar", v)} />
+      <PowersEditor card={d} onChange={(patch) => setD((p) => ({ ...p, ...patch }))} />
+      <div className="row gap center">
+        <label className="small">Money is called <HelpTip id="currency" /></label>
+        <input className="field" style={{ width: 140 }} value={d.currency || "gold"} onChange={(e) => set("currency", e.target.value)} />
+      </div>
 
       <SkillPicker attached={d.skills.attached} onChange={(a) => set("skills", { attached: a })} cardText={cardText} />
 
@@ -355,6 +384,15 @@ function Editor({ initial, id, onCancel, onSaved }) {
               <option value="off">Nothing</option>
               <option value="lite">Light (relationships, characters, memories)</option>
               <option value="full">Full (also HP, gold, items, quests)</option>
+            </select>
+          </div>
+        </div>
+        <div className="set-row">
+          <div className="set-label">INFO status block <HelpTip id="status_by" /></div>
+          <div className="set-control">
+            <select className="field" value={d.features.status_by || ""} onChange={(e) => setFeature("status_by", e.target.value)}>
+              <option value="">Kept by the app (default)</option>
+              <option value="ai">Written by the AI</option>
             </select>
           </div>
         </div>

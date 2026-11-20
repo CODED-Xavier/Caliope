@@ -1,8 +1,36 @@
-import React, { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Markdown } from "../markdown.jsx";
 import { firstMood, hideStatus, moodUrl, portraitSrc, stripTags } from "../portraits.js";
 import Story from "./Story.jsx";
 import HelpTip from "./HelpTip.jsx";
+
+/** A picture of the scene, painted by Pollinations.ai the first time it is shown (can take up to a minute). */
+function ScenePicture({ pic, onReroll, canAct }) {
+  const [state, setState] = useState("loading");
+  const [tries, setTries] = useState(0);
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => { setState("loading"); setTries(0); }, [pic.url]);
+  useEffect(() => { // the free service paints one picture at a time: try again a little later
+    if (state !== "error" || tries >= 2) return undefined;
+    const t = setTimeout(() => { setTries((n) => n + 1); setState("loading"); }, 30000);
+    return () => clearTimeout(t);
+  }, [state, tries]);
+  if (hidden) return <button className="link-btn tiny muted" onClick={() => setHidden(false)}>🖼 show scene picture</button>;
+  return (
+    <figure className={`scene-pic ${state}`}>
+      {state !== "error" && (
+        <img key={tries} src={`${portraitSrc(pic.url)}${tries ? `&try=${tries}` : ""}`} alt={pic.prompt} title={pic.prompt}
+          onLoad={() => setState("ok")} onError={() => setState("error")} />
+      )}
+      {state === "loading" && <div className="scene-wait"><span className="spinner" /> Painting the scene… (up to a minute)</div>}
+      {state === "error" && <div className="scene-wait">{tries >= 2 ? "The picture service did not answer. Try 🎲 later." : "The picture service is busy; trying again in 30 s…"}</div>}
+      <figcaption>
+        {canAct && <button className="icon-btn" title="Another version of this picture" onClick={onReroll}>🎲</button>}
+        <button className="icon-btn" title="Hide" onClick={() => setHidden(true)}>✕</button>
+      </figcaption>
+    </figure>
+  );
+}
 
 /** A small round picture beside a message. Hidden when the picture cannot be loaded. */
 function Avatar({ url, title, size }) {
@@ -18,7 +46,26 @@ function speakerAvatar(text, speaker) {
   return { url: moodUrl(speaker.portraits, mood || ""), mood: mood || "", text: stripTags(text) };
 }
 
-const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, hit }) {
+const CHECK_KIND = { save: "saving throw", check: "check" };
+
+/** Buttons for the rolls the GM just asked for: the app adds the sheet's bonus and tells the GM the result. */
+function CheckButtons({ checks, onCheck }) {
+  return (
+    <div className="check-row">
+      {checks.map((c, i) => (
+        <span key={i} className="check-btn">
+          <button className="btn small primary" onClick={() => onCheck(i, "")} title="Roll with the bonus from your sheet; the result goes to the GM">
+            🎲 {c.skill || c.ability} {CHECK_KIND[c.kind]}{c.dc ? ` · DC ${c.dc}` : ""}
+          </button>
+          <button className="btn small" title="Roll with advantage (two d20, keep the higher)" onClick={() => onCheck(i, "advantage")}>▲</button>
+          <button className="btn small" title="Roll with disadvantage (two d20, keep the lower)" onClick={() => onCheck(i, "disadvantage")}>▼</button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, scenePictures, onPaint, onCheck, onBuy, currency, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, hit }) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -74,18 +121,20 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
       {canAct && !isLast && <button className="icon-btn" title="Rewind: delete everything after this message" onClick={() => onRewind(m.id, false)}>⏪</button>}
       {canAct && !isOpening && <button className="icon-btn" title="Delete this message and everything after it" onClick={() => onRewind(m.id, true)}>🗑</button>}
       {canAct && <button className="icon-btn" title="Save point: start a new game from this moment (this game stays as it is)" onClick={() => onFork(m.id)}>⑂</button>}
+      {canAct && scenePictures && !isUser && !m.meta?.scene_picture && <button className="icon-btn" title="Paint this scene (Pollinations.ai)" onClick={() => onPaint(m.id)}>🖼</button>}
     </div>
   );
 
   if (isUser) {
     const isDice = m.content.startsWith("\u{1F3B2}");
+    const isCombat = !!m.meta?.combat || m.content.includes("\u2694\uFE0F");
     return (
       <div className={`msg user ${hit || ""}`} data-mid={m.id}>
         {playerPic && portraitStyle !== "off" && <Avatar url={playerPic} title="You" size="small" />}
         <div className="user-col">
           {editing ? editor : (
             <>
-              <div className={`bubble ${isDice ? "dice" : ""}`}><Markdown text={showThoughts(m.content)} /></div>
+              <div className={`bubble ${isDice ? "dice" : ""} ${isCombat ? "combat-card" : ""}`}><Markdown text={showThoughts(m.content)} /></div>
               {m.meta?.edited && <div className="muted tiny edited">edited</div>}
               {actions}
             </>
@@ -104,6 +153,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
       {isOpening && <div className="tag">Opening scene</div>}
       {editing ? editor : (
         <>
+          {m.meta?.scene_picture && portraitStyle !== "off" && <ScenePicture pic={m.meta.scene_picture} canAct={canAct} onReroll={() => onPaint(m.id, true)} />}
           <Story text={av ? av.text : m.content} npcs={npcs} known={m.meta?.portraits} portraitStyle={portraitStyle} />
           {m.meta?.edited && <span className="muted tiny edited"> (edited)</span>}
           {m.meta?.interrupted && <div className="muted small">⏹ Stopped early</div>}
@@ -121,8 +171,21 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
               {" "}· prompt ~{m.meta.timing.prompt_tokens} tokens
             </div>
           )}
+          {isLast && canAct && m.meta?.checks?.length > 0 && <CheckButtons checks={m.meta.checks} onCheck={(i, mode) => onCheck(m.id, i, mode)} />}
+          {isLast && canAct && m.meta?.offers?.length > 0 && (
+            <div className="check-row">
+              {m.meta.offers.map((o, i) => (
+                <button key={i} className="btn small" title="Buy one: the app takes the money and puts it in your bag" onClick={() => onBuy(m.id, i)}>
+                  🛒 {o.item} · {o.price} {currency}
+                </button>
+              ))}
+            </div>
+          )}
           {isLastAssistant && lastContext && lastContext.memories.length > 0 && (
             <div className="muted small ctx">🧠 {lastContext.memories.length} memor{lastContext.memories.length === 1 ? "y" : "ies"} recalled</div>
+          )}
+          {isLastAssistant && lastContext && lastContext.rules?.length > 0 && (
+            <div className="muted small ctx" title={lastContext.rules.join("\n")}>📖 Rules used: {lastContext.rules.join(" · ")}</div>
           )}
           {actions}
         </>
@@ -143,7 +206,7 @@ const showThoughts = (t) => (t.trimStart().startsWith("/") && !/^\s*\/roll/i.tes
 // While a reply is being written: hide the status block and any half-written portrait tag at the end.
 const liveText = (t) => hideStatus(t).replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, "");
 
-export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch, portraitStyle = "big" }) {
+export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint, onCheck, onBuy }) {
   const [text, setText] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [query, setQuery] = useState("");
@@ -223,6 +286,17 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
 
   const regenerate = () => { waitingReply.current = true; anchored.current = false; onRegenerate(); };
 
+  // The same function objects on every render, so the (memoized) messages do not all redraw on every new word.
+  const live = useRef({});
+  const check = (...args) => { waitingReply.current = true; anchored.current = false; onCheck?.(...args); };
+  const buy = (...args) => { waitingReply.current = true; anchored.current = false; onBuy?.(...args); };
+  live.current = { regenerate, onContinue, onFork, onPaint, onEdit, onResend, onRewind, check, buy };
+  const actions = useMemo(() => {
+    const call = (name) => (...args) => live.current[name]?.(...args);
+    return { regenerate: call("regenerate"), onContinue: call("onContinue"), onFork: call("onFork"), onPaint: call("onPaint"),
+      onEdit: call("onEdit"), onResend: call("onResend"), onRewind: call("onRewind"), check: call("check"), buy: call("buy") };
+  }, []);
+
   const submit = () => {
     const t = text.trim();
     if (!t || busy) return;
@@ -255,10 +329,11 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
       }}>
         <div className="chat-inner">
           {messages.map((m, i) => (
-            <Message key={m.id} m={m} npcs={game.npcs} speaker={speaker} playerPic={playerPic} portraitStyle={portraitStyle} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
-              onRegenerate={regenerate} onContinue={onContinue} onFork={onFork}
+            <Message key={m.id} m={m} npcs={game.npcs} speaker={speaker} playerPic={playerPic} portraitStyle={portraitStyle}
+              scenePictures={scenePictures} onPaint={actions.onPaint} onCheck={actions.check} onBuy={actions.buy} currency={game.conversation.scenario?.currency || "gold"} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
+              onRegenerate={actions.regenerate} onContinue={actions.onContinue} onFork={actions.onFork}
               hit={m.id === current ? "search-hit current" : hits.includes(m.id) ? "search-hit" : ""} canAct={!busy} lastContext={busy ? null : lastContext}
-              onEdit={onEdit} onResend={onResend} onRewind={onRewind} />
+              onEdit={actions.onEdit} onResend={actions.onResend} onRewind={actions.onRewind} />
           ))}
           {!busy && messages.length > 0 && messages[messages.length - 1].role === "user" && (
             <div className="retry">

@@ -12,6 +12,16 @@ from .appearance import normalize_appearance
 from .portraits import normalize_portraits
 from .util import as_int, clamp, deep_merge, truncate
 
+
+def normalize_pools(raw):  # imported late: resources imports state
+    from .resources import normalize_pools as f
+    return f(raw)
+
+
+def normalize_abilities(raw):
+    from .resources import normalize_abilities as f
+    return f(raw)
+
 DEFAULT_STATE: dict = {
     "player": {
         "name": "Player",
@@ -33,12 +43,20 @@ DEFAULT_STATE: dict = {
     "location": "",
     "time": "",
     "weather": "",
+    "scene_mood": "",     # for the Jukebox: calm, tavern, tension, combat... (see app/jukebox.py)
     "locations": [],      # [{"name": str, "description": str, "connections": [str], "visited": bool}]
     "notes": "",
     "setup": "",          # "app": the player made their character on the start screen; "card": the card asks in the story
+    "clock": {"minutes": 0},  # world calendar: minutes since the start of the card's starting day (app/worldtime.py)
+    "date_label": "",     # "Sunday, 3 Frostmoon, 812 AE · 19:40 (evening)" when the card has a calendar
+    "events": [],         # appointments: [{"id", "day", "hour", "text"}]
+    "untracked": 0,       # replies the tracker skipped (quiet turns) and will read next time
+    "resources": {},      # Mana, Aura...: {"Mana": {"current", "max", "regen", "color"}} (app/resources.py)
+    "abilities": [],      # the player's abilities that spend them
+    "card_status": {},    # the card's own INFO-block fields (Tier, EXP...) kept by the app (app/statusbook.py)
 }
 
-TOP_LEVEL_FROM_PLAYER = ("gold", "inventory", "quests", "location", "time", "weather", "locations")
+TOP_LEVEL_FROM_PLAYER = ("gold", "inventory", "quests", "location", "time", "weather", "scene_mood", "locations")
 QUEST_STATUSES = ("active", "completed", "failed")
 MAX_ITEMS = 8
 
@@ -78,7 +96,26 @@ def normalize_state(state: dict) -> dict:
     return new_state(
         {**merged["player"], **{k: merged[k] for k in TOP_LEVEL_FROM_PLAYER}},
         None,
-    ) | {"notes": str(merged.get("notes", "")), "setup": merged.get("setup") if merged.get("setup") in ("app", "card") else ""}
+    ) | {"notes": str(merged.get("notes", "")), "setup": merged.get("setup") if merged.get("setup") in ("app", "card") else ""} | (
+        {"combat": merged["combat"]} if isinstance(merged.get("combat"), dict) else {}) | _calendar_part(merged)  # fights survive sheet edits
+
+
+def _calendar_part(merged: dict) -> dict:
+    clock = merged.get("clock") if isinstance(merged.get("clock"), dict) else {}
+    events = []
+    for e in merged.get("events") if isinstance(merged.get("events"), list) else []:
+        if isinstance(e, dict) and str(e.get("text", "")).strip():
+            hour = e.get("hour")
+            events.append({"id": str(e.get("id") or uuid.uuid4().hex[:8]), "day": as_int(e.get("day", 0)),
+                           "hour": as_int(hour) if hour not in (None, "") else None, "text": truncate(str(e["text"]).strip(), 160),
+                           "date": truncate(str(e.get("date", "")), 60)})
+    return {"clock": {"minutes": max(0, as_int(clock.get("minutes", 0))), "seed": as_int(clock.get("seed", 0))}, "events": events[:40],
+            "untracked": max(0, as_int(merged.get("untracked", 0))),
+            "resources": normalize_pools(merged.get("resources")),
+            "abilities": normalize_abilities(merged.get("abilities")),
+            "card_status": {truncate(str(k), 40): truncate(str(v), 160) for k, v in list(
+                (merged.get("card_status") if isinstance(merged.get("card_status"), dict) else {}).items())[:40]},
+            "date_label": truncate(str(merged.get("date_label") or ""), 120)}
 
 
 # ---------------------------------------------------------------- model updates
@@ -98,11 +135,23 @@ def normalize_updates(raw) -> dict:
         "location": truncate(str(raw.get("location") or "").strip(), 80),
         "time": truncate(str(raw.get("time") or "").strip(), 60),
         "weather": truncate(str(raw.get("weather") or "").strip(), 60),
+        "scene_mood": str(raw.get("scene_mood") or "").strip().lower(),
         "new_locations": [],
         "relationship_changes": [],
         "new_npcs": [],
         "memories": [],
+        "minutes_passed": max(0, as_int(raw.get("minutes_passed", 0))),
+        "resource_changes": [{"resource": str(c.get("resource", "")), "delta": as_int(c.get("delta", 0)),
+                              "reason": truncate(str(c.get("reason", "")), 80)}
+                             for c in _list(raw.get("resource_changes")) if isinstance(c, dict)],
+        "status_changes": [{"field": str(c.get("field", "")), "value": str(c.get("value", ""))}
+                           for c in _list(raw.get("status_changes")) if isinstance(c, dict)],
+        "appointments": [],
     }
+    for ap in _list(raw.get("appointments")):
+        if isinstance(ap, dict) and str(ap.get("text", "")).strip():
+            updates["appointments"].append({"text": truncate(str(ap["text"]).strip(), 160), "when": truncate(str(ap.get("when", "")), 60),
+                                            "days_from_now": ap.get("days_from_now")})
     for key in ("inventory_add", "inventory_remove"):
         for item in _list(raw.get(key)):
             norm = _norm_item(item)
@@ -192,12 +241,22 @@ def apply_state_updates(state: dict, updates: dict) -> tuple[dict, list[str]]:
         existing = next((x for x in state["quests"] if x["title"].lower() == q["title"].lower()), None)
         if existing:
             if existing["status"] != q["status"]:
-                changes.append(f"Quest '{existing['title']}': {q['status']}")
-            existing["status"] = q["status"]
+                if existing["status"] == "active" and q["status"] in ("completed", "failed"):
+                    # The AI only suggests the end of a quest; the player confirms it in the Bag tab.
+                    if existing.get("suggested") != q["status"]:
+                        existing["suggested"] = q["status"]
+                        changes.append(f"Quest '{existing['title']}' looks {q['status']}: confirm it in the Bag tab")
+                else:
+                    existing["status"] = q["status"]
+                    existing.pop("suggested", None)
+                    changes.append(f"Quest '{existing['title']}': {q['status']}")
             if q["notes"]:
                 existing["notes"] = q["notes"]
         else:
-            state["quests"].append({"id": uuid.uuid4().hex[:8], **q})
+            new = {"id": uuid.uuid4().hex[:8], **q}
+            if q["status"] != "active":  # a quest the AI reports as already over: the player confirms it
+                new.update(status="active", suggested=q["status"])
+            state["quests"].append(new)
             changes.append(f"New quest: {q['title']}")
 
     if updates.get("location"):
@@ -207,6 +266,10 @@ def apply_state_updates(state: dict, updates: dict) -> tuple[dict, list[str]]:
         _add_location(state, updates["location"], "", [], [], visited=True)
     if updates.get("time"):
         state["time"] = updates["time"]
+    if updates.get("scene_mood"):
+        from .jukebox import MOODS
+        if updates["scene_mood"] in MOODS:
+            state["scene_mood"] = updates["scene_mood"]
     if updates.get("weather"):
         if updates["weather"] != state.get("weather"):
             changes.append(f"Weather: {updates['weather']}")

@@ -5,6 +5,9 @@ import Chat from "./components/Chat.jsx";
 import SidePanel from "./components/SidePanel.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import SkillsModal from "./components/SkillsModal.jsx";
+import RulebooksModal from "./components/RulebooksModal.jsx";
+import ModelsModal from "./components/ModelsModal.jsx";
+import { JukeboxModal, JukeboxPlayer } from "./components/Jukebox.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
 import { KIND_LABELS, MODE_LABELS } from "./utils.js";
 
@@ -69,6 +72,11 @@ export default function App() {
   const [view, setViewState] = useState(loadView);
   const [viewOpen, setViewOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [tracks, setTracks] = useState([]);
+  const [scenePictures, setScenePictures] = useState(false);
+  const loadSettingsFlags = () => api.settings().then((s) => setScenePictures(!!s.scene_pictures)).catch(() => {});
+  useEffect(() => { loadSettingsFlags(); }, []);
+  useEffect(() => { api.music().then((r) => setTracks(r.tracks)).catch(() => {}); }, []);
   const setView = (v) => { setViewState(v); try { localStorage.setItem("view", JSON.stringify(v)); } catch { /* private mode */ } };
 
   const abortRef = useRef(null);
@@ -146,7 +154,7 @@ export default function App() {
         break;
       case "context":
         setStream((s) => (s ? { ...s, context: ev } : s));
-        setLastContext({ skills: ev.skills || [], memories: ev.memories || [] });
+        setLastContext({ skills: ev.skills || [], memories: ev.memories || [], rules: ev.rules || [] });
         break;
       case "token":
         bufferRef.current += ev.text;
@@ -161,6 +169,9 @@ export default function App() {
       case "continue_start":
         setStream((s) => (s ? { ...s, continuing: true } : s));
         break;
+      case "scene_picture":
+        setGame((g) => (g ? { ...g, messages: g.messages.map((m) => (m.id === ev.message_id ? { ...m, meta: { ...m.meta, scene_picture: ev.picture } } : m)) } : g));
+        break;
       case "message_updated":
         if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
         bufferRef.current = "";
@@ -171,7 +182,7 @@ export default function App() {
         setStream((s) => (s ? { ...s, phase: "updating" } : s));
         break;
       case "state":
-        setGame((g) => (g ? { ...g, state: ev.state, npcs: ev.npcs } : g));
+        setGame((g) => (g ? { ...g, state: ev.state, npcs: ev.npcs || g.npcs } : g));
         setMemoryKey((k) => k + 1);
         break;
       case "summary":
@@ -210,6 +221,15 @@ export default function App() {
 
   const send = (text) => runTurn(`/api/conversations/${activeRef.current}/chat`, { content: text });
   const regenerate = () => runTurn(`/api/conversations/${activeRef.current}/regenerate`, {});
+  const combatAction = (body) => runTurn(`/api/conversations/${activeRef.current}/combat`, body);
+  const combatEdit = async (cid, patch) => {
+    try { const state = await api.combatEdit(activeId, cid, patch); setGame((g) => (g ? { ...g, state } : g)); } catch (e) { setError(e.message); }
+  };
+  const buyOffer = (messageId, index) => runTurn(`/api/conversations/${activeRef.current}/buy`, { message_id: messageId, index, qty: 1 });
+  const usePower = (id) => runTurn(`/api/conversations/${activeRef.current}/ability`, { ability: id });
+  const restNow = (kind) => runTurn(`/api/conversations/${activeRef.current}/rest`, { kind });
+  const payGold = (body) => runTurn(`/api/conversations/${activeRef.current}/pay`, body);
+  const rollCheck = (messageId, index, mode) => runTurn(`/api/conversations/${activeRef.current}/check`, { message_id: messageId, index, mode });
   const continueReply = () => runTurn(`/api/conversations/${activeRef.current}/continue`, {});
   const stop = () => abortRef.current?.abort();
 
@@ -242,6 +262,13 @@ export default function App() {
       : "Delete everything after this message? The sheet, characters and memories go back to how they were at this point.";
     if (!window.confirm(text)) return;
     try { setGame(await api.rewind(activeId, messageId, inclusive)); setLastContext(null); setMemoryKey((k) => k + 1); refreshConvs(); } catch (e) { setError(e.message); }
+  };
+
+  const paintScene = async (messageId, reroll = false) => {
+    try {
+      const msg = await api.paintScene(activeId, messageId, reroll);
+      setGame((g) => (g ? { ...g, messages: g.messages.map((m) => (m.id === msg.id ? msg : m)) } : g));
+    } catch (e) { setError(e.message); }
   };
 
   const forkAt = async (messageId) => {
@@ -325,7 +352,7 @@ export default function App() {
       style={{ "--story-font": `${view.fontSize}px`, "--panel-w": `${view.panelWidth}px` }}>
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => setModal("new")}
-        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onSettings={() => setModal("settings")}
+        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onModels={() => setModal("models")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
       <main className="main">
@@ -336,11 +363,13 @@ export default function App() {
                 <div className="top-title">{game.conversation.title}</div>
                 <div className="muted small">{scenario?.name} · {MODE_LABELS[scenario?.mode] || ""}
                   {game.features?.kind && <span className={`tag kind-${game.features.kind} kind-badge`}>{KIND_LABELS[game.features.kind]}</span>}
+                  {game.state?.date_label && <span className="tag date-badge" title="In-story date and time (kept by the app)">📅 {game.state.date_label}</span>}
                 </div>
               </div>
               {!online && <button className="btn small danger" onClick={() => setModal("settings")}>Model offline</button>}
               <button className="icon-btn" title="Search this story (Ctrl+F)" onClick={() => setSearchOpen(!searchOpen)}>🔍</button>
               <a className="icon-btn" title="Export this story as a text file (Markdown)" href={api.exportChatUrl(game.conversation.id)} download>⤓</a>
+              <JukeboxPlayer game={game} tracks={tracks} onOpenLibrary={() => setModal("jukebox")} />
               <div className="view-wrap">
                 <button className="btn small view-btn" title="Text size, column width, scrolling" onClick={() => setViewOpen(!viewOpen)}>Aa</button>
                 {viewOpen && <ViewMenu view={view} setView={setView} onClose={() => setViewOpen(false)} />}
@@ -351,7 +380,8 @@ export default function App() {
             <Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
               onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt}
-              follow={view.follow} portraitStyle={view.portraits} searchOpen={searchOpen} onCloseSearch={() => setSearchOpen(false)} />
+              follow={view.follow} portraitStyle={view.portraits} searchOpen={searchOpen}
+              scenePictures={scenePictures} onPaint={paintScene} onCheck={rollCheck} onBuy={buyOffer} onCloseSearch={() => setSearchOpen(false)} />
           </>
         ) : (
           <div className="welcome">
@@ -366,12 +396,18 @@ export default function App() {
       </main>
       {game && panelOpen && <div className="panel-resizer" onMouseDown={startResize} title="Drag to resize the panel" />}
       {game && panelOpen && (
-        <SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}
-          onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} onPinnedSave={savePinned} />
+        <SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onPay={payGold} onPower={usePower} onRest={restNow} busy={busy} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}
+          onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} onPinnedSave={savePinned}
+          onStateLoaded={(st) => setGame((g) => (g ? { ...g, state: st } : g))}
+          onLoreSaved={(conv) => setGame((g) => (g ? { ...g, conversation: { ...g.conversation, player_lore: conv.player_lore } } : g))}
+          onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit} />
       )}
+      {modal === "models" && <ModelsModal onClose={() => { setModal(null); refreshHealth(); }} />}
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
-      {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={refreshHealth} />}
+      {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} />}
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}
+      {modal === "rulebooks" && <RulebooksModal onClose={() => setModal(null)} />}
+      {modal === "jukebox" && <JukeboxModal onClose={() => setModal(null)} onChanged={setTracks} />}
     </div>
   );
 }

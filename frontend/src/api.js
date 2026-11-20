@@ -72,6 +72,50 @@ export const api = {
     if (!res.ok) throw new Error(await errorMessage(res));
     return res.json();
   },
+  combatDefaults: (id, system) => request("GET", `/api/conversations/${id}/combat/defaults?system=${system}`),
+  combatSuggest: (id, system) => request("POST", `/api/conversations/${id}/combat/suggest`, { system }),
+  combatEdit: (id, cid, patch) => request("PATCH", `/api/conversations/${id}/combat/${cid}`, patch),
+  paintScene: (convId, messageId, reroll = false) => request("POST", `/api/conversations/${convId}/messages/${messageId}/scene-picture`, { reroll }),
+  engine: () => request("GET", "/api/engine"),
+  engineModels: () => request("GET", "/api/engine/models"),
+  engineStart: () => request("POST", "/api/engine/start"),
+  engineStop: () => request("POST", "/api/engine/stop"),
+  engineDownload: () => request("POST", "/api/engine/download"),
+  modelLibrary: () => request("GET", "/api/models/library"),
+  searchModels: (q) => request("GET", `/api/models/search?q=${encodeURIComponent(q)}`),
+  modelFiles: (repo) => request("GET", `/api/models/files?repo=${encodeURIComponent(repo)}`),
+  downloadModel: (repo, file) => request("POST", "/api/models/download", { repo, file }),
+  cancelDownload: (key) => request("POST", "/api/models/download/cancel", { key }),
+  clearDownload: (key) => request("POST", "/api/models/download/clear", { key }),
+  loadModel: (path, role) => request("POST", "/api/models/load", { path, role }),
+  unloadModel: (role) => request("POST", "/api/models/unload", { role }),
+  setModelActive: (path, active) => request("POST", "/api/models/active", { path, active }),
+  deleteModel: (path) => request("POST", "/api/models/delete", { path }),
+  music: () => request("GET", "/api/music"),
+  async uploadMusic(file, name, tags = []) {
+    const qs = new URLSearchParams({ name, tags: tags.join(",") });
+    const res = await fetch(`/api/music/upload?${qs}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    return res.json();
+  },
+  addMusicLink: (body) => request("POST", "/api/music", body),
+  updateMusic: (id, body) => request("PATCH", `/api/music/${id}`, body),
+  deleteMusic: (id) => request("DELETE", `/api/music/${id}`),
+  maps: () => request("GET", "/api/maps"),
+  generateMap: (body) => request("POST", "/api/maps/generate", body),
+  createMap: (body) => request("POST", "/api/maps", body),
+  updateMap: (id, body) => request("PUT", `/api/maps/${id}`, body),
+  deleteMap: (id) => request("DELETE", `/api/maps/${id}`),
+  rulebooks: () => request("GET", "/api/rulebooks"),
+  async uploadRulebook(file, name, system) {
+    const qs = new URLSearchParams({ name, system, filename: file.name });
+    const res = await fetch(`/api/rulebooks?${qs}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    return res.json();
+  },
+  updateRulebook: (id, body) => request("PATCH", `/api/rulebooks/${id}`, body),
+  deleteRulebook: (id) => request("DELETE", `/api/rulebooks/${id}`),
+  searchRulebooks: (q, ids = []) => request("GET", `/api/rulebooks/search?${new URLSearchParams({ q, ids: ids.join(",") })}`),
   draftField: (field, card, hint = "") => request("POST", "/api/drafts/card-field", { field, card, hint }),
   draftPlayer: (scenarioId, player) => request("POST", "/api/drafts/player", { scenario_id: scenarioId, player }),
   fork: (id, messageId) => request("POST", `/api/conversations/${id}/fork`, { message_id: messageId }),
@@ -83,6 +127,14 @@ export const api = {
 
   conversations: () => request("GET", "/api/conversations"),
   conversation: (id) => request("GET", `/api/conversations/${id}`),
+  setPlayerLore: (convId, entries) => request("PUT", `/api/conversations/${convId}/player-lore`, { entries }),
+  suggestPlayerLore: (convId, id) => request("POST", `/api/conversations/${convId}/player-lore/suggest`, { id }),
+  calendarPresets: () => request("GET", "/api/calendar/presets"),
+  calendarPreview: (cal) => request("POST", "/api/calendar/preview", cal),
+  addEvent: (convId, text, when) => request("POST", `/api/conversations/${convId}/events`, { text, when }),
+  deleteEvent: (convId, id) => request("DELETE", `/api/conversations/${convId}/events/${id}`),
+  syncResources: (convId) => request("POST", `/api/conversations/${convId}/resources/sync`),
+  suggestResources: (card) => request("POST", "/api/resources/suggest", { card }),
   createConversation: (body) => request("POST", "/api/conversations", body),
   renameConversation: (id, title) => request("PATCH", `/api/conversations/${id}`, { title }),
   deleteConversation: (id) => request("DELETE", `/api/conversations/${id}`),

@@ -91,7 +91,11 @@ def make_services(llm=None, skills_src=True):
         for name, text in SAMPLE_SKILLS.items():
             (skills_dir / name).mkdir()
             (skills_dir / name / "SKILL.md").write_text(text, encoding="utf-8")
-    return Services(db_path=":memory:", skills_dir=skills_dir, seed_dir=SEED_DIR, llm=llm or FakeLLM())
+    svc = Services(db_path=":memory:", skills_dir=skills_dir, seed_dir=SEED_DIR, llm=llm or FakeLLM())
+    svc.settings.update({"tracker_skip": False})
+    from app.util import set_chars_per_token
+    set_chars_per_token(3.4)  # a test that measured another value must not change the next ones  # most tests expect the tracker on every turn (tests/test_signals.py covers skipping)
+    return svc
 
 
 def new_game(s, mode="gm_world", attach=None, features=None, kind=None, **extra):
@@ -766,7 +770,7 @@ class CardTypeAndAppearanceTests(unittest.IsolatedAsyncioTestCase):
         text = prompt[0]["content"] + prompt[1]["content"]
         self.assertIn("I smile at Wren", text)   # both exchanges are read
         self.assertIn("I thank Wren again", text)
-        self.assertEqual(set(schema["properties"]), {"location", "time", "weather", "relationship_changes", "new_npcs", "memories"})
+        self.assertEqual(set(schema["properties"]), {"location", "time", "weather", "scene_mood", "relationship_changes", "new_npcs", "memories"})
         self.assertNotIn("hp_change", prompt[0]["content"])
         state = s.conversations.get_state(cid)
         self.assertEqual((state["player"]["hp"]["current"], state["gold"]), (hp, 30))  # lite never touches the sheet

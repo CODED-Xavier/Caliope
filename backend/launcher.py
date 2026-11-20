@@ -223,8 +223,11 @@ def main() -> int:
             say("  ! The app did not start. Read the messages above for the reason.")
             server.terminate()
             return 1
-        if not args.no_lmstudio:
-            prepare_lmstudio(get_json(APP_URL + "/api/settings") or {})
+        settings = get_json(APP_URL + "/api/settings") or {}
+        if settings.get("ai_engine") == "builtin":
+            say("  Built-in AI engine: the model loads in the background (see Settings > Model).")
+        elif not args.no_lmstudio:
+            prepare_lmstudio(settings)
         say(f"\n  Ready: {APP_URL}")
         say("  Keep this window open while you play. Close it (or press Ctrl+C) to stop.\n")
         if not args.no_browser:

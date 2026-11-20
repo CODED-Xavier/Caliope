@@ -17,6 +17,8 @@ from .db import Database
 from .portraits import _url, normalize_portraits  # noqa: F401  (kept here for older imports)
 from .status import split_template
 from .util import extract_json, now, slugify, truncate
+from .worldtime import normalize_calendar
+from .resources import normalize_abilities, normalize_resources
 
 MODES = ("gm_world", "gm_cast", "character")
 
@@ -61,6 +63,18 @@ def normalize_lorebook(raw) -> dict:
         "token_budget": max(100, min(4000, int(raw.get("token_budget", 800) or 800))),
         "entries": entries,
     }
+
+
+def _ids(raw) -> list[int]:
+    out: list[int] = []
+    for v in raw if isinstance(raw, list) else []:
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            continue
+        if n > 0 and n not in out:
+            out.append(n)
+    return out[:6]
 
 
 def normalize_information(raw) -> dict:
@@ -136,7 +150,12 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "tone": str(raw.get("tone", "")),
         "species": species,
         "information": normalize_information(raw.get("information")),
+        "rulebooks": _ids(raw.get("rulebooks")),
         "lorebook": normalize_lorebook(raw.get("lorebook")),
+        "calendar": normalize_calendar(raw.get("calendar")),
+        "currency": truncate(str(raw.get("currency") or "gold").strip(), 20) or "gold",
+        "resources": normalize_resources(raw.get("resources")),
+        "abilities": normalize_abilities(raw.get("abilities"), normalize_resources(raw.get("resources"))),
         "alternate_openings": [_clip(x, 6000) for x in raw.get("alternate_openings", [])[:10] if str(x).strip()] if isinstance(raw.get("alternate_openings"), list) else [],
         "opening_message": str(raw.get("opening_message", "")),
         "player": raw.get("player") if isinstance(raw.get("player"), dict) else {},

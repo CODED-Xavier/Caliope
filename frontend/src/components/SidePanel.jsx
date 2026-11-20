@@ -3,20 +3,26 @@ import { api } from "../api.js";
 import { NumberField, TextField } from "./Fields.jsx";
 import HelpTip from "./HelpTip.jsx";
 import MoodEditor from "./MoodEditor.jsx";
+import CombatTab from "./CombatTab.jsx";
 import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
 import { latestStatus, portraitSrc } from "../portraits.js";
+import PlayerLore from "./PlayerLore.jsx";
+import { CalendarBox } from "./Calendar.jsx";
 
 /* ----------------------------------------------------------------- Status */
-function StatusTab({ messages, every }) {
+function StatusTab({ messages, every, byApp, fields, values, onPatch }) {
   const status = latestStatus(messages);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({});
   if (!status) {
     return (
       <div className="tab-body">
-        <div className="muted small">No status yet. This card's AI writes a status block {every ? `every ${every} replies` : "now and then"}, and it shows up here instead of in the story.</div>
+        <div className="muted small">{byApp ? "The status appears after the first reply." : `No status yet. This card's AI writes a status block ${every ? `every ${every} replies` : "now and then"}, and it shows up here instead of in the story.`}</div>
       </div>
     );
   }
   const lines = status.text.split("\n").map((l) => l.replace(/\*\*/g, "").trim()).filter((l) => l && !/^\[?INFO\]?$/i.test(l));
+  const save = async () => { await onPatch({ card_status: { ...(values || {}), ...draft } }); setEditing(false); };
   return (
     <div className="tab-body status-tab">
       {lines.map((line, i) => {
@@ -32,13 +38,86 @@ function StatusTab({ messages, every }) {
           </div>
         );
       })}
-      <div className="muted tiny">Written by the AI{every ? ` every ${every} replies` : ""}. The app's own relationship meters are in the People tab.</div>
+      {byApp ? (
+        <>
+          <div className="muted tiny">Kept by the app: place, time, items and relationships come from the game; the card's own values change when the story changes them (the tracker reports it). Correct them here if needed.</div>
+          {fields?.length > 0 && !editing && <button className="btn small" onClick={() => { setDraft({}); setEditing(true); }}>✎ Edit the card's values</button>}
+          {editing && (
+            <div className="status-edit">
+              {fields.map((f) => (
+                <label key={f} className="lbl">{f}
+                  <input className="field" defaultValue={(values || {})[f] || ""} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
+                </label>
+              ))}
+              <div className="row gap"><button className="btn small primary" onClick={save}>Save</button><button className="btn small" onClick={() => setEditing(false)}>Cancel</button></div>
+            </div>
+          )}
+        </>
+      ) : <div className="muted tiny">Written by the AI{every ? ` every ${every} replies` : ""}. The app's own relationship meters are in the People tab.</div>}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ Sheet */
-function SheetTab({ state, onPatch, mode, kind }) {
+/** Mana, Aura...: bars kept by the app, the powers that spend them, and rests that refill them. */
+function ResourcesBox({ state, onPatch, onPower, onRest, busy, convId, onState }) {
+  const pools = state.resources || {};
+  const names = Object.keys(pools);
+  const [err, setErr] = useState("");
+  const sync = async () => { setErr(""); try { onState(await api.syncResources(convId)); } catch (e) { setErr(e.message); } };
+  if (!names.length) {
+    return (
+      <div className="muted tiny">
+        <button className="link-btn tiny" onClick={sync}>↻ Get resources and powers from the card</button> (Mana, Aura… set in the card editor)
+        {err && <div className="error-text small">{err}</div>}
+      </div>
+    );
+  }
+  const inFight = !!state.combat?.active;
+  return (
+    <>
+      <div className="section-title">Resources <HelpTip id="resources" /></div>
+      {names.map((n) => {
+        const p = pools[n];
+        return (
+          <div className="res-row" key={n}>
+            <span className="res-name">{n}</span>
+            <div className="res-bar"><div className="res-fill" style={{ width: `${(p.current / Math.max(1, p.max)) * 100}%`, background: p.color || undefined }} /></div>
+            <button className="icon-btn" onClick={() => onPatch({ resources: { [n]: { current: Math.max(0, p.current - 1) } } })}>−</button>
+            <span className="res-num">{p.current}/{p.max}</span>
+            <button className="icon-btn" onClick={() => onPatch({ resources: { [n]: { current: Math.min(p.max, p.current + 1) } } })}>＋</button>
+          </div>
+        );
+      })}
+      {(state.abilities || []).length > 0 && (
+        <>
+          <div className="section-title">Powers</div>
+          {state.abilities.map((a) => {
+            const short = Object.entries(a.costs || {}).find(([k, v]) => (pools[k]?.current ?? 0) < v);
+            return (
+              <div className="ability-card" key={a.id}>
+                <div className="grow small">
+                  <strong>{a.name}</strong> <span className="muted tiny">· {Object.entries(a.costs || {}).map(([k, v]) => `${v} ${k}`).join(", ") || "free"}{a.dice ? ` · ${a.dice}` : ""}</span>
+                  {a.description && <div className="muted tiny">{a.description}</div>}
+                </div>
+                <button className="btn small" disabled={busy || inFight || !!short} onClick={() => onPower(a.id)}
+                  title={inFight ? "In a fight, use it from the Combat tab" : short ? `Not enough ${short[0]}` : "Use it now: the app pays the cost and tells the GM"}>Use</button>
+              </div>
+            );
+          })}
+        </>
+      )}
+      <div className="row gap">
+        <button className="btn small grow" disabled={busy || inFight} onClick={() => onRest("short")} title="About an hour of rest">☕ Short rest</button>
+        <button className="btn small grow" disabled={busy || inFight} onClick={() => onRest("long")} title="A night's sleep: refills more and heals">🛌 Long rest</button>
+      </div>
+      <button className="link-btn tiny" disabled={busy} onClick={sync} title="After editing the card's resources or powers">↻ Update from the card</button>
+      {err && <div className="error-text small">{err}</div>}
+    </>
+  );
+}
+
+function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, onState }) {
   const p = state.player;
   const [picOpen, setPicOpen] = useState(false);
   const numbers = kind !== "roleplay";
@@ -84,6 +163,8 @@ function SheetTab({ state, onPatch, mode, kind }) {
         ))}
       </div></>}
 
+      <ResourcesBox state={state} onPatch={onPatch} onPower={onPower} onRest={onRest} busy={busy} convId={convId} onState={onState} />
+
       <div className="section-title">Scene</div>
       <label className="lbl">Location</label>
       <TextField value={state.location} placeholder="Where are you?" onCommit={(v) => onPatch({ location: v })} />
@@ -107,7 +188,27 @@ function SheetTab({ state, onPatch, mode, kind }) {
 }
 
 /* -------------------------------------------------------------------- Bag */
-function BagTab({ state, onPatch }) {
+function PayBox({ gold, currency, onPay, busy }) {
+  const [amount, setAmount] = useState("");
+  const [to, setTo] = useState("");
+  const [why, setWhy] = useState("");
+  const n = parseInt(amount, 10) || 0;
+  return (
+    <form className="pay-box" onSubmit={(e) => { e.preventDefault(); if (n > 0 && n <= gold) { onPay({ amount: n, to, why }); setAmount(""); setTo(""); setWhy(""); } }}>
+      <div className="section-title">💰 {gold} {currency}</div>
+      <div className="row gap">
+        <input className="field num" style={{ width: 64 }} placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <input className="field grow" placeholder="to whom" value={to} onChange={(e) => setTo(e.target.value)} />
+      </div>
+      <div className="row gap">
+        <input className="field grow" placeholder="for what (optional)" value={why} onChange={(e) => setWhy(e.target.value)} />
+        <button className="btn small" type="submit" disabled={busy || n <= 0 || n > gold} title="The app takes the money and tells the GM">Pay</button>
+      </div>
+    </form>
+  );
+}
+
+function BagTab({ state, onPatch, onPay, busy, currency }) {
   const [name, setName] = useState("");
   const [qty, setQty] = useState(1);
   const [quest, setQuest] = useState("");
@@ -115,6 +216,7 @@ function BagTab({ state, onPatch }) {
   const setInv = (next) => onPatch({ inventory: next });
   return (
     <div className="tab-body">
+      {onPay && <PayBox gold={state.gold} currency={currency} onPay={onPay} busy={busy} />}
       <div className="section-title">Inventory ({inv.length})</div>
       {inv.length === 0 && <div className="muted small">Your bag is empty.</div>}
       {inv.map((it, i) => (
@@ -146,6 +248,13 @@ function BagTab({ state, onPatch }) {
             <button className="icon-btn" onClick={() => onPatch({ quests: state.quests.filter((x) => x.id !== q.id) })}>✕</button>
           </div>
           {q.notes && <div className="muted small">{q.notes}</div>}
+          {q.suggested && q.status === "active" && (
+            <div className="quest-suggest small">
+              Looks {q.suggested}.{" "}
+              <button className="btn small" onClick={() => onPatch({ quests: state.quests.map((x) => (x.id === q.id ? { ...x, status: q.suggested, suggested: "" } : x)) })}>✓ Confirm</button>{" "}
+              <button className="btn small ghost" onClick={() => onPatch({ quests: state.quests.map((x) => (x.id === q.id ? { ...x, suggested: "" } : x)) })}>Not yet</button>
+            </div>
+          )}
         </div>
       ))}
       <form className="row gap" onSubmit={(e) => { e.preventDefault(); if (!quest.trim()) return; onPatch({ quests: [...state.quests, { id: Math.random().toString(16).slice(2, 10), title: quest.trim(), status: "active", notes: "" }] }); setQuest(""); }}>
@@ -412,7 +521,7 @@ function PinnedBox({ value, limit, onSave }) {
   );
 }
 
-function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinnedSave }) {
+function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinnedSave, lore, onLoreSaved, state, onState }) {
   const [mems, setMems] = useState([]);
   const [filter, setFilter] = useState("");
   const [text, setText] = useState("");
@@ -423,7 +532,9 @@ function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinned
   const who = (m) => { try { return JSON.parse(m.participants || "[]").join(", "); } catch { return ""; } };
   return (
     <div className="tab-body">
+      {state?.date_label && <CalendarBox convId={convId} state={state} onState={onState} />}
       <PinnedBox value={pinned} limit={pinnedLimit} onSave={onPinnedSave} />
+      <PlayerLore key={convId} entries={lore} convId={convId} onSaved={onLoreSaved} />
       <div className="section-title">Story so far</div>
       <div className="card small">{summary || <span className="muted">The summary appears once the conversation gets long. Older messages are condensed here so the AI never loses the plot.</span>}</div>
       <div className="section-title">Remembered facts ({mems.length})</div>
@@ -453,15 +564,17 @@ const TABS = [
   ["bag", "🎒", "Bag"],
   ["people", "👥", "People"],
   ["map", "🗺", "Map"],
+  ["combat", "⚔", "Combat"],
   ["dice", "🎲", "Dice"],
   ["journal", "📖", "Journal"],
 ];
 
-export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave }) {
+export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onPay, onPower, onRest, onCombat, onCombatEdit, style }) {
   const { state, npcs, conversation } = game;
   const mode = conversation.scenario?.mode;
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
-  const allowed = game.features?.panels || TABS.map(([k]) => k);
+  const allowed = [...(game.features?.panels || TABS.map(([k]) => k)), ...(state.combat?.active ? ["combat"] : []),
+    ...(Object.keys(state.resources || {}).length || game.card_has_resources ? ["sheet"] : [])];  // resources live on the sheet
   const tabs = TABS.filter(([k]) => allowed.includes(k));
   const active = tabs.some(([k]) => k === tab) ? tab : tabs[0]?.[0];
   return (
@@ -475,14 +588,19 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         <button className="icon-btn close-panel" onClick={onClose} title="Hide panel">✕</button>
       </div>
       <div className="tab-scroll">
-        {active === "status" && <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every} />}
-        {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} />}
-        {active === "bag" && <BagTab state={state} onPatch={onPatch} />}
+        {active === "status" && <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every}
+          byApp={!!game.status_by_app} fields={game.status_fields}
+          values={state.card_status} onPatch={onPatch} />}
+        {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} onPower={onPower} onRest={onRest} busy={!canRoll}
+          convId={conversation.id} onState={onStateLoaded} />}
+        {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} />}
         {active === "map" && <MapTab state={state} />}
+        {active === "combat" && <CombatTab game={game} busy={!canRoll} onCombat={onCombat} onCombatEdit={onCombatEdit} />}
         {active === "dice" && <DiceTab onRollToChat={onRollToChat} canRoll={canRoll} />}
         {active === "journal" && <JournalTab convId={conversation.id} summary={conversation.summary} refreshKey={memoryKey}
-          pinned={conversation.pinned_memory} pinnedLimit={game.pinned_limit || 2000} onPinnedSave={onPinnedSave} />}
+          pinned={conversation.pinned_memory} pinnedLimit={game.pinned_limit || 2000} onPinnedSave={onPinnedSave}
+          lore={conversation.player_lore} onLoreSaved={onLoreSaved} state={state} onState={onStateLoaded} />}
       </div>
     </aside>
   );

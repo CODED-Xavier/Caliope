@@ -18,3 +18,9 @@ frontend/dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Windows program build (build-exe.bat) and the built-in engine
+build/
+LocalRPG/
+engine/
+engine.new/
