@@ -37,6 +37,9 @@ DEFAULT_STATE: dict = {
     "locations": [],      # [{"name": str, "description": str, "connections": [str], "visited": bool}]
     "notes": "",
     "setup": "",          # "app": the player made their character on the start screen; "card": the card asks in the story
+    "clock": {"minutes": 0},  # world calendar: minutes since the start of the card's starting day (app/worldtime.py)
+    "date_label": "",     # "Sunday, 3 Frostmoon, 812 AE · 19:40 (evening)" when the card has a calendar
+    "events": [],         # appointments: [{"id", "day", "hour", "text"}]
 }
 
 TOP_LEVEL_FROM_PLAYER = ("gold", "inventory", "quests", "location", "time", "weather", "scene_mood", "locations")
@@ -80,7 +83,20 @@ def normalize_state(state: dict) -> dict:
         {**merged["player"], **{k: merged[k] for k in TOP_LEVEL_FROM_PLAYER}},
         None,
     ) | {"notes": str(merged.get("notes", "")), "setup": merged.get("setup") if merged.get("setup") in ("app", "card") else ""} | (
-        {"combat": merged["combat"]} if isinstance(merged.get("combat"), dict) else {})  # a fight in progress survives sheet edits
+        {"combat": merged["combat"]} if isinstance(merged.get("combat"), dict) else {}) | _calendar_part(merged)  # fights survive sheet edits
+
+
+def _calendar_part(merged: dict) -> dict:
+    clock = merged.get("clock") if isinstance(merged.get("clock"), dict) else {}
+    events = []
+    for e in merged.get("events") if isinstance(merged.get("events"), list) else []:
+        if isinstance(e, dict) and str(e.get("text", "")).strip():
+            hour = e.get("hour")
+            events.append({"id": str(e.get("id") or uuid.uuid4().hex[:8]), "day": as_int(e.get("day", 0)),
+                           "hour": as_int(hour) if hour not in (None, "") else None, "text": truncate(str(e["text"]).strip(), 160),
+                           "date": truncate(str(e.get("date", "")), 60)})
+    return {"clock": {"minutes": max(0, as_int(clock.get("minutes", 0)))}, "events": events[:40],
+            "date_label": truncate(str(merged.get("date_label") or ""), 120)}
 
 
 # ---------------------------------------------------------------- model updates
@@ -105,7 +121,13 @@ def normalize_updates(raw) -> dict:
         "relationship_changes": [],
         "new_npcs": [],
         "memories": [],
+        "minutes_passed": max(0, as_int(raw.get("minutes_passed", 0))),
+        "appointments": [],
     }
+    for ap in _list(raw.get("appointments")):
+        if isinstance(ap, dict) and str(ap.get("text", "")).strip():
+            updates["appointments"].append({"text": truncate(str(ap["text"]).strip(), 160), "when": truncate(str(ap.get("when", "")), 60),
+                                            "days_from_now": ap.get("days_from_now")})
     for key in ("inventory_add", "inventory_remove"):
         for item in _list(raw.get(key)):
             norm = _norm_item(item)

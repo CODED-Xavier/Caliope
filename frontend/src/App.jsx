@@ -358,6 +358,7 @@ export default function App() {
                 <div className="top-title">{game.conversation.title}</div>
                 <div className="muted small">{scenario?.name} · {MODE_LABELS[scenario?.mode] || ""}
                   {game.features?.kind && <span className={`tag kind-${game.features.kind} kind-badge`}>{KIND_LABELS[game.features.kind]}</span>}
+                  {game.state?.date_label && <span className="tag date-badge" title="In-story date and time (kept by the app)">📅 {game.state.date_label}</span>}
                 </div>
               </div>
               {!online && <button className="btn small danger" onClick={() => setModal("settings")}>Model offline</button>}
@@ -392,6 +393,7 @@ export default function App() {
       {game && panelOpen && (
         <SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}
           onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} onPinnedSave={savePinned}
+          onStateLoaded={(st) => setGame((g) => (g ? { ...g, state: st } : g))}
           onLoreSaved={(conv) => setGame((g) => (g ? { ...g, conversation: { ...g.conversation, player_lore: conv.player_lore } } : g))}
           onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit} />
       )}

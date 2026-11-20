@@ -10,6 +10,7 @@ from .util import estimate_tokens, render_macros, truncate
 from .writing import RULES as WRITING_RULES
 from .writing import for_model
 from .playerlore import always_section, triggered
+from .worldtime import CALENDAR_RULES, gm_notes
 
 LANGUAGE_DIRECTIVES = {
     "en": "Write everything in English.",
@@ -186,7 +187,7 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
 
 SECTION_ORDER = [
     "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario",
-    "lore_always", "player_lore", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
+    "lore_always", "player_lore", "calendar", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
     "player", "pinned", "opening", "summary",
 ]
 
@@ -223,6 +224,10 @@ class PromptBuilder:
         sections = self._stable_sections(scenario, prompt_npcs, summary, pinned, language, settings, mode, opening, skills)
         sections.update(self._card_sections(scenario, npcs, lore[0], macro))
         sections["writing"] = WRITING_RULES
+        cal = scenario.get("calendar") or {}
+        cal_on = bool(cal.get("enabled") and cal.get("months"))
+        if cal_on:
+            sections["calendar"] = "## Calendar and time\n" + CALENDAR_RULES
         if player_lore:
             sections["player_lore"] = always_section(player_lore)
         if house_rules:
@@ -245,6 +250,8 @@ class PromptBuilder:
         used_memories = fit_memories(memories, mem_budget)
         met = [n for n in npcs if n.get("met", True)]
         extra = self._card_volatile(scenario, lore[1], status_due, macro)
+        if cal_on:
+            extra = "## Date and time (kept by the app)\n" + gm_notes(state, cal) + ("\n\n" + extra if extra else "")
         lore_hits = triggered(player_lore or [], [h["content"] for h in reversed(history)], int(ctx * 0.06))
         if lore_hits:
             mine = "## The player's world additions (relevant right now, canon)\n" + "\n\n".join(
@@ -433,7 +440,7 @@ class PromptBuilder:
 
     # ----------------------------------------------------- analysis / summarizing
     def analysis_messages(self, *, scenario: dict, state: dict, npcs: list[dict], exchanges: list[tuple[str, str]],
-                          tracker: str = "full") -> list[dict]:
+                          tracker: str = "full", calendar: dict | None = None) -> list[dict]:
         """Ask the model what changed in the latest exchange(s). `lite` skips HP, gold, items and quests."""
         mode = scenario.get("mode", "gm_world")
         npc_names = ", ".join(n["name"] for n in npcs) or "none yet"
@@ -447,9 +454,21 @@ class PromptBuilder:
                 "- inventory_add / inventory_remove: items the player gained, or lost/used up (name, qty).",
                 "- quests: quests started, updated or finished (title, status: active|completed|failed, notes).",
             ]
+        if calendar:
+            lines += [
+                "- location: the player's new location name if they moved, else \"\". weather: the new weather if it changed, else \"\".",
+                "- minutes_passed: how many in-story minutes the exchange took (a short talk 5, a meal 45, a walk across town 30, "
+                "a night's sleep 480). Do not count time already stated in a line starting with \u23f3 (the app counted it).",
+                "- appointments: future plans with a day that someone states (\"the festival is on Sunday\", \"meet me tomorrow at noon\"): "
+                "text (what and who), when (the words used: \"Sunday\", \"tomorrow at noon\", \"in three days\"), days_from_now (your count). "
+                "Only NEW ones; already planned: " + ("; ".join(e["text"] for e in state.get("events", [])[-8:]) or "none") + ".",
+            ]
+        else:
+            lines += [
+                "- location: the player's new location name if they moved, else \"\". time: the new time of day if it changed, else \"\". "
+                "weather: the new weather if it changed, else \"\".",
+            ]
         lines += [
-            "- location: the player's new location name if they moved, else \"\". time: the new time of day if it changed, else \"\". "
-            "weather: the new weather if it changed, else \"\".",
             "- scene_mood: the feeling of the scene for background music, one of: " + ", ".join(MOODS) + ".",
         ]
         if full:
@@ -529,5 +548,15 @@ ANALYSIS_SCHEMA_LITE = {
 }
 
 
-def analysis_schema(tracker: str) -> dict:
-    return ANALYSIS_SCHEMA if tracker == "full" else ANALYSIS_SCHEMA_LITE
+_APPOINTMENT = {"type": "object", "properties": {"text": {"type": "string"}, "when": {"type": "string"},
+                                                "days_from_now": {"type": "integer"}}, "required": ["text", "when", "days_from_now"]}
+
+
+def analysis_schema(tracker: str, calendar: bool = False) -> dict:
+    base = ANALYSIS_SCHEMA if tracker == "full" else ANALYSIS_SCHEMA_LITE
+    if not calendar:
+        return base
+    props = {k: v for k, v in base["properties"].items() if k != "time"}
+    props["minutes_passed"] = {"type": "integer"}
+    props["appointments"] = {"type": "array", "items": _APPOINTMENT}
+    return {"type": "object", "properties": props, "required": [k for k in base["required"] if k != "time"] + ["minutes_passed", "appointments"]}

@@ -32,6 +32,7 @@ from .state import apply_state_updates, normalize_updates
 from .status import split_template
 from .writing import is_gm_message, strip_thoughts
 from .util import clamp, estimate_tokens, extract_json, truncate
+from . import worldtime
 
 log = logging.getLogger("rpg.engine")
 
@@ -126,6 +127,14 @@ class ChatEngine:
                 yield {"type": "dice", "roll": rolled.to_dict()}
                 text = rolled.text + note
             meta = None
+            kind = "combat"
+            if prepare is None:
+                try:
+                    prepare, text = self._time_skip(conv_id, text)
+                except ValueError as exc:
+                    yield {"type": "error", "message": str(exc)}
+                    return
+                kind = "time_skip"
             if prepare is not None:
                 before = self.repo.capture_snapshot(conv_id)  # undo/rewind of this turn also undoes the dice results
                 try:
@@ -135,7 +144,7 @@ class ChatEngine:
                     return
                 self.repo.save_state(conv_id, new_state)
                 text = f"{text}\n\n{line}".strip() if text else line
-                meta = {"snapshot": before, "combat": True}
+                meta = {"snapshot": before, kind: True}
                 yield {"type": "state", "state": new_state, "npcs": self.repo.list_npcs(conv_id), "changes": []}
             user_msg = self.repo.add_message(conv_id, "user", text, meta)
             self._auto_title(conv_id, text)
@@ -143,6 +152,28 @@ class ChatEngine:
             async with aclosing(self._reply(conv_id, user_msg)) as turn:
                 async for event in turn:
                     yield event
+
+    def _time_skip(self, conv_id: int, text: str):
+        """(prepare, text) for '/wait …' or 'I sleep until morning' in a game with a calendar, else (None, text)."""
+        cal = self.repo.get(conv_id)["scenario"].get("calendar") or {}
+        if not cal.get("enabled") or not cal.get("months"):
+            if text.lower().startswith("/wait"):
+                raise ValueError("This card has no calendar. Turn it on in the card editor (Calendar) to use /wait.")
+            return None, text
+        state = self.repo.get_state(conv_id)
+        found = worldtime.parse_skip(cal, text, worldtime.clock_of(state))
+        if not found:
+            return None, text
+        minutes, spec = found
+
+        def prepare(st):
+            before = worldtime.clock_of(st)
+            worldtime.advance(st, cal, minutes)
+            st["date_label"] = worldtime.format_now(cal, worldtime.clock_of(st))
+            passed = worldtime.events_between(st, cal, before, worldtime.clock_of(st))
+            return st, worldtime.skip_note(cal, before, worldtime.clock_of(st), passed, spec)
+
+        return prepare, ("" if text.lower().startswith("/wait") else text)
 
     async def regenerate(self, conv_id: int) -> AsyncIterator[dict]:
         try:
@@ -326,6 +357,8 @@ class ChatEngine:
             removed += 1
             last = self.repo.last_message(conv_id)
         if last and last["role"] == "user":
+            if last.get("snapshot"):  # a fight action or a time skip changed the state before this message
+                self.repo.restore_snapshot(conv_id, last["snapshot"])
             self.repo.delete_message(last["id"])
             removed += 1
         return {"removed": removed}
@@ -550,6 +583,22 @@ class ChatEngine:
         pairs.reverse()
         return count, pairs
 
+    @staticmethod
+    def _move_clock(state: dict, cal: dict, updates: dict) -> list[str]:
+        """The tracker's estimate moves the clock (at most 12 hours a turn); appointments get their exact day."""
+        changes = []
+        before = worldtime.clock_of(state)
+        for ap in updates.get("appointments", []):  # "tomorrow" counts from when it was said, before the clock moves
+            ev = worldtime.add_event(state, cal, ap["text"], ap.get("when", ""), ap.get("days_from_now"))
+            if ev:
+                changes.append("Appointment: " + worldtime.describe_event(cal, ev, worldtime.day_index(cal, before)))
+        worldtime.advance(state, cal, min(updates.get("minutes_passed", 0), worldtime.MAX_TURN_MINUTES))
+        after = worldtime.clock_of(state)
+        state["date_label"] = worldtime.format_now(cal, after)
+        if worldtime.day_index(cal, after) != worldtime.day_index(cal, before):
+            changes.append("New day: " + worldtime.format_date(cal, worldtime.now(cal, after)))
+        return changes
+
     async def _remember_exchange(self, conv_id: int, user_text: str, reply: str, message_id: int) -> None:
         text = f"Player: {truncate(strip_thoughts(user_text), 200)} | Response: {truncate(reply, 300)}"
         await self.memory.add(conv_id, text, kind="exchange", importance=2, message_id=message_id)
@@ -559,9 +608,12 @@ class ChatEngine:
         user_text, reply = exchanges[-1]
         state = self.repo.get_state(conv_id)
         npcs = self.repo.list_npcs(conv_id)
-        prompt = self.prompts.analysis_messages(scenario=scenario, state=state, npcs=npcs, exchanges=exchanges, tracker=tracker)
+        cal = scenario.get("calendar") or {}
+        cal_on = bool(cal.get("enabled") and cal.get("months"))
+        prompt = self.prompts.analysis_messages(scenario=scenario, state=state, npcs=npcs, exchanges=exchanges, tracker=tracker,
+                                                calendar=cal if cal_on else None)
         try:
-            raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker), temperature=0.2,
+            raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker, cal_on), temperature=0.2,
                                       max_tokens=700 if tracker == "full" else 450)
         except LLMError as exc:
             log.warning("State analysis failed: %s", exc)
@@ -583,7 +635,11 @@ class ChatEngine:
         if (state.get("combat") or {}).get("active") or any("\u2694" in u for u, _ in exchanges):
             updates["hp_change"] = 0  # in a fight the app already applied the damage
 
+        if cal_on:
+            updates["time"] = ""  # the app's clock decides the time of day
         new_state, changes = apply_state_updates(state, updates)
+        if cal_on:
+            changes += self._move_clock(new_state, cal, updates)
         self.repo.save_state(conv_id, new_state)
 
         for npc in updates["new_npcs"]:

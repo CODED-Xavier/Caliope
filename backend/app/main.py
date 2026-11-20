@@ -31,6 +31,7 @@ from .modelhub import download_root
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import is_pollinations, polite_fetch
 from .playerlore import parse_suggestions, suggest_prompt
+from . import worldtime
 from .dice import DiceError
 from .engine import BusyError
 from .llm import LLMError
@@ -546,6 +547,38 @@ async def suggest_player_lore(conv_id: int, body: dict[str, Any] = Body(...)):
     text = await svc().llm.chat([{"role": "user", "content": suggest_prompt(entry, conv["summary"], recent)}],
                                 max_tokens=250, temperature=0.3)
     return {"suggestions": parse_suggestions(text)}
+
+
+@app.get("/api/calendar/presets")
+async def calendar_presets():
+    return worldtime.PRESETS
+
+
+@app.post("/api/calendar/preview")
+async def calendar_preview(body: dict[str, Any] = Body(...)):
+    cal = worldtime.normalize_calendar({**body, "enabled": True})
+    return {"calendar": cal, "starts": worldtime.format_now(cal, 0), "year_days": worldtime.year_days(cal)}
+
+
+@app.post("/api/conversations/{conv_id}/events")
+async def add_event(conv_id: int, body: dict[str, Any] = Body(...)):
+    """An appointment the player adds by hand ("Sunday: Mira's festival")."""
+    cal = svc().conversations.get(conv_id)["scenario"].get("calendar") or {}
+    if not cal.get("enabled"):
+        raise ValueError("This card has no calendar.")
+    state = svc().conversations.get_state(conv_id)
+    if not worldtime.add_event(state, cal, str(body.get("text", "")), str(body.get("when", ""))):
+        raise ValueError("Write what happens and when (for example: Sunday, tomorrow at noon, in 3 days, 10 Frostmoon).")
+    svc().conversations.save_state(conv_id, state)
+    return state
+
+
+@app.delete("/api/conversations/{conv_id}/events/{event_id}")
+async def delete_event(conv_id: int, event_id: str):
+    state = svc().conversations.get_state(conv_id)
+    state["events"] = [e for e in state.get("events", []) if e["id"] != event_id]
+    svc().conversations.save_state(conv_id, state)
+    return state
 
 
 @app.delete("/api/conversations/{conv_id}")

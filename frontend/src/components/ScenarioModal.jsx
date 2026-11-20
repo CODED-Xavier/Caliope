@@ -7,6 +7,7 @@ import MoodEditor from "./MoodEditor.jsx";
 import { portraitSrc } from "../portraits.js";
 import { api } from "../api.js";
 import { KIND_LABELS, MODE_LABELS } from "../utils.js";
+import { CalendarEditor } from "./Calendar.jsx";
 
 const LOOKS = [["race", "Race / species"], ["hair", "Hair"], ["eyes", "Eyes"], ["build", "Build"], ["skin", "Skin"], ["outfit", "Style / outfit"], ["extra", "Other details"]];
 const MAX_SKILLS = 3;
@@ -363,6 +364,7 @@ function Editor({ initial, id, onCancel, onSaved }) {
       <RulebookPicker attached={d.rulebooks || []} onChange={(v) => set("rulebooks", v)} />
       <InformationEditor info={d.information} onChange={(v) => set("information", v)} />
       <LorebookEditor book={d.lorebook} onChange={(v) => set("lorebook", v)} />
+      <CalendarEditor value={d.calendar} onChange={(v) => set("calendar", v)} />
 
       <SkillPicker attached={d.skills.attached} onChange={(a) => set("skills", { attached: a })} cardText={cardText} />
 

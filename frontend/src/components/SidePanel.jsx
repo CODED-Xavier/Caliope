@@ -7,6 +7,7 @@ import CombatTab from "./CombatTab.jsx";
 import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
 import { latestStatus, portraitSrc } from "../portraits.js";
 import PlayerLore from "./PlayerLore.jsx";
+import { CalendarBox } from "./Calendar.jsx";
 
 /* ----------------------------------------------------------------- Status */
 function StatusTab({ messages, every }) {
@@ -414,7 +415,7 @@ function PinnedBox({ value, limit, onSave }) {
   );
 }
 
-function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinnedSave, lore, onLoreSaved }) {
+function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinnedSave, lore, onLoreSaved, state, onState }) {
   const [mems, setMems] = useState([]);
   const [filter, setFilter] = useState("");
   const [text, setText] = useState("");
@@ -425,6 +426,7 @@ function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinned
   const who = (m) => { try { return JSON.parse(m.participants || "[]").join(", "); } catch { return ""; } };
   return (
     <div className="tab-body">
+      {state?.date_label && <CalendarBox convId={convId} state={state} onState={onState} />}
       <PinnedBox value={pinned} limit={pinnedLimit} onSave={onPinnedSave} />
       <PlayerLore key={convId} entries={lore} convId={convId} onSaved={onLoreSaved} />
       <div className="section-title">Story so far</div>
@@ -461,7 +463,7 @@ const TABS = [
   ["journal", "📖", "Journal"],
 ];
 
-export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onCombat, onCombatEdit, style }) {
+export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onCombat, onCombatEdit, style }) {
   const { state, npcs, conversation } = game;
   const mode = conversation.scenario?.mode;
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
@@ -488,7 +490,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         {active === "dice" && <DiceTab onRollToChat={onRollToChat} canRoll={canRoll} />}
         {active === "journal" && <JournalTab convId={conversation.id} summary={conversation.summary} refreshKey={memoryKey}
           pinned={conversation.pinned_memory} pinnedLimit={game.pinned_limit || 2000} onPinnedSave={onPinnedSave}
-          lore={conversation.player_lore} onLoreSaved={onLoreSaved} />}
+          lore={conversation.player_lore} onLoreSaved={onLoreSaved} state={state} onState={onStateLoaded} />}
       </div>
     </aside>
   );

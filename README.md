@@ -231,6 +231,14 @@ On the start screen (and later in Journal > *Your world additions*) you can add 
 - **✨ New facts from the story** reads the recent story and suggests facts it established about the entry (new members, events); click *Add* on the ones you want, then Save.
 - Your character's Background now keeps up to 900 characters in the prompt (was 400); put long details in a lore entry instead.
 
+## 4k. World calendar (card editor > Calendar)
+
+Each card can have its own calendar: week days, months and their lengths, what a month and a year are called, the era, and the date and hour the story starts (presets: our calendar, a fantasy one).
+- **The app keeps the clock, not the AI.** The date and hour are shown at the top of the chat and in Journal. After each turn the tracker only estimates how long the scene took (a talk: minutes, a meal: an hour); the app moves the clock, never more than 12 hours in one turn.
+- **Days pass only when you choose:** `/wait 2 hours`, `/wait 3 days`, `/wait until Sunday`, `/wait until morning`, or in your own words ("I sleep until morning", "we travel for three days"). What your character *says* (in quotes) never skips time. Undo puts the clock back.
+- **Appointments:** "the festival is on Sunday" becomes an appointment on the exact day (counted by the app from the calendar, not by the AI). The GM sees today, the coming week day by day and the appointments, so "in two days" is always right; skipping past an appointment tells you about it. You can add or remove appointments in Journal.
+- Needs the tracker (on by default) to move the clock between skips.
+
 ## 5. Tests
 
 ```

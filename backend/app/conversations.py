@@ -10,6 +10,7 @@ from .state import new_state
 from .portraits import process_reply
 from .util import clamp, now, render_macros
 from .playerlore import clean_entries
+from .worldtime import format_now, time_label
 
 NPC_COLUMNS = ("name", "description", "personality", "speech_style", "appearance", "portraits", "in_prompt", "met", "relationship", "notes", "active", "is_main")
 
@@ -55,6 +56,11 @@ class ConversationRepository:
                 if key in PLAYER_FIELDS and value not in (None, ""):
                     template[key] = value
             state = new_state(template, player_name or (player or {}).get("name"))
+            cal = data.get("calendar") or {}
+            if cal.get("enabled") and cal.get("months"):
+                state["clock"] = {"minutes": 0}
+                state["time"] = time_label(cal, 0)
+                state["date_label"] = format_now(cal, 0)
             if setup in ("app", "card"):
                 state["setup"] = setup
             self.db.execute("INSERT INTO game_state(conversation_id, data) VALUES(?,?)", (conv_id, json.dumps(state, ensure_ascii=False)))
