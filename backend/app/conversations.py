@@ -13,7 +13,7 @@ from .portraits import process_reply
 from .util import clamp, now, render_macros
 from .playerlore import clean_entries
 from .resources import start_pools
-from . import statusbook
+from . import routes, statusbook
 from .cards import resolve_features
 from .worldtime import format_now, time_label, weather_on
 
@@ -36,18 +36,28 @@ def _json_list(raw) -> list:
     return value if isinstance(value, list) else []
 
 
+
+def _focused(name: str, focus: set[str]) -> bool:
+    """A character the route starts with: the full name, or its first name, is in the route's focus list."""
+    n = name.lower().strip()
+    return n in focus or n.split(" ")[0] in focus or any(f.split(" ")[0] == n for f in focus)
+
+
 class ConversationRepository:
     def __init__(self, db: Database):
         self.db = db
 
     # ------------------------------------------------------------ conversations
     def create(self, scenario: dict | None = None, title: str = "", player_name: str | None = None,
-               player: dict | None = None, setup: str = "", player_lore: list | None = None) -> dict:
+               player: dict | None = None, setup: str = "", player_lore: list | None = None, start: str = "") -> dict:
         """`player` comes from the start screen and is laid over the card's starting sheet.
         `setup` is "app" (made on the start screen), "card" (the card asks in the story) or ""."""
         """Start a new playthrough. `scenario` is a full scenario row (with `data`) or None for freeform."""
         data = scenario["data"] if scenario else normalize_scenario({"name": "Freeform adventure", "mode": "gm_world"})
         snapshot = {**data, "name": scenario["name"] if scenario else data["name"]}
+        route = routes.resolve(data, start)  # None: the card's default start
+        if route:
+            snapshot["route"] = {k: route[k] for k in ("id", "name", "setting", "focus", "scenes")}
         ts = now()
         with self.db.transaction():
             cur = self.db.execute(
@@ -73,6 +83,9 @@ class ConversationRepository:
                 state["date_label"] = format_now(cal, 0)
             if setup in ("app", "card"):
                 state["setup"] = setup
+            if route and route["scenes"]:
+                state["script"] = {"next": 0}
+            focus = {f.lower() for f in (route or {}).get("focus") or []}
             self.db.execute("INSERT INTO game_state(conversation_id, data) VALUES(?,?)", (conv_id, json.dumps(state, ensure_ascii=False)))
             for i, npc in enumerate(data.get("npcs", [])):
                 self.add_npc(
@@ -84,12 +97,13 @@ class ConversationRepository:
                     appearance=npc.get("appearance"),
                     portraits=npc.get("portraits"),
                     in_prompt=npc.get("in_prompt", True),
-                    met=npc.get("met", True),
+                    met=True if focus and _focused(npc["name"], focus) else (False if focus else npc.get("met", True)),
                     relationship=npc.get("relationship", 0),
                     is_main=1 if (data["mode"] == "character" and i == 0) else 0,
                 )
-            if data.get("opening_message"):
-                opening = render_macros(data["opening_message"], player_name or state["player"].get("name") or "the player", snapshot["name"])
+            opening_text = (route or {}).get("opening") or data.get("opening_message")
+            if opening_text:
+                opening = render_macros(opening_text, player_name or state["player"].get("name") or "the player", snapshot["name"])
                 opening, extra, met = process_reply(opening, self.list_npcs(conv_id))
                 tpl = statusbook.template_of(data)
                 if tpl and extra.get("status") and resolve_features(data).get("status_by", "app") == "app":

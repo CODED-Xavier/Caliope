@@ -137,6 +137,20 @@ export default function SettingsModal({ onClose, onSaved }) {
           </Row>
         </>)}
       </>)}
+      <h3>Pictures in the cloud (optional)</h3>
+      <div className="muted tiny">Your private Cloudflare R2 bucket for card pictures. Leave empty to keep pictures only on this PC.</div>
+      <Row label="R2 account ID" help="r2">
+        <input className="field" value={s.r2_account_id || ""} onChange={(e) => set("r2_account_id", e.target.value.trim())} />
+      </Row>
+      <Row label="R2 bucket name" help="r2">
+        <input className="field" value={s.r2_bucket || ""} onChange={(e) => set("r2_bucket", e.target.value.trim())} />
+      </Row>
+      <Row label="R2 access key ID" help="r2">
+        <SecretField value={s.r2_access_key_id || ""} onChange={(v) => set("r2_access_key_id", v.trim())} />
+      </Row>
+      <Row label="R2 secret access key" help="r2">
+        <SecretField value={s.r2_secret_access_key || ""} onChange={(v) => set("r2_secret_access_key", v.trim())} />
+      </Row>
       <Row label="Open in its own window" help="app_window">
         <input type="checkbox" checked={s.app_window !== false} onChange={(e) => set("app_window", e.target.checked)} />
       </Row>

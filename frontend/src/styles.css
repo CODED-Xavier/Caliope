@@ -465,3 +465,16 @@ body.resizing { user-select: none; cursor: col-resize; }
 /* Calíope brand */
 .brand-icon { width: 24px; height: 24px; image-rendering: pixelated; vertical-align: -5px; border-radius: 5px; }
 .brand-name { font-family: var(--serif); font-weight: 700; background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* character preview and card pictures */
+.cast-preview { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.cast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.cast-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 4px; cursor: zoom-in; }
+.cast-card:hover { border-color: var(--accent); }
+.cast-card img, .cast-empty { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: top; border-radius: 8px; background: var(--bg2); }
+.cast-empty { display: flex; align-items: center; justify-content: center; font: 700 40px var(--serif); color: var(--muted); }
+.cast-name { font-weight: 600; font-size: 13px; }
+.cast-role { line-height: 1.3; }
+.starts-pick { flex-wrap: wrap; }
+.pics-folder { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.pics-found { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }

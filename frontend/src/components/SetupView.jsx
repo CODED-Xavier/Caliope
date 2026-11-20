@@ -4,6 +4,7 @@ import PlayerLore from "./PlayerLore.jsx";
 const NO_LORE = [];
 import { api } from "../api.js";
 import HelpTip from "./HelpTip.jsx";
+import { CharacterPreview, StartPicker } from "./CardExtras.jsx";
 import { abilityMod, fmtMod } from "../utils.js";
 
 // Hit die per class (D&D 5e). Anything else uses d8.
@@ -30,6 +31,8 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState("");
   const [lore, setLore] = useState([]);
+  const [startId, setStartId] = useState("default");
+  const [showCast, setShowCast] = useState(false);
 
   useEffect(() => {
     api.scenario(scenarioId).then((s) => {
@@ -76,21 +79,25 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
     setBusy(true); setError("");
     try {
       if (way === "card") {
-        await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined, player_lore: lore });
+        await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined, player_lore: lore, start: startId });
       } else {
         if (!p.name.trim()) { setError("Give your character a name."); setBusy(false); return; }
         const player = { ...p, name: p.name.trim() };
         if (adventure) { player.hp = { current: hp, max: hp }; player.ac = ac; }
         else delete player.stats;
-        await onStart(scenarioId, { setup: "app", player, player_lore: lore });
+        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId });
       }
     } catch (e) { setError(e.message); setBusy(false); }
   };
 
   return (
     <div className="setup">
-      <h3 className="setup-title">{adventure ? "Create your sheet" : "Who are you?"} <span className="muted small">· {card.name}</span></h3>
+      <h3 className="setup-title">{adventure ? "Create your sheet" : "Who are you?"} <span className="muted small">· {card.name}</span>
+        {(card.npcs || []).length > 0 && <button type="button" className="btn small ghost" style={{ marginLeft: 8 }} onClick={() => setShowCast((v) => !v)}>👥 {showCast ? "Hide characters" : "Characters"}</button>}</h3>
+      {showCast && <CharacterPreview npcs={card.npcs} />}
+      <StartPicker card={card} value={startId} onChange={setStartId} />
 
+      <div className="section-title">Your character</div>
       <div className="way-pick">
         <label className={`way ${way === "app" ? "active" : ""}`}>
           <input type="radio" checked={way === "app"} onChange={() => setWay("app")} />

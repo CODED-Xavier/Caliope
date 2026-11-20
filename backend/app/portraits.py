@@ -14,7 +14,7 @@ MAX_PER_REPLY = 2
 
 def _url(value) -> str:
     v = str(value or "").strip()
-    return v if v.startswith(("http://", "https://", "/")) and len(v) < 600 else ""
+    return v if v.startswith(("http://", "https://", "/", "r2:")) and len(v) < 600 else ""
 
 
 def normalize_portraits(raw) -> dict:

@@ -13,6 +13,7 @@ from .playerlore import always_section, triggered
 from .worldtime import CALENDAR_RULES, gm_notes
 from .resources import RESOURCE_RULES
 from .resources import gm_notes as resource_notes
+from .routes import planned_scene, route_section
 
 LANGUAGE_DIRECTIVES = {
     "en": "Write everything in English.",
@@ -195,7 +196,7 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
 
 
 SECTION_ORDER = [
-    "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario",
+    "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "route",
     "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
     "player", "pinned", "opening", "summary",
 ]
@@ -244,6 +245,9 @@ class PromptBuilder:
             sections["rules"] = sections["rules"].replace(TIME_RULE, CAL_TIME_RULE)
         if player_lore:
             sections["player_lore"] = always_section(player_lore)
+        route = scenario.get("route")
+        if route_section(route):
+            sections["route"] = route_section(route)
         if state.get("resources"):
             sections["resources"] = "## Resources\n" + RESOURCE_RULES
         if house_rules:
@@ -271,6 +275,9 @@ class PromptBuilder:
             extra = "## Resources (kept by the app)\n" + res_notes + ("\n\n" + extra if extra else "")
         if cal_on:
             extra = "## Date and time (kept by the app)\n" + gm_notes(state, cal) + ("\n\n" + extra if extra else "")
+        scene_plan = planned_scene(route, state)
+        if scene_plan:
+            extra = scene_plan + ("\n\n" + extra if extra else "")
         lore_hits = triggered(player_lore or [], [h["content"] for h in reversed(history)], int(ctx * 0.06))
         if lore_hits:
             mine = "## The player's world additions (relevant right now, canon)\n" + "\n\n".join(

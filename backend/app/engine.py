@@ -17,7 +17,7 @@ from typing import AsyncIterator
 
 from .appearance import appearance_seed
 from .checks import find_checks
-from . import resources
+from . import resources, routes
 from .shop import find_offers, is_trade
 from . import statusbook
 from .signals import needs_tracking, quiet_minutes
@@ -538,6 +538,9 @@ class ChatEngine:
         if timing:
             meta["timing"] = timing
         assistant_msg = self.repo.add_message(conv_id, "assistant", reply, meta)
+        st = self.repo.get_state(conv_id)
+        if routes.advance(st, scenario.get("route")):  # the planned scene was written: the next one comes after it
+            self.repo.save_state(conv_id, st)
         yield {"type": "assistant_message", "message": self.repo.get_message(assistant_msg["id"])}
 
         tracker = features["tracker"]

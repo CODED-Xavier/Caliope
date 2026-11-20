@@ -29,6 +29,8 @@ from .jukebox import MusicError
 from .rulebooks import RulebookError, ocr_available
 from .runtime import ENGINE_KEYS, EngineError
 from .modelhub import download_root, pick_model_file
+from .picker import pick_folder
+from . import cardpics, r2
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import PixAIError, is_pixai, is_pollinations, pixai_paint, polite_fetch
 from .playerlore import parse_suggestions, suggest_prompt
@@ -509,6 +511,110 @@ async def import_card(body: dict[str, Any] = Body(...)):
     return svc().scenarios.create(data)
 
 
+# ------------------------------------------------------------------ a card's pictures from a folder on this PC
+CARDPIC_DIR = Path(DB_PATH).parent / "cardpics"
+
+
+def _card_names(scenario_id: int) -> tuple[dict, list[str]]:
+    sc = svc().scenarios.get(scenario_id)
+    if not sc:
+        raise NotFound("Card not found")
+    return sc, [n["name"] for n in sc["data"].get("npcs", [])]
+
+
+@app.post("/api/scenarios/{scenario_id}/pictures/browse")
+async def card_pictures_browse(scenario_id: int):
+    _card_names(scenario_id)
+    if _PICKER.locked():
+        raise HTTPException(409, "The folder picker is already open (it may be behind this window).")
+    async with _PICKER:
+        folder = await asyncio.to_thread(pick_folder, "Pick the folder with the character pictures")
+    return {"folder": folder}
+
+
+@app.post("/api/scenarios/{scenario_id}/pictures/scan")
+async def card_pictures_scan(scenario_id: int, body: dict = Body(...)):
+    """Preview: which characters the folder's pictures belong to. Nothing changes yet."""
+    _, names = _card_names(scenario_id)
+    return await asyncio.to_thread(cardpics.scan, str(body.get("folder", "")), names)
+
+
+@app.post("/api/scenarios/{scenario_id}/pictures/apply")
+async def card_pictures_apply(scenario_id: int, body: dict = Body(...)):
+    """Copy the pictures into the app and use them for the card (and, if asked, for games already using it)."""
+    sc, names = _card_names(scenario_id)
+    found = await asyncio.to_thread(cardpics.scan, str(body.get("folder", "")), names)
+    overrides = {str(k): str(v) for k, v in (body.get("overrides") or {}).items() if str(v) in names}
+    labels = {n["name"]: {m["n"]: m["label"] for m in (n.get("portraits") or {}).get("moods", []) if m.get("n")}
+              for n in sc["data"].get("npcs", [])}
+    pics = await asyncio.to_thread(cardpics.apply, found, labels, CARDPIC_DIR / str(scenario_id),
+                                   f"/api/cardpics/{scenario_id}", overrides)
+    data = dict(sc["data"])
+    data["npcs"] = [{**n, "portraits": pics[n["name"]]} if n["name"] in pics else n for n in data.get("npcs", [])]
+    svc().scenarios.update(scenario_id, {**data, "name": sc["name"]})
+    games = 0
+    if body.get("update_games", True):
+        rows = svc().db.query("SELECT id FROM conversations WHERE scenario_id = ?", (scenario_id,))
+        for r in rows:
+            touched = False
+            for npc in svc().conversations.list_npcs(r["id"]):
+                if npc["name"] in pics:
+                    svc().conversations.update_npc(npc["id"], portraits=pics[npc["name"]])
+                    touched = True
+            games += touched
+    return {"characters": len(pics), "games": games, "card": svc().scenarios.get(scenario_id)}
+
+
+@app.post("/api/scenarios/{scenario_id}/pictures/r2")
+async def card_pictures_to_r2(scenario_id: int):
+    """Upload the card's pictures (the ones in the app's folder) to your private R2 bucket and use them from there."""
+    sc, _ = _card_names(scenario_id)
+    settings = svc().settings.all()
+    if not r2.ready(settings):
+        raise ValueError("Add the R2 account ID, bucket and keys in Settings > Pictures in the cloud first.")
+    prefix = f"/api/cardpics/{scenario_id}/"
+    slug = re.sub(r"[^a-z0-9]+", "-", sc["name"].lower()).strip("-") or f"card-{scenario_id}"
+    moved: dict[str, str] = {}
+
+    async def put(url: str) -> str:
+        if not url.startswith(prefix):
+            return url
+        if url not in moved:
+            path = CARDPIC_DIR / str(scenario_id) / url[len(prefix):]
+            data = path.read_bytes()
+            ctype = {".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}.get(path.suffix, "")
+            moved[url] = await r2.upload(settings, f"cards/{slug}/{url[len(prefix):]}", data, ctype)
+        return moved[url]
+
+    async def remap(p: dict) -> dict:
+        return {"default": await put(p.get("default") or ""),
+                "moods": [{**m, "url": await put(m["url"])} for m in p.get("moods") or []]}
+
+    data = dict(sc["data"])
+    data["npcs"] = [{**n, "portraits": await remap(n.get("portraits") or {})} for n in data.get("npcs", [])]
+    svc().scenarios.update(scenario_id, {**data, "name": sc["name"]})
+    by_name = {n["name"]: n["portraits"] for n in data["npcs"]}
+    for r in svc().db.query("SELECT id FROM conversations WHERE scenario_id = ?", (scenario_id,)):
+        for npc in svc().conversations.list_npcs(r["id"]):
+            if npc["name"] in by_name and any(u.startswith(prefix) for u in _urls(npc["portraits"])):
+                svc().conversations.update_npc(npc["id"], portraits=by_name[npc["name"]])
+    return {"uploaded": len(moved), "card": svc().scenarios.get(scenario_id)}
+
+
+def _urls(p: dict) -> list[str]:
+    return [p.get("default") or ""] + [m.get("url", "") for m in p.get("moods") or []]
+
+
+@app.get("/api/cardpics/{scenario_id}/{who}/{name}")
+async def card_picture(scenario_id: int, who: str, name: str):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", who) or not re.fullmatch(r"\d{1,2}\.(png|jpg|webp|gif)", name):
+        raise HTTPException(status_code=404, detail="Picture not found")
+    path = CARDPIC_DIR / str(scenario_id) / who / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Picture not found")
+    return FileResponse(path, headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/api/scenarios/{scenario_id}/export")
 async def export_scenario(scenario_id: int):
     scenario = svc().scenarios.get(scenario_id)
@@ -545,7 +651,10 @@ async def uploaded_picture(name: str):
 async def portrait(url: str = Query(...)):
     """A character picture, downloaded once from its link and then served from this PC."""
     try:
-        if is_pixai(url):  # a scene picture painted by PixAI with your key, then kept on this PC
+        if r2.is_r2(url):  # a picture in your private R2 bucket: a short-lived signed link, then kept on this PC
+            link = r2.download_link(svc().settings.all(), url)
+            path = await get_image(url, PORTRAIT_DIR, fetch=lambda _u: http_fetch(link, timeout=60.0), check=lambda u: u)
+        elif is_pixai(url):  # a scene picture painted by PixAI with your key, then kept on this PC
             s = svc().settings
             async def fetch(u):
                 return await http_fetch(await pixai_paint(u, s.get("pixai_api_key"), s.get("pixai_model")), timeout=60.0)
@@ -555,7 +664,7 @@ async def portrait(url: str = Query(...)):
             path = await get_image(url, PORTRAIT_DIR, fetch=fetch)
         else:
             path = await get_image(url, PORTRAIT_DIR)
-    except (ImageError, PixAIError) as exc:
+    except (ImageError, PixAIError, r2.R2Error) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:  # network problems: the picture just doesn't show
         raise HTTPException(status_code=502, detail=f"Could not download the picture: {exc}") from exc
@@ -577,6 +686,7 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
             raise NotFound("Scenario not found")
     player = body.get("player") if isinstance(body.get("player"), dict) else None
     conv = svc().conversations.create(scenario, title=str(body.get("title", "")), player_name=body.get("player_name"),
+                                      start=str(body.get("start") or ""),
                                       player=player, setup=str(body.get("setup") or ""),
                                       player_lore=body.get("player_lore") if isinstance(body.get("player_lore"), list) else None)
     return full_conversation(conv["id"])

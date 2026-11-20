@@ -50,7 +50,7 @@ export default function PlayerLore({ entries, onChange, convId, onSaved }) {
   return (
     <div className="player-lore">
       <div className="section-title">Your world additions <HelpTip id="player_lore" /></div>
-      {!list.length && <p className="muted tiny">Add things your character brings to the world: a great house, a home town, an order. The GM treats them as true, even where the card's lore says otherwise.</p>}
+      {!list.length && <p className="muted tiny">Add things your character brings to the world: a great house, a home town, an order. The Aedo treats them as true, even where the card's lore says otherwise.</p>}
       {list.map((e) => (
         <div key={e.id} className={`card lore-entry ${e.enabled ? "" : "off"}`}>
           <div className="row center gap">

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { CharacterPreview, PicturesFolder, StartsEditor } from "./CardExtras.jsx";
 import Modal from "./Modal.jsx";
 import HelpTip from "./HelpTip.jsx";
 import KindPicker from "./KindPicker.jsx";
@@ -332,8 +333,13 @@ function Editor({ initial, id, onCancel, onSaved }) {
       <textarea className="field" rows={2} value={d.tone} onChange={(e) => set("tone", e.target.value)} />
       <label className="lbl">Opening message <DraftButton field="opening_message" card={d} onText={(t) => set("opening_message", t)} /></label>
       <textarea className="field" rows={4} value={d.opening_message} onChange={(e) => set("opening_message", e.target.value)} />
+      <StartsEditor starts={d.starts} npcs={d.npcs} onChange={(v) => set("starts", v)} />
 
       <div className="section-title">{d.mode === "character" ? "The character" : "Characters (NPCs)"} <span className="muted tiny">({d.npcs.length})</span></div>
+      <PicturesFolder cardId={id} npcs={d.npcs} onApplied={(card) => {
+        const pics = Object.fromEntries((card.data.npcs || []).map((n) => [n.name, n.portraits]));
+        setD((p) => ({ ...p, npcs: p.npcs.map((n) => (pics[n.name] ? { ...n, portraits: pics[n.name] } : n)) }));
+      }} />
       {d.npcs.length > 8 && <div className="row gap center"><input className="field grow" placeholder="Find a character…" value={npcFilter} onChange={(e) => setNpcFilter(e.target.value)} /></div>}
       {d.npcs.map((n, i) => (npcFilter && !n.name.toLowerCase().includes(npcFilter.toLowerCase())) ? null : (
         <div className="card" key={i}>
@@ -424,7 +430,8 @@ function Editor({ initial, id, onCancel, onSaved }) {
 export default function ScenarioModal({ onClose, onStart }) {
   const [list, setList] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [view, setView] = useState("pick"); // pick | edit | import | setup
+  const [view, setView] = useState("pick"); // pick | edit | import | setup | cast
+  const [cast, setCast] = useState(null);
   const [editing, setEditing] = useState(null); // {id, initial}
   const [error, setError] = useState("");
 
@@ -449,6 +456,14 @@ export default function ScenarioModal({ onClose, onStart }) {
     return (
       <Modal title="New game" onClose={onClose} wide>
         <SetupView scenarioId={sel.id} onBack={() => setView("pick")} onStart={onStart} />
+      </Modal>
+    );
+  }
+
+  if (view === "cast" && cast) {
+    return (
+      <Modal title={`Characters · ${cast.name}`} onClose={onClose} wide>
+        <CharacterPreview npcs={cast.npcs} onClose={() => setView("pick")} />
       </Modal>
     );
   }
@@ -481,6 +496,7 @@ export default function ScenarioModal({ onClose, onStart }) {
           <div key={s.id} className={`scn ${s.id === selected ? "active" : ""}`} onClick={() => setSelected(s.id)}>
             <div className="row gap center">
               <div className="scn-name grow">{s.name}</div>
+              <button className="icon-btn" title="Characters" onClick={(e) => { e.stopPropagation(); api.scenario(s.id).then((full) => { setCast({ name: s.name, npcs: full.data.npcs }); setView("cast"); }).catch((er) => setError(er.message)); }}>👥</button>
               <a className="icon-btn" title="Export as a character card (JSON)" href={api.exportCardUrl(s.id)} download onClick={(e) => e.stopPropagation()}>⤓</a>
               <button className="icon-btn" title="Edit" onClick={(e) => { e.stopPropagation(); edit(s.id); }}>✎</button>
               <button className="icon-btn" title="Delete" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete card "${s.name}"? Your saved games stay.`)) api.deleteScenario(s.id).then(() => load()).catch((er) => setError(er.message)); }}>🗑</button>

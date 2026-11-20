@@ -263,6 +263,12 @@ Card editor > **Resources and powers**: the card's pools (name, maximum, colour,
 
 Play.bat and Caliope.exe open the game in a window of its own (Microsoft Edge's app mode, which comes with Windows: no tabs, no address bar), not in a browser tab. The black window is minimized; it still holds the messages and errors. **Closing the game window stops everything.** Settings > *Open in its own window* turns it off (back to a browser tab). If Edge is missing, Chrome or Brave is used, else your normal browser.
 
+## 4o. Starts, characters and pictures (v2.1)
+- **👥 Characters**: on a card in the New game list (and on the "Who are you?" screen) shows every character with picture, name and role. Click a picture to zoom.
+- **Choose your start**: a card can have several starts. The default is the card's opening; imported alternate openings appear too; the card editor (under *Opening message*) adds full starts: their own opening, how the world is on that route (the Aedo reads it every turn), who the story starts with (everyone else is met in the story) and **fixed scenes** the Aedo plays in order, one per reply (separate them with a line of `---`).
+- **Pictures from a folder** (card editor, *Characters*): pick a folder with one subfolder per character holding `1.png`…`6.png` (1 Standard, 2 Happy, 3 Sad, 4 Angry, 5 Disgusted, 6 Blushing), or a single `Name.png`. Names match without caring about capitals, accents or a missing surname; a preview shows what matched and lets you assign the rest by hand. Missing moods use the closest one. The pictures are copied into the app (`data\cardpics`) and also replace them in games already using the card. Run it again whenever you add pictures.
+- **Private cloud (Cloudflare R2)**: Settings > *Pictures in the cloud* takes your R2 account ID, bucket and keys; ☁ in the card editor uploads the card's pictures. The bucket stays private: the app signs every download, keeps a copy on this PC, and the card only holds `r2:` links that nobody else can open.
+
 ## 5. Tests
 
 ```

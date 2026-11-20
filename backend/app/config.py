@@ -75,6 +75,11 @@ DEFAULT_SETTINGS: dict = {
     "picture_service": "pollinations",  # pollinations (free, no account) | pixai (your own API key)
     "pixai_api_key": "",
     "pixai_model": "",            # PixAI model version ID
+    # --- Cloudflare R2 (optional private cloud storage for card pictures) ---
+    "r2_account_id": "",
+    "r2_bucket": "",
+    "r2_access_key_id": "",
+    "r2_secret_access_key": "",
     "scene_picture_style": "atmospheric fantasy painting, detailed, cinematic lighting",
 }
 
