@@ -17,12 +17,18 @@ class NotFound(Exception):
     pass
 
 
+PLAYER_FIELDS = ("name", "race", "class", "level", "background", "description", "traits", "stats", "hp", "ac", "skills")
+
+
 class ConversationRepository:
     def __init__(self, db: Database):
         self.db = db
 
     # ------------------------------------------------------------ conversations
-    def create(self, scenario: dict | None = None, title: str = "", player_name: str | None = None) -> dict:
+    def create(self, scenario: dict | None = None, title: str = "", player_name: str | None = None,
+               player: dict | None = None, setup: str = "") -> dict:
+        """`player` comes from the start screen and is laid over the card's starting sheet.
+        `setup` is "app" (made on the start screen), "card" (the card asks in the story) or ""."""
         """Start a new playthrough. `scenario` is a full scenario row (with `data`) or None for freeform."""
         data = scenario["data"] if scenario else normalize_scenario({"name": "Freeform adventure", "mode": "gm_world"})
         snapshot = {**data, "name": scenario["name"] if scenario else data["name"]}
@@ -33,7 +39,13 @@ class ConversationRepository:
                 (title or snapshot["name"], scenario["id"] if scenario else None, json.dumps(snapshot, ensure_ascii=False), ts, ts),
             )
             conv_id = cur.lastrowid
-            state = new_state(data.get("player"), player_name)
+            template = dict(data.get("player") or {})
+            for key, value in (player or {}).items():
+                if key in PLAYER_FIELDS and value not in (None, ""):
+                    template[key] = value
+            state = new_state(template, player_name or (player or {}).get("name"))
+            if setup in ("app", "card"):
+                state["setup"] = setup
             self.db.execute("INSERT INTO game_state(conversation_id, data) VALUES(?,?)", (conv_id, json.dumps(state, ensure_ascii=False)))
             for i, npc in enumerate(data.get("npcs", [])):
                 self.add_npc(
@@ -275,6 +287,78 @@ class ConversationRepository:
         )
 
     # ---------------------------------------------------------------- snapshots
+    # ---------------------------------------------------------------- save points
+    def fork(self, conv_id: int, message_id: int, title: str = "") -> int:
+        """Copy a game up to `message_id` into a new game (a save point you can play from).
+
+        The copy gets the sheet, characters and memories as they were right after that message, and every
+        earlier message keeps its undo data, so rewind and regenerate keep working inside the copy.
+        """
+        conv = self.get(conv_id)
+        rows = self.db.query("SELECT * FROM messages WHERE conversation_id = ? ORDER BY id", (conv_id,))
+        if not any(r["id"] == message_id for r in rows):
+            raise NotFound(f"Message {message_id} is not part of this game")
+        keep = [r for r in rows if r["id"] <= message_id]
+        later = [r for r in rows if r["id"] > message_id]
+        metas = {r["id"]: json.loads(r["meta"] or "{}") for r in rows}
+        point = next((metas[r["id"]]["snapshot"] for r in later if r["role"] == "assistant" and metas[r["id"]].get("snapshot")), None)
+        state = point["state"] if point else self.get_state(conv_id)
+        npcs = point["npcs"] if point else self.list_npcs(conv_id)
+
+        # Characters get new ids in the copy; the undo data inside old messages is rewritten to match.
+        old_ids: list[int] = [n["id"] for n in npcs]
+        for r in keep:
+            for n in (metas[r["id"]].get("snapshot") or {}).get("npcs", []):
+                if n["id"] not in old_ids:
+                    old_ids.append(n["id"])
+        base = (self.db.query_one("SELECT COALESCE(MAX(id), 0) AS m FROM npcs") or {"m": 0})["m"]
+        npc_map = {old: base + i + 1 for i, old in enumerate(old_ids)}
+
+        ts = now()
+        with self.db.transaction():
+            cur = self.db.execute(
+                "INSERT INTO conversations(title, scenario_id, scenario_snapshot, pinned_memory, created_at, updated_at) VALUES(?,?,?,?,?,?)",
+                (title or f"⑂ {conv['title']}", conv["scenario_id"], json.dumps(conv["scenario"], ensure_ascii=False),
+                 conv.get("pinned_memory", ""), ts, ts),
+            )
+            new_id = cur.lastrowid
+            self.db.execute("INSERT INTO game_state(conversation_id, data) VALUES(?,?)", (new_id, json.dumps(state, ensure_ascii=False)))
+            for n in npcs:
+                self._insert_npc_copy(new_id, n, npc_map[n["id"]])
+            msg_map: dict[int, int] = {}
+            for r in keep:
+                meta = metas[r["id"]]
+                if meta.get("snapshot"):
+                    snap = meta["snapshot"]
+                    meta["snapshot"] = {**snap, "npcs": [{**n, "id": npc_map[n["id"]]} for n in snap.get("npcs", [])]}
+                c = self.db.execute(
+                    "INSERT INTO messages(conversation_id, role, content, meta, created_at) VALUES(?,?,?,?,?)",
+                    (new_id, r["role"], r["content"], json.dumps(meta, ensure_ascii=False), r["created_at"]),
+                )
+                msg_map[r["id"]] = c.lastrowid
+            if conv["summary"] and conv["summary_upto"] in msg_map:
+                self.db.execute("UPDATE conversations SET summary = ?, summary_upto = ? WHERE id = ?",
+                                (conv["summary"], msg_map[conv["summary_upto"]], new_id))
+            for m in self.db.query("SELECT * FROM memories WHERE conversation_id = ? AND (message_id IS NULL OR message_id <= ?)",
+                                   (conv_id, message_id)):
+                self.db.execute(
+                    "INSERT INTO memories(conversation_id, message_id, text, kind, importance, participants, embedding, embed_model, created_at) "
+                    "VALUES(?,?,?,?,?,?,?,?,?)",
+                    (new_id, msg_map.get(m["message_id"]) if m["message_id"] else None, m["text"], m["kind"], m["importance"],
+                     m["participants"], m["embedding"], m["embed_model"], m["created_at"]),
+                )
+        return new_id
+
+    def _insert_npc_copy(self, conv_id: int, n: dict, npc_id: int) -> None:
+        self.db.execute(
+            "INSERT INTO npcs(id, conversation_id, name, description, personality, speech_style, appearance, portraits, in_prompt, met, "
+            "relationship, notes, active, is_main, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (npc_id, conv_id, n["name"], n["description"], n["personality"], n["speech_style"],
+             json.dumps(n.get("appearance") or {}, ensure_ascii=False), json.dumps(n.get("portraits") or {}, ensure_ascii=False),
+             int(n.get("in_prompt", True)), int(n.get("met", True)), n["relationship"], n["notes"],
+             int(n["active"]), int(n["is_main"]), n["created_at"]),
+        )
+
     def capture_snapshot(self, conv_id: int) -> dict:
         return {"state": self.get_state(conv_id), "npcs": self.list_npcs(conv_id)}
 

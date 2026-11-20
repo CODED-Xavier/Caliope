@@ -28,6 +28,7 @@ from .prompts import PromptBuilder, analysis_schema, reply_token_limit
 from .skills import SkillManager
 from .state import apply_state_updates, normalize_updates
 from .status import split_template
+from .writing import is_gm_message, strip_thoughts
 from .util import clamp, estimate_tokens, extract_json, truncate
 
 log = logging.getLogger("rpg.engine")
@@ -249,6 +250,12 @@ class ChatEngine:
             self.repo.set_summary(conv_id, "", 0)
         return len(rows)
 
+    def fork(self, conv_id: int, message_id: int) -> int:
+        """Save point: a new game that starts from this message. The original game is not changed."""
+        if self.is_busy(conv_id):
+            raise BusyError("Wait for the current reply to finish before making a save point.")
+        return self.repo.fork(conv_id, message_id)
+
     def rewind(self, conv_id: int, message_id: int, inclusive: bool = False) -> dict:
         """Go back in the story: remove everything after a message (and the message too if `inclusive`)."""
         if self.is_busy(conv_id):
@@ -319,8 +326,9 @@ class ChatEngine:
         conv = self.repo.get(conv_id)
         scenario_name = conv["scenario"].get("name", "")
         if conv["title"] in DEFAULT_TITLES or conv["title"] == scenario_name:
-            if not text.startswith("\U0001F3B2"):
-                self.repo.rename(conv_id, truncate(f"{scenario_name}: {text}" if scenario_name else text, 60))
+            said = strip_thoughts(text)  # thoughts and GM messages never end up in the title
+            if said and not said.startswith("\U0001F3B2"):
+                self.repo.rename(conv_id, truncate(f"{scenario_name}: {said}" if scenario_name else said, 60))
 
     async def _reply(self, conv_id: int, user_msg: dict) -> AsyncIterator[dict]:
         t_start = time.perf_counter()
@@ -333,8 +341,9 @@ class ChatEngine:
 
         previous_assistant = next((m for m in reversed(history[:-1]) if m["role"] == "assistant"), None)
         previous_text = previous_assistant["content"] if previous_assistant else ""
-        query = user_msg["content"] + (" " + previous_text[-300:] if previous_text else "")
-        active = scene_names(npcs, user_msg["content"], previous_text)
+        said = strip_thoughts(user_msg["content"])  # NPC-visible part of the player's message
+        query = said + (" " + previous_text[-300:] if previous_text else "")
+        active = scene_names(npcs, said, previous_text)
         memories = await self.memory.search(conv_id, query, active_names=active)
         skills = self.skills.attached((scenario.get("skills") or {}).get("attached", []))
         features = resolve_features(scenario, settings)
@@ -408,7 +417,9 @@ class ChatEngine:
         yield {"type": "assistant_message", "message": self.repo.get_message(assistant_msg["id"])}
 
         tracker = features["tracker"]
-        if tracker == "off":
+        if is_gm_message(user_msg["content"]):
+            pass  # a message to the GM, outside the story: nothing to track or remember
+        elif tracker == "off":
             await self._remember_exchange(conv_id, user_msg["content"], reply, assistant_msg["id"])
         else:
             count, exchanges = self._tracking_context(conv_id, features["tracker_interval"])
@@ -452,7 +463,8 @@ class ChatEngine:
         i = len(msgs) - 1
         while i >= 1 and len(pairs) < interval:
             if msgs[i]["role"] == "assistant" and msgs[i - 1]["role"] == "user":
-                pairs.append((msgs[i - 1]["content"], msgs[i]["content"]))
+                if not is_gm_message(msgs[i - 1]["content"]):  # the tracker never reads thoughts or GM messages
+                    pairs.append((strip_thoughts(msgs[i - 1]["content"]), msgs[i]["content"]))
                 i -= 2
             else:
                 i -= 1
@@ -460,7 +472,7 @@ class ChatEngine:
         return count, pairs
 
     async def _remember_exchange(self, conv_id: int, user_text: str, reply: str, message_id: int) -> None:
-        text = f"Player: {truncate(user_text, 200)} | Response: {truncate(reply, 300)}"
+        text = f"Player: {truncate(strip_thoughts(user_text), 200)} | Response: {truncate(reply, 300)}"
         await self.memory.add(conv_id, text, kind="exchange", importance=2, message_id=message_id)
 
     async def _analyze(self, conv_id: int, scenario: dict, exchanges: list[tuple[str, str]], message_id: int,

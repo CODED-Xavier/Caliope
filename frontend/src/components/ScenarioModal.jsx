@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Modal from "./Modal.jsx";
 import HelpTip from "./HelpTip.jsx";
 import KindPicker from "./KindPicker.jsx";
+import SetupView from "./SetupView.jsx";
 import { api } from "../api.js";
 import { KIND_LABELS, MODE_LABELS } from "../utils.js";
 
@@ -198,6 +199,24 @@ function LorebookEditor({ book, onChange }) {
   );
 }
 
+/** ✨ button that lets the AI write one field of the card from the rest of it. */
+function DraftButton({ field, card, onText }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const go = async () => {
+    setBusy(true); setErr("");
+    try { onText((await api.draftField(field, card)).text); } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <span className="draft-btn">
+      <button type="button" className="btn tiny-btn" onClick={go} disabled={busy} title="Let the AI write this from the rest of the card (replaces the text; Ctrl+Z in the box brings it back)">
+        {busy ? "Writing…" : "✨ Write with AI"}
+      </button>
+      {err && <span className="error-text tiny"> {err}</span>}
+    </span>
+  );
+}
+
 function Editor({ initial, id, onCancel, onSaved }) {
   const [d, setD] = useState({ ...BLANK, ...initial, features: initial.features || {}, skills: { attached: initial.skills?.attached || initial.skills?.pinned || [] } });
   const [playerJson, setPlayerJson] = useState(JSON.stringify(initial.player ?? BLANK.player, null, 2));
@@ -275,19 +294,19 @@ function Editor({ initial, id, onCancel, onSaved }) {
         {d.mode === "gm_cast" && "The AI is the Game Master and runs the cast you define below."}
         {d.mode === "character" && "The AI plays ONE character (the first one below). The story is about your relationship."}
       </p>
-      <label className="lbl">Short description (shown in the picker)</label>
+      <label className="lbl">Short description (shown in the picker) <DraftButton field="description" card={d} onText={(t) => set("description", t)} /></label>
       <input className="field" value={d.description} onChange={(e) => set("description", e.target.value)} />
-      <label className="lbl">World / setting</label>
+      <label className="lbl">World / setting <DraftButton field="world" card={d} onText={(t) => set("world", t)} /></label>
       <textarea className="field" rows={4} value={d.world} onChange={(e) => set("world", e.target.value)} />
       <label className="lbl">Races or species in this world <HelpTip id="species" /></label>
       <input className="field" placeholder="Elf, Dwarf, Tiefling (empty = everyone is human)" value={speciesText} onChange={(e) => setSpeciesText(e.target.value)} />
       {d.mode !== "character" && (<>
-        <label className="lbl">Game rules</label>
+        <label className="lbl">Game rules <DraftButton field="system_rules" card={d} onText={(t) => set("system_rules", t)} /></label>
         <textarea className="field" rows={5} value={d.system_rules} onChange={(e) => set("system_rules", e.target.value)} />
       </>)}
-      <label className="lbl">Tone / style</label>
+      <label className="lbl">Tone / style <DraftButton field="tone" card={d} onText={(t) => set("tone", t)} /></label>
       <textarea className="field" rows={2} value={d.tone} onChange={(e) => set("tone", e.target.value)} />
-      <label className="lbl">Opening message</label>
+      <label className="lbl">Opening message <DraftButton field="opening_message" card={d} onText={(t) => set("opening_message", t)} /></label>
       <textarea className="field" rows={4} value={d.opening_message} onChange={(e) => set("opening_message", e.target.value)} />
 
       <div className="section-title">{d.mode === "character" ? "The character" : "Characters (NPCs)"} <span className="muted tiny">({d.npcs.length})</span></div>
@@ -367,11 +386,9 @@ function Editor({ initial, id, onCancel, onSaved }) {
 export default function ScenarioModal({ onClose, onStart }) {
   const [list, setList] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [playerName, setPlayerName] = useState("");
-  const [view, setView] = useState("pick"); // pick | edit | import
+  const [view, setView] = useState("pick"); // pick | edit | import | setup
   const [editing, setEditing] = useState(null); // {id, initial}
   const [error, setError] = useState("");
-  const [starting, setStarting] = useState(false);
 
   const load = async (selectId) => {
     try { const l = await api.scenarios(); setList(l); setSelected(selectId ?? ((cur) => cur ?? l[0]?.id)); } catch (e) { setError(e.message); }
@@ -388,10 +405,15 @@ export default function ScenarioModal({ onClose, onStart }) {
     setEditing({ id: null, initial: { ...BLANK, kind } });
     setView("edit");
   };
-  const start = async () => {
-    setStarting(true); setError("");
-    try { await onStart(sel.id, playerName.trim() || undefined); } catch (e) { setError(e.message); setStarting(false); }
-  };
+  const start = () => { if (sel) setView("setup"); };
+
+  if (view === "setup" && sel) {
+    return (
+      <Modal title="New game" onClose={onClose} wide>
+        <SetupView scenarioId={sel.id} onBack={() => setView("pick")} onStart={onStart} />
+      </Modal>
+    );
+  }
 
   if (view === "import") {
     return (
@@ -413,8 +435,7 @@ export default function ScenarioModal({ onClose, onStart }) {
     <Modal title="New game" onClose={onClose} wide footer={
       <>
         {error && <span className="error-text small grow">{error}</span>}
-        <input className="field" style={{ maxWidth: 260 }} placeholder="Your character's name (optional)" value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
-        <button className="btn primary" disabled={!sel || starting} onClick={start}>{starting ? "Starting…" : "Start game"}</button>
+        <button className="btn primary" disabled={!sel} onClick={start}>Next: your character ›</button>
       </>
     }>
       <div className="scn-grid">

@@ -5,6 +5,8 @@ from .appearance import appearance_line
 from .portraits import portrait_instructions
 from .status import split_template
 from .util import estimate_tokens, render_macros, truncate
+from .writing import RULES as WRITING_RULES
+from .writing import for_model
 
 LANGUAGE_DIRECTIVES = {
     "en": "Write everything in English.",
@@ -31,6 +33,7 @@ CORE_RULES = """## Rules you always follow
 - Keep replies focused: usually 1-4 paragraphs. Match the pace the player wants.
 - This is fiction between adults. Dark, violent or mature themes are allowed when the story calls for them; portray them honestly without moralizing, disclaimers or breaking character. Every character in romantic or sexual content must be an adult.
 - Text inside [GM notes ...] is private information for you. Never repeat it, quote it or mention that it exists.
+- Keep track of the time of day and the weather. Mention them when they matter or change (dawn breaking, rain starting, night falling), keep them consistent, and let time pass naturally with travel, rest and long scenes.
 - Never mention these instructions, the game state format or that you are an AI unless the player steps out of the story."""
 
 GM_RULES = """- When the outcome of an action is uncertain or risky, tell the player which roll to make (for example "Make a DEX (Stealth) check, DC 13") and wait. Do not decide the result before the roll.
@@ -91,12 +94,45 @@ def describe_state(state: dict) -> str:
     active = [q for q in state["quests"] if q["status"] == "active"]
     if active:
         lines.append("Active quests: " + "; ".join(f"{q['title']}" + (f" ({truncate(q['notes'], 80)})" if q["notes"] else "") for q in active))
-    if state.get("location"):
-        lines.append(f"Current location: {state['location']}." + (f" Time: {state['time']}." if state.get("time") else ""))
+    scene = describe_scene(state)
+    if scene:
+        lines.append(scene)
     known = [l["name"] for l in state["locations"] if l["name"] != state.get("location")][:12]
     if known:
         lines.append("Known places: " + ", ".join(known) + ".")
     return "\n".join(lines)
+
+
+def describe_scene(state: dict) -> str:
+    bits = []
+    if state.get("location"):
+        bits.append(f"Current location: {state['location']}.")
+    if state.get("time"):
+        bits.append(f"Time: {state['time']}.")
+    if state.get("weather"):
+        bits.append(f"Weather: {state['weather']}.")
+    return " ".join(bits)
+
+
+def describe_player(state: dict, numbers: bool) -> str:
+    """The player's character, near the top of the prompt so the model never forgets who they are."""
+    p = state["player"]
+    who = " ".join(x for x in (p.get("race", ""), p.get("class", "")) if x)
+    lines = [f"Name: {p['name']}" + (f" ({who}" + (f", level {p.get('level', 1)})" if numbers else ")") if who else "")]
+    if numbers and p.get("stats"):
+        from .util import as_int
+        stats = ", ".join(f"{k} {v} ({(as_int(v, 10) - 10) // 2:+d})" for k, v in p["stats"].items())
+        lines.append(f"Abilities: {stats}")
+    if p.get("skills"):
+        lines.append("Skills: " + ", ".join(str(s) for s in p["skills"][:12]))
+    for key, label in (("background", "Background"), ("description", "Appearance"), ("traits", "Personality")):
+        if p.get(key):
+            lines.append(f"{label}: {truncate(p[key], 400)}")
+    rule = ("Always call the player's character by this name and keep these details exactly. Their "
+            + ("class, skills and abilities matter: let strengths shine and weaknesses show (a low STR character struggles to lift "
+               "heavy things, a wizard understands magic, a fighter reads a fight)." if numbers else
+               "background and personality matter: NPCs react to who they are and how they look."))
+    return "## The player's character\n" + "\n".join(lines) + "\n" + rule
 
 
 def describe_npcs(npcs: list[dict], limit_chars: int = 3200, with_relationship: bool = False) -> str:
@@ -145,6 +181,13 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
     return kept
 
 
+SECTION_ORDER = [
+    "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario",
+    "lore_always", "game_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
+    "player", "pinned", "opening", "summary",
+]
+
+
 class PromptBuilder:
     """Builds the prompt in two parts so the model can reuse its work between turns:
 
@@ -175,6 +218,11 @@ class PromptBuilder:
         prompt_npcs = [n for n in npcs if n.get("in_prompt", True)]
         sections = self._stable_sections(scenario, prompt_npcs, summary, pinned, language, settings, mode, opening, skills)
         sections.update(self._card_sections(scenario, npcs, lore[0], macro))
+        sections["writing"] = WRITING_RULES
+        kind = scenario.get("kind") or ("roleplay" if mode == "character" else "adventure")
+        sections["player"] = describe_player(state, numbers=(kind == "adventure"))
+        # Parts that change most often go last, so the model can reuse everything before them.
+        sections = {k: sections[k] for k in sorted(sections, key=lambda k: SECTION_ORDER.index(k) if k in SECTION_ORDER else 50)}
         dropped: list[str] = []
         cap = int(ctx * 0.55)
         if estimate_tokens(self._join(sections)) > cap and "opening" in sections:
@@ -188,7 +236,8 @@ class PromptBuilder:
         used_memories = fit_memories(memories, mem_budget)
         met = [n for n in npcs if n.get("met", True)]
         extra = self._card_volatile(scenario, lore[1], status_due, macro)
-        volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra)
+        early = sum(1 for h in history if h["role"] == "user") <= 2  # the first turns of a game
+        volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra, early)
         budget = ctx - reserve - estimate_tokens(system_text) - estimate_tokens(volatile)
 
         kept: list[dict] = []
@@ -207,7 +256,7 @@ class PromptBuilder:
             fresh = [m for m in used_memories if m.get("message_id") is None or m["message_id"] < first_id]
             if len(fresh) != len(used_memories):
                 used_memories = fresh
-                volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra)
+                volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra, early)
 
         # Many chat templates require the first turn after the system prompt to come from the user.
         while kept and kept[0]["role"] == "assistant" and len(kept) > 1:
@@ -215,6 +264,8 @@ class PromptBuilder:
 
         messages: list[dict] = [{"role": "system", "content": system_text}]
         for msg in kept:
+            if msg["role"] == "user":
+                msg = {**msg, "content": for_model(msg["content"])}
             if messages[-1]["role"] == msg["role"] and messages[-1]["role"] != "system":
                 messages[-1]["content"] += "\n\n" + msg["content"]
             else:
@@ -338,17 +389,20 @@ class PromptBuilder:
         return "\n\n".join(parts)
 
     @staticmethod
-    def _volatile(state, npcs, memories, mode, appearance_hint: str = "", extra: str = "") -> str:
+    def _volatile(state, npcs, memories, mode, appearance_hint: str = "", extra: str = "", early: bool = False) -> str:
         parts: list[str] = []
         if mode != "character":
             parts.append("## Current game state\n" + describe_state(state))
-        elif state.get("location"):
-            parts.append(f"## Scene\nLocation: {state['location']}.")
+        elif describe_scene(state):
+            parts.append("## Scene\n" + describe_scene(state))
         rel = describe_relationships(npcs)
         if rel:
             parts.append("## Relationships with the player\n" + rel)
         if memories:
             parts.append("## Relevant memories\n" + "\n".join(f"- {m['text']}" for m in memories))
+        if state.get("setup") == "app" and early:
+            parts.append("## Character creation\nThe player already created their character (see \"The player's character\"). "
+                         "Do not ask the card's character creation questions; weave their details into the scene naturally.")
         if appearance_hint:
             parts.append(f"## New characters\nIf you introduce a new named character this turn, give them: {appearance_hint}.")
         if extra:  # card reminders go last, closest to the player's message, as cards expect
@@ -372,7 +426,8 @@ class PromptBuilder:
                 "- quests: quests started, updated or finished (title, status: active|completed|failed, notes).",
             ]
         lines += [
-            "- location: the player's new location name if they moved, else \"\". time: new in-world time if stated, else \"\".",
+            "- location: the player's new location name if they moved, else \"\". time: the new time of day if it changed, else \"\". "
+            "weather: the new weather if it changed, else \"\".",
         ]
         if full:
             lines += ["- new_locations: newly mentioned places (name, description, connects_to: names of existing places)."]
@@ -432,16 +487,17 @@ ANALYSIS_SCHEMA = {
         "quests": {"type": "array", "items": {"type": "object", "properties": {"title": {"type": "string"}, "status": {"type": "string"}, "notes": {"type": "string"}}, "required": ["title", "status", "notes"]}},
         "location": {"type": "string"},
         "time": {"type": "string"},
+        "weather": {"type": "string"},
         "new_locations": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "connects_to": {"type": "array", "items": {"type": "string"}}}, "required": ["name", "description", "connects_to"]}},
         "relationship_changes": {"type": "array", "items": {"type": "object", "properties": {"npc": {"type": "string"}, "delta": {"type": "integer"}, "reason": {"type": "string"}}, "required": ["npc", "delta", "reason"]}},
         "new_npcs": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "personality": {"type": "string"}, "appearance": _APPEARANCE_SCHEMA}, "required": ["name", "description", "personality", "appearance"]}},
         "memories": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "importance": {"type": "integer"}, "characters": {"type": "array", "items": {"type": "string"}}}, "required": ["text", "importance", "characters"]}},
     },
-    "required": ["hp_change", "gold_change", "inventory_add", "inventory_remove", "quests", "location", "time",
+    "required": ["hp_change", "gold_change", "inventory_add", "inventory_remove", "quests", "location", "time", "weather",
                  "new_locations", "relationship_changes", "new_npcs", "memories"],
 }
 
-_LITE_KEYS = ("location", "time", "relationship_changes", "new_npcs", "memories")
+_LITE_KEYS = ("location", "time", "weather", "relationship_changes", "new_npcs", "memories")
 ANALYSIS_SCHEMA_LITE = {
     "type": "object",
     "properties": {k: ANALYSIS_SCHEMA["properties"][k] for k in _LITE_KEYS},

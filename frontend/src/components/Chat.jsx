@@ -2,8 +2,9 @@ import React, { memo, useEffect, useLayoutEffect, useRef, useState } from "react
 import { Markdown } from "../markdown.jsx";
 import { hideStatus } from "../portraits.js";
 import Story from "./Story.jsx";
+import HelpTip from "./HelpTip.jsx";
 
-const Message = memo(function Message({ m, npcs, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind }) {
+const Message = memo(function Message({ m, npcs, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, hit }) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -58,17 +59,18 @@ const Message = memo(function Message({ m, npcs, isLast, isLastAssistant, onRege
       {canAct && !isUser && isLast && !isOpening && <button className="btn small continue-btn" title="Keep writing this reply from where it stopped" onClick={onContinue}>Continue ▸</button>}
       {canAct && !isLast && <button className="icon-btn" title="Rewind: delete everything after this message" onClick={() => onRewind(m.id, false)}>⏪</button>}
       {canAct && !isOpening && <button className="icon-btn" title="Delete this message and everything after it" onClick={() => onRewind(m.id, true)}>🗑</button>}
+      {canAct && <button className="icon-btn" title="Save point: start a new game from this moment (this game stays as it is)" onClick={() => onFork(m.id)}>⑂</button>}
     </div>
   );
 
   if (isUser) {
     const isDice = m.content.startsWith("\u{1F3B2}");
     return (
-      <div className="msg user">
+      <div className={`msg user ${hit || ""}`} data-mid={m.id}>
         <div className="user-col">
           {editing ? editor : (
             <>
-              <div className={`bubble ${isDice ? "dice" : ""}`}><Markdown text={m.content} /></div>
+              <div className={`bubble ${isDice ? "dice" : ""}`}><Markdown text={showThoughts(m.content)} /></div>
               {m.meta?.edited && <div className="muted tiny edited">edited</div>}
               {actions}
             </>
@@ -80,7 +82,7 @@ const Message = memo(function Message({ m, npcs, isLast, isLastAssistant, onRege
 
   const changes = m.meta?.changes || [];
   return (
-    <div className="msg assistant">
+    <div className={`msg assistant ${hit || ""}`} data-mid={m.id}>
       {isOpening && <div className="tag">Opening scene</div>}
       {editing ? editor : (
         <>
@@ -113,23 +115,80 @@ const Message = memo(function Message({ m, npcs, isLast, isLastAssistant, onRege
 
 const PHASES = { thinking: "Thinking…", writing: "", saved: "", updating: "Updating sheet and memories…" };
 
+// In your own messages, thoughts are shown as 💭 in italics (they stay 'single-quoted' in the saved text).
+const THOUGHT = /(?<![\w'])'(?=\S)((?:[^'\n]|(?<=\w)'(?=\w))*?[^\s'])'(?!\w)/g;
+const showThoughts = (t) => (t.trimStart().startsWith("/") && !/^\s*\/roll/i.test(t)
+  ? `🗨 *to the GM:* ${t.trimStart().slice(1)}`
+  : t.split(/("[^"\n]*")/).map((part, i) => (i % 2 ? part : part.replace(THOUGHT, (_, x) => `*(💭 ${x})*`))).join(""));
+
 // While a reply is being written: hide the status block and any half-written portrait tag at the end.
 const liveText = (t) => hideStatus(t).replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, "");
 
-export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind }) {
+export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch }) {
   const [text, setText] = useState("");
+  const [atBottom, setAtBottom] = useState(true);
+  const [query, setQuery] = useState("");
+  const [hitIdx, setHitIdx] = useState(0);
   const scrollRef = useRef(null);
+  const streamRef = useRef(null);
   const nearBottom = useRef(true);
+  const anchored = useRef(false); // the start of the new reply was already brought into view
   const taRef = useRef(null);
   const messages = game.messages;
   const lastAssistantIdx = (() => { for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === "assistant") return i; return -1; })();
 
+  const toBottom = (smooth) => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  };
+
+  // Opening a game: start at the end.
+  useLayoutEffect(() => { nearBottom.current = true; toBottom(false); }, [game.conversation.id]);
+  // A new message of yours: show it.
+  const lastId = messages[messages.length - 1]?.id;
+  const lastRole = messages[messages.length - 1]?.role;
+  const waitingReply = useRef(false);
+  useLayoutEffect(() => {
+    if (lastRole === "user") { toBottom(false); waitingReply.current = true; return; }
+    // The reply was saved before the view could stop at its start (a fast reply): show its start now.
+    if (lastRole === "assistant" && waitingReply.current) {
+      waitingReply.current = false;
+      if (!follow && !anchored.current) {
+        const el = scrollRef.current;
+        const box = el?.querySelector(`[data-mid="${lastId}"]`);
+        if (el && box && box.offsetTop - 12 > el.scrollTop) el.scrollTop = box.offsetTop - 12;
+      }
+      anchored.current = true;
+    }
+  }, [lastId, lastRole]); // eslint-disable-line
+  useEffect(() => { if (!stream) anchored.current = false; }, [stream]);
+
+  // While the AI writes: either follow the text, or stop at the start of the reply so you can read at your pace.
   useLayoutEffect(() => {
     const el = scrollRef.current;
-    if (el && nearBottom.current) el.scrollTop = el.scrollHeight;
-  }, [messages.length, stream?.text, stream?.phase]);
+    if (!el || !stream) return;
+    if (follow) {
+      if (nearBottom.current) el.scrollTop = el.scrollHeight;
+      return;
+    }
+    const box = streamRef.current;
+    if (!anchored.current && box && stream.text) {
+      anchored.current = true;
+      const top = box.offsetTop - 12;
+      if (top > el.scrollTop) el.scrollTop = top;
+    }
+  }, [stream?.text, stream?.phase, follow]);
 
-  useEffect(() => { nearBottom.current = true; }, [game.conversation.id]);
+  // Chat search
+  const q = query.trim().toLowerCase();
+  const hits = q.length >= 2 ? messages.filter((m) => m.content.toLowerCase().includes(q)).map((m) => m.id) : [];
+  const current = hits.length ? hits[Math.min(hitIdx, hits.length - 1)] : null;
+  useEffect(() => { setHitIdx(hits.length ? hits.length - 1 : 0); }, [q]); // eslint-disable-line
+  useEffect(() => {
+    if (current == null) return;
+    scrollRef.current?.querySelector(`[data-mid="${current}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [current]);
+  useEffect(() => { if (!searchOpen) setQuery(""); }, [searchOpen]);
 
   useEffect(() => {
     const ta = taRef.current;
@@ -138,34 +197,53 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
     ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
   }, [text]);
 
+  const regenerate = () => { waitingReply.current = true; anchored.current = false; onRegenerate(); };
+
   const submit = () => {
     const t = text.trim();
     if (!t || busy) return;
     setText("");
     nearBottom.current = true;
+    anchored.current = false;
+    waitingReply.current = true;
     onSend(t);
   };
 
   return (
     <div className="chat">
+      {searchOpen && (
+        <div className="search-bar">
+          <input className="field grow" autoFocus placeholder="Search this story…" value={query} onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") onCloseSearch();
+              if (e.key === "Enter" && hits.length) setHitIdx((i) => (e.shiftKey ? (i - 1 + hits.length) % hits.length : (i + 1) % hits.length));
+            }} />
+          <span className="muted small">{q.length >= 2 ? (hits.length ? `${Math.min(hitIdx, hits.length - 1) + 1} / ${hits.length}` : "no match") : ""}</span>
+          <button className="icon-btn" title="Previous (Shift+Enter)" disabled={!hits.length} onClick={() => setHitIdx((i) => (i - 1 + hits.length) % hits.length)}>▲</button>
+          <button className="icon-btn" title="Next (Enter)" disabled={!hits.length} onClick={() => setHitIdx((i) => (i + 1) % hits.length)}>▼</button>
+          <button className="icon-btn" title="Close" onClick={onCloseSearch}>✕</button>
+        </div>
+      )}
       <div className="chat-scroll" ref={scrollRef} onScroll={(e) => {
         const el = e.currentTarget;
         nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+        if (nearBottom.current !== atBottom) setAtBottom(nearBottom.current);
       }}>
         <div className="chat-inner">
           {messages.map((m, i) => (
             <Message key={m.id} m={m} npcs={game.npcs} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
-              onRegenerate={onRegenerate} onContinue={onContinue} canAct={!busy} lastContext={busy ? null : lastContext}
+              onRegenerate={regenerate} onContinue={onContinue} onFork={onFork}
+              hit={m.id === current ? "search-hit current" : hits.includes(m.id) ? "search-hit" : ""} canAct={!busy} lastContext={busy ? null : lastContext}
               onEdit={onEdit} onResend={onResend} onRewind={onRewind} />
           ))}
           {!busy && messages.length > 0 && messages[messages.length - 1].role === "user" && (
             <div className="retry">
-              <button className="btn" onClick={onRegenerate}>↻ Generate reply</button>
+              <button className="btn" onClick={regenerate}>↻ Generate reply</button>
               <span className="muted small"> The last message has no reply yet (the model may have been offline).</span>
             </div>
           )}
           {stream && (
-            <div className="msg assistant streaming">
+            <div className="msg assistant streaming" ref={streamRef}>
               {stream.continuing && <div className="muted tiny">continuing…</div>}
               {stream.text ? <Story text={liveText(stream.text)} npcs={game.npcs} /> : null}
               {stream.phase === "writing" && <span className="cursor">▍</span>}
@@ -183,13 +261,18 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
           )}
         </div>
       </div>
+      {!atBottom && (
+        <button className="latest-btn" onClick={() => { nearBottom.current = true; toBottom(true); }} title="Go to the latest message">
+          ↓ {busy ? "Writing…" : "Latest"}
+        </button>
+      )}
       <div className="composer-wrap">
         <div className="composer">
           <textarea
             ref={taRef}
             rows={1}
             value={text}
-            placeholder="What do you do?  (tip: /roll 1d20+3 rolls dice)"
+            placeholder={`What do you do?   "speech"   *action*   'thought'   /to the GM`}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); }
@@ -201,7 +284,10 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
             <button className="send" onClick={submit} disabled={!text.trim()} title="Send">↑</button>
           )}
         </div>
-        <div className="composer-hint muted small">Enter to send · Shift+Enter for a new line</div>
+        <div className="composer-hint muted small">
+          <span className="mark">"speech"</span> <span className="mark">*action*</span> <span className="mark">'thought' (only the GM knows)</span>{" "}
+          <span className="mark">/message to the GM</span> <span className="mark">/roll 1d20</span> <HelpTip id="writing" /> · Shift+Enter: new line
+        </div>
       </div>
     </div>
   );
