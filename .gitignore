@@ -22,5 +22,6 @@ Thumbs.db
 # Windows program build (build-exe.bat) and the built-in engine
 build/
 LocalRPG/
+Caliope/
 engine/
 engine.new/

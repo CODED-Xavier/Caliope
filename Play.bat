@@ -1,5 +1,5 @@
 @echo off
-title Local RPG
+title Caliope
 REM Double-click to play. Sets everything up on the first run, then starts the app and opens it.
 cd /d "%~dp0backend"
 

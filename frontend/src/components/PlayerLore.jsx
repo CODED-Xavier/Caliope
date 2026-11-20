@@ -58,7 +58,7 @@ export default function PlayerLore({ entries, onChange, convId, onSaved }) {
               {open === e.id ? "▾" : "▸"} <b>{e.name || "(new entry)"}</b>
               {!e.enabled && <span className="muted tiny"> · off</span>}
             </button>
-            <label className="tiny row center gap" title="Off: the GM ignores this entry">
+            <label className="tiny row center gap" title="Off: the Aedo ignores this entry">
               <input type="checkbox" checked={e.enabled} onChange={(ev) => edit(e.id, "enabled", ev.target.checked)} /> on
             </label>
           </div>
@@ -67,8 +67,8 @@ export default function PlayerLore({ entries, onChange, convId, onSaved }) {
               <input className="field" value={e.name} maxLength={80} onChange={(ev) => edit(e.id, "name", ev.target.value)} placeholder="Name, e.g. House Ardent" />
               <input className="field" value={e.keys} onChange={(ev) => edit(e.id, "keys", ev.target.value)} placeholder="Keywords that bring up the details (comma separated): Ardent, burning stag, Emberhold" />
               <textarea className="field" rows={5} maxLength={2000} value={e.content} onChange={(ev) => edit(e.id, "content", ev.target.value)}
-                placeholder="Everything the GM should know: history, sigil, seat, members, allies and rivals among the card's houses…" />
-              <input className="field" value={e.summary} maxLength={200} onChange={(ev) => edit(e.id, "summary", ev.target.value)} placeholder="One line the GM always sees (optional; the first sentence is used otherwise)" />
+                placeholder="Everything the Aedo should know: history, sigil, seat, members, allies and rivals among the card's houses…" />
+              <input className="field" value={e.summary} maxLength={200} onChange={(ev) => edit(e.id, "summary", ev.target.value)} placeholder="One line the Aedo always sees (optional; the first sentence is used otherwise)" />
               <div className="row gap center">
                 <span className="muted tiny grow">{e.content.length} / 2000</span>
                 {convId && <button className="btn small" disabled={!!asking || !e.name} onClick={() => suggest(e.id)}>{asking === e.id ? "Reading the story…" : "✨ New facts from the story"}</button>}

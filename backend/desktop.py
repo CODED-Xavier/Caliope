@@ -1,4 +1,4 @@
-"""Entry point of the Windows program (LocalRPG.exe, made by build-exe.bat).
+"""Entry point of the Windows program (Caliope.exe, made by build-exe.bat).
 
 Runs the app inside this one process, opens it in your browser, and (in LM Studio mode) starts LM Studio's
 server like Play.bat does. With the built-in engine the app starts the AI by itself.
@@ -45,7 +45,7 @@ def after_start() -> None:
 
 def main() -> int:
     multiprocessing.freeze_support()
-    say("=== Local RPG ===")
+    say("=== Caliope ===")
     if get_json(APP_URL + "/api/health"):
         say("  The app is already running. Opening it...")
         if not open_app_window(APP_URL, DATA_DIR / "window"):

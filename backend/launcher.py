@@ -170,9 +170,11 @@ def create_shortcut() -> bool:
     if os.name != "nt":
         return False
     target = ROOT / "Play.bat"
+    icon = ROOT / "assets" / "icon.ico"
+    icon_loc = str(icon) if icon.is_file() else "%SystemRoot%\\System32\\imageres.dll,76"
     script = (
-        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\Local RPG.lnk');"
-        f"$s.TargetPath='{target}';$s.WorkingDirectory='{ROOT}';$s.IconLocation='%SystemRoot%\\System32\\imageres.dll,76';$s.Save()"
+        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\Caliope.lnk');"
+        f"$s.TargetPath='{target}';$s.WorkingDirectory='{ROOT}';$s.IconLocation='{icon_loc}';$s.Save()"
     )
     return subprocess.call(["powershell", "-NoProfile", "-Command", script]) == 0
 
@@ -185,7 +187,7 @@ def first_run_questions() -> None:
         state = {}
     if state.get("asked_shortcut") or os.name != "nt" or not sys.stdin.isatty():
         return
-    answer = input("  Create a 'Local RPG' shortcut on your desktop? (y/n) ").strip().lower()
+    answer = input("  Create a 'Caliope' shortcut on your desktop? (y/n) ").strip().lower()
     if answer.startswith(("y", "s")):
         say("  Shortcut created." if create_shortcut() else "  ! Could not create the shortcut.")
     DATA.mkdir(parents=True, exist_ok=True)
@@ -250,7 +252,7 @@ def wait_window(win) -> bool:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Start Local RPG")
+    ap = argparse.ArgumentParser(description="Start Caliope")
     ap.add_argument("--no-browser", action="store_true", help="do not open the browser")
     ap.add_argument("--no-lmstudio", action="store_true", help="do not start LM Studio or load the model")
     ap.add_argument("--shortcut", action="store_true", help="create the desktop shortcut and exit")
@@ -261,7 +263,7 @@ def main() -> int:
         say("Shortcut created on your desktop." if ok else "Could not create the shortcut (Windows only).")
         return 0 if ok else 1
 
-    say("=== Local RPG ===")
+    say("=== Caliope ===")
     if get_json(APP_URL + "/api/health"):
         say("  The app is already running. Opening it...")
         if not args.no_browser:

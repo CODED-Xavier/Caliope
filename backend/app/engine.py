@@ -27,7 +27,7 @@ from .conversations import ConversationRepository, NotFound
 from .dice import DiceError, DiceRoller
 from .llm import LLMError
 from .jukebox import guess_mood
-from .scenes import new_seed, picture_url, write_prompt
+from .scenes import new_seed, picture_url, pixai_url, write_prompt
 from .lorebook import select_entries
 from .memory import MemoryManager
 from .portraits import process_reply
@@ -618,7 +618,8 @@ class ChatEngine:
             log.warning("Scene picture prompt failed: %s", exc)
             return None
         seed = new_seed()
-        pic = {"prompt": prompt, "seed": seed, "url": picture_url(prompt, seed)}
+        use_pixai = settings.get("picture_service") == "pixai" and settings.get("pixai_api_key")
+        pic = {"prompt": prompt, "seed": seed, "url": (pixai_url if use_pixai else picture_url)(prompt, seed)}
         self.repo.update_message_meta(message_id, {"scene_picture": pic})
         return pic
 

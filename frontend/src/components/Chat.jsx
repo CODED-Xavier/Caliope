@@ -48,13 +48,13 @@ function speakerAvatar(text, speaker) {
 
 const CHECK_KIND = { save: "saving throw", check: "check" };
 
-/** Buttons for the rolls the GM just asked for: the app adds the sheet's bonus and tells the GM the result. */
+/** Buttons for the rolls the Aedo just asked for: the app adds the sheet's bonus and tells the Aedo the result. */
 function CheckButtons({ checks, onCheck }) {
   return (
     <div className="check-row">
       {checks.map((c, i) => (
         <span key={i} className="check-btn">
-          <button className="btn small primary" onClick={() => onCheck(i, "")} title="Roll with the bonus from your sheet; the result goes to the GM">
+          <button className="btn small primary" onClick={() => onCheck(i, "")} title="Roll with the bonus from your sheet; the result goes to the Aedo">
             🎲 {c.skill || c.ability} {CHECK_KIND[c.kind]}{c.dc ? ` · DC ${c.dc}` : ""}
           </button>
           <button className="btn small" title="Roll with advantage (two d20, keep the higher)" onClick={() => onCheck(i, "advantage")}>▲</button>
@@ -200,7 +200,7 @@ const PHASES = { thinking: "Thinking…", writing: "", saved: "", updating: "Upd
 // In your own messages, thoughts are shown as 💭 in italics (they stay 'single-quoted' in the saved text).
 const THOUGHT = /(?<![\w'])'(?=\S)((?:[^'\n]|(?<=\w)'(?=\w))*?[^\s'])'(?!\w)/g;
 const showThoughts = (t) => (t.trimStart().startsWith("/") && !/^\s*\/roll/i.test(t)
-  ? `🗨 *to the GM:* ${t.trimStart().slice(1)}`
+  ? `🗨 *to the Aedo:* ${t.trimStart().slice(1)}`
   : t.split(/("[^"\n]*")/).map((part, i) => (i % 2 ? part : part.replace(THOUGHT, (_, x) => `*(💭 ${x})*`))).join(""));
 
 // While a reply is being written: hide the status block and any half-written portrait tag at the end.
@@ -374,7 +374,7 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
             ref={taRef}
             rows={1}
             value={text}
-            placeholder={`What do you do?   "speech"   *action*   'thought'   /to the GM`}
+            placeholder={`What do you do?   "speech"   *action*   'thought'   /to the Aedo`}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); }
@@ -387,8 +387,8 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
           )}
         </div>
         <div className="composer-hint muted small">
-          <span className="mark">"speech"</span> <span className="mark">*action*</span> <span className="mark">'thought' (only the GM knows)</span>{" "}
-          <span className="mark">/message to the GM</span> <span className="mark">/roll 1d20</span> <HelpTip id="writing" /> · Shift+Enter: new line
+          <span className="mark">"speech"</span> <span className="mark">*action*</span> <span className="mark">'thought' (only the Aedo knows)</span>{" "}
+          <span className="mark">/message to the Aedo</span> <span className="mark">/roll 1d20</span> <HelpTip id="writing" /> · Shift+Enter: new line
         </div>
       </div>
     </div>

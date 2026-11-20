@@ -101,7 +101,7 @@ function ResourcesBox({ state, onPatch, onPower, onRest, busy, convId, onState }
                   {a.description && <div className="muted tiny">{a.description}</div>}
                 </div>
                 <button className="btn small" disabled={busy || inFight || !!short} onClick={() => onPower(a.id)}
-                  title={inFight ? "In a fight, use it from the Combat tab" : short ? `Not enough ${short[0]}` : "Use it now: the app pays the cost and tells the GM"}>Use</button>
+                  title={inFight ? "In a fight, use it from the Combat tab" : short ? `Not enough ${short[0]}` : "Use it now: the app pays the cost and tells the Aedo"}>Use</button>
               </div>
             );
           })}
@@ -202,7 +202,7 @@ function PayBox({ gold, currency, onPay, busy }) {
       </div>
       <div className="row gap">
         <input className="field grow" placeholder="for what (optional)" value={why} onChange={(e) => setWhy(e.target.value)} />
-        <button className="btn small" type="submit" disabled={busy || n <= 0 || n > gold} title="The app takes the money and tells the GM">Pay</button>
+        <button className="btn small" type="submit" disabled={busy || n <= 0 || n > gold} title="The app takes the money and tells the Aedo">Pay</button>
       </div>
     </form>
   );
@@ -483,7 +483,7 @@ function DiceTab({ onRollToChat, canRoll }) {
       </form>
       <label className="row gap center small">
         <input type="checkbox" checked={toChat} onChange={(e) => setToChat(e.target.checked)} />
-        Send roll into the story (the GM sees it)
+        Send roll into the story (the Aedo sees it)
       </label>
       {error && <div className="error-text small">{error}</div>}
       <div className="section-title">Private rolls</div>

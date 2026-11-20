@@ -1,6 +1,7 @@
-# Local RPG Chat (v1.0: built-in AI engine and Windows program)
+# Calíope (v2.0)
 
-A chatbot for RPG and roleplay that runs 100% on your PC: no token limits, no subscription.
+Calíope, named after the muse of epic poetry, is a roleplay and tabletop RPG app that runs 100% on your PC: no token limits, no subscription.
+In Calíope the game master is **the Aedo** (the singer of the Homeric epics), chapters are **Cantos**, and the AI that helps you write stories and cards is **the Muse**.
 It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
 
 
@@ -15,7 +16,7 @@ Double-click **`Play.bat`**. That's it. It:
 5. opens **http://127.0.0.1:8000** in your browser.
 
 Keep the black window open while you play; close it to stop. The first run asks whether to put a
-**Local RPG** shortcut on your desktop (or run `Play.bat --shortcut` any time).
+**Caliope** shortcut on your desktop (or run `Play.bat --shortcut` any time).
 
 Options: `Play.bat --no-browser` (don't open the browser), `Play.bat --no-lmstudio` (don't touch LM Studio).
 
@@ -213,10 +214,11 @@ the AI writes a short description of the place and the free **Pollinations.ai** 
 - The engine uses the Context window setting directly, keeps the whole context for the story (one slot), and reuses the unchanged start of the prompt between turns, like LM Studio.
 - Ports: 8091 (story) and 8092 (memory search). Change `engine_port` if something else uses them.
 
-**The Windows program.** Run **build-exe.bat** (after Play.bat ran once). It builds the interface, installs PyInstaller the first time, and makes the folder `LocalRPG\` with **LocalRPG.exe**.
-- The program keeps its own saves in `LocalRPG\data` (copied from Play.bat's `backend\data` the first time), the engine in `LocalRPG\engine`, skills in `LocalRPG\skills`. Rebuilding replaces only the program files, never these folders.
-- Double-click LocalRPG.exe: a window shows the status and the app opens in your browser. Close that window to stop everything (the engine stops with it).
-- Copy the whole `LocalRPG` folder to move it; it needs no Python or Node.js.
+**The Windows program.** Run **build-exe.bat** (after Play.bat ran once). It builds the interface, installs PyInstaller the first time, and makes the folder `Caliope\` with **Caliope.exe**.
+- The program keeps its own saves in `Caliope\data` (copied from Play.bat's `backend\data` the first time), the engine in `Caliope\engine`, skills in `Caliope\skills`. Rebuilding replaces only the program files, never these folders.
+- Double-click Caliope.exe: a window shows the status and the app opens in your browser. Close that window to stop everything (the engine stops with it).
+- Copy the whole `Caliope` folder to move it; it needs no Python or Node.js.
+- Coming from v1.x? The first build copies your saves and engine from the old `LocalRPG` folder; delete that folder afterwards.
 
 **Models window (🧠 Models in the sidebar).** Like LM Studio's model page, inside the app:
 - *My models*: every .gguf on this PC (LM Studio's folder included). **Load** / **Unload** in the built-in engine, **Use for memory** for embedding models, **Deactivate** to hide a model from the lists without deleting it, 🗑 to delete it (asks first; only inside the model folders).
@@ -259,7 +261,7 @@ Card editor > **Resources and powers**: the card's pools (name, maximum, colour,
 
 ## 4n. Its own window
 
-Play.bat and LocalRPG.exe open the game in a window of its own (Microsoft Edge's app mode, which comes with Windows: no tabs, no address bar), not in a browser tab. The black window is minimized; it still holds the messages and errors. **Closing the game window stops everything.** Settings > *Open in its own window* turns it off (back to a browser tab). If Edge is missing, Chrome or Brave is used, else your normal browser.
+Play.bat and Caliope.exe open the game in a window of its own (Microsoft Edge's app mode, which comes with Windows: no tabs, no address bar), not in a browser tab. The black window is minimized; it still holds the messages and errors. **Closing the game window stops everything.** Settings > *Open in its own window* turns it off (back to a browser tab). If Edge is missing, Chrome or Brave is used, else your normal browser.
 
 ## 5. Tests
 

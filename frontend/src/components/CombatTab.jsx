@@ -157,7 +157,7 @@ function StartForm({ convId, kind, busy, onStart }) {
         onPicked={(m) => { setEditor(false); loadSaved(); setPreview({ tiles: m.tiles, background: m.background, name: m.name }); setMapMode(m.id ? "saved" : "gen-custom"); if (m.id) setSavedId(String(m.id)); }} />}
       {error && <div className="error-text small">{error}</div>}
       <button className="btn primary" disabled={busy} onClick={start}>⚔ Start the fight</button>
-      {kind === "roleplay" && <div className="muted tiny">Tip: roleplay cards can fight too; the GM narrates what the dice decide.</div>}
+      {kind === "roleplay" && <div className="muted tiny">Tip: roleplay cards can fight too; the Aedo narrates what the dice decide.</div>}
     </div>
   );
 }
@@ -271,7 +271,7 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities }) {
           <button className="btn small grow" disabled={busy} onClick={() => onAction({ action: "enemies" })} title="Let everyone else act now">Others act</button>
           <button className="btn small danger" disabled={busy} onClick={() => { if (window.confirm("End the fight now?")) onAction({ action: "end", reason: "the fight was stopped" }); }}>End fight</button>
         </div>
-        <div className="muted tiny">The app rolls everything and the GM narrates it. One reply per round: your action, then everyone else.</div>
+        <div className="muted tiny">The app rolls everything and the Aedo narrates it. One reply per round: your action, then everyone else.</div>
       </div>
     </div>
   );

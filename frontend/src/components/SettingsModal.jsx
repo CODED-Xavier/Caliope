@@ -70,6 +70,9 @@ export default function SettingsModal({ onClose, onSaved }) {
       <Row label="Server address" help="llm_base_url" hint="LM Studio default: http://localhost:1234/v1">
         <input className="field" value={s.llm_base_url} onChange={(e) => set("llm_base_url", e.target.value)} />
       </Row>
+      <Row label="API key" help="api_key" hint="Keep 'lm-studio' for LM Studio. Online services (OpenRouter…) need your own key.">
+        <SecretField value={s.api_key ?? ""} onChange={(v) => set("api_key", v)} />
+      </Row>
       <Row label="Chat model" help="model">
         <select className="field" value={s.model} onChange={(e) => set("model", e.target.value)}>
           <option value="">(first available)</option>
@@ -115,11 +118,25 @@ export default function SettingsModal({ onClose, onSaved }) {
       <Row label="Scene pictures (internet)" help="scene_pictures">
         <input type="checkbox" checked={!!s.scene_pictures} onChange={(e) => set("scene_pictures", e.target.checked)} />
       </Row>
-      {s.scene_pictures && (
+      {s.scene_pictures && (<>
         <Row label="Picture style" help="scene_picture_style">
           <input className="field" value={s.scene_picture_style || ""} onChange={(e) => set("scene_picture_style", e.target.value)} />
         </Row>
-      )}
+        <Row label="Painted by" help="picture_service">
+          <select className="field" value={s.picture_service || "pollinations"} onChange={(e) => set("picture_service", e.target.value)}>
+            <option value="pollinations">Pollinations (free, no account)</option>
+            <option value="pixai">PixAI (your own API key)</option>
+          </select>
+        </Row>
+        {s.picture_service === "pixai" && (<>
+          <Row label="PixAI API key" help="pixai_api_key">
+            <SecretField value={s.pixai_api_key || ""} onChange={(v) => set("pixai_api_key", v)} />
+          </Row>
+          <Row label="PixAI model version ID" help="pixai_model">
+            <input className="field" value={s.pixai_model || ""} placeholder="e.g. 1983308862240288769" onChange={(e) => set("pixai_model", e.target.value.trim())} />
+          </Row>
+        </>)}
+      </>)}
       <Row label="Open in its own window" help="app_window">
         <input type="checkbox" checked={s.app_window !== false} onChange={(e) => set("app_window", e.target.checked)} />
       </Row>
@@ -156,5 +173,18 @@ export default function SettingsModal({ onClose, onSaved }) {
         </div>
       )}
     </Modal>
+  );
+}
+
+
+/** A key or password box: hidden by default, with Show/Hide. */
+function SecretField({ value, onChange }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="row gap center">
+      <input className="field grow" type={show ? "text" : "password"} value={value} autoComplete="off" spellCheck={false}
+        onChange={(e) => onChange(e.target.value)} />
+      <button type="button" className="btn small" onClick={() => setShow((v) => !v)}>{show ? "Hide" : "Show"}</button>
+    </div>
   );
 }

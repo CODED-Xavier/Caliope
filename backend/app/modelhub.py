@@ -383,7 +383,7 @@ async def _http_json(url: str):
     import httpx
     async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as c:
         try:
-            r = await c.get(url, headers={"User-Agent": "LocalRPG"})
+            r = await c.get(url, headers={"User-Agent": "Caliope"})
         except httpx.HTTPError as exc:
             raise ModelError(f"Could not reach Hugging Face (check your internet): {exc.__class__.__name__}") from exc
         if r.status_code in (401, 403):
@@ -396,7 +396,7 @@ async def _http_json(url: str):
 
 async def _http_stream(url: str, start: int = 0):
     import httpx
-    headers = {"User-Agent": "LocalRPG"}
+    headers = {"User-Agent": "Caliope"}
     if start:
         headers["Range"] = f"bytes={start}-"
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=120.0), follow_redirects=True) as c:

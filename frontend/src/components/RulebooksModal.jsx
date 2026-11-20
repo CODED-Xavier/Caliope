@@ -81,7 +81,7 @@ export default function RulebooksModal({ onClose }) {
   return (
     <Modal title="Rulebooks" onClose={onClose} wide>
       <p className="muted small">
-        Import a rulebook once. During play, the GM gets only the one or two passages that fit the moment, so the book never fills the
+        Import a rulebook once. During play, the Aedo gets only the one or two passages that fit the moment, so the book never fills the
         AI's memory. Attach books to a card in the card editor (✎ → Rulebooks). <HelpTip id="rulebooks" />
       </p>
 

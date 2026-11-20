@@ -19,8 +19,8 @@ export function relationshipColor(v) {
 }
 
 export const MODE_LABELS = {
-  gm_world: "Game Master · open world",
-  gm_cast: "Game Master · preset cast",
+  gm_world: "Aedo · open world",
+  gm_cast: "Aedo · preset cast",
   character: "Character card",
 };
 

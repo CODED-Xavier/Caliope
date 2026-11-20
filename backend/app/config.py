@@ -7,11 +7,11 @@ from pathlib import Path
 
 from .db import Database
 
-# Two ways to run: from the source folder (Play.bat), or as the Windows program (LocalRPG.exe, built by
+# Two ways to run: from the source folder (Play.bat), or as the Windows program (Caliope.exe, built by
 # build-exe.bat). The program keeps its read-only parts inside its _internal folder and your saves next to it.
 FROZEN = bool(getattr(sys, "frozen", False))
 if FROZEN:
-    APP_HOME = Path(sys.executable).resolve().parent         # the folder that holds LocalRPG.exe
+    APP_HOME = Path(sys.executable).resolve().parent         # the folder that holds Caliope.exe
     _BUNDLE = Path(getattr(sys, "_MEIPASS", APP_HOME))
     BASE_DIR = APP_HOME
     SEED_DIR = _BUNDLE / "app" / "seed"
@@ -64,7 +64,7 @@ DEFAULT_SETTINGS: dict = {
     "memory_min_similarity": 0.40,
     "show_timing": True,
     "chars_per_token": 3.4,
-    "app_window": True,           # Play.bat / LocalRPG.exe open the game in its own window instead of a browser tab       # measured automatically from the model server's real token counts
+    "app_window": True,           # Play.bat / Caliope.exe open the game in its own window instead of a browser tab       # measured automatically from the model server's real token counts
     # --- Cards and skills ---
     "default_card_kind": "roleplay",  # type used for new cards: roleplay | adventure
     "skills_char_budget": 3500,       # max characters of attached skill text shared by one card's skills
@@ -72,6 +72,9 @@ DEFAULT_SETTINGS: dict = {
     "rules_char_budget": 1400,        # characters of rulebook passages added to a turn (about 350 tokens)
     # --- Scene pictures (optional, uses the free Pollinations.ai service over the internet) ---
     "scene_pictures": False,
+    "picture_service": "pollinations",  # pollinations (free, no account) | pixai (your own API key)
+    "pixai_api_key": "",
+    "pixai_model": "",            # PixAI model version ID
     "scene_picture_style": "atmospheric fantasy painting, detailed, cinematic lighting",
 }
 
@@ -129,6 +132,8 @@ class SettingsStore:
     @staticmethod
     def _coerce(key: str, value):
         default = DEFAULT_SETTINGS[key]
+        if key == "picture_service" and value not in ("pollinations", "pixai"):
+            raise ValueError("picture_service must be 'pollinations' or 'pixai'")
         if key == "ai_engine" and value not in ("lmstudio", "builtin"):
             raise ValueError("ai_engine must be 'lmstudio' or 'builtin'")
         if key == "engine_gpu_layers":

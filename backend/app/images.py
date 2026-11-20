@@ -59,7 +59,7 @@ async def http_fetch(url: str, timeout: float = 20.0, check: Callable[[str], str
     check = check or validate_url
     async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
         for _ in range(5):
-            async with client.stream("GET", url, headers={"User-Agent": "LocalRPGChat/1.0"}) as resp:
+            async with client.stream("GET", url, headers={"User-Agent": "Caliope/2.0"}) as resp:
                 if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get("location"):
                     url = check(str(resp.url.join(resp.headers["location"])))
                     continue

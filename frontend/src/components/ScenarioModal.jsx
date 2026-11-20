@@ -314,8 +314,8 @@ function Editor({ initial, id, onCancel, onSaved }) {
         </div>
       </div>
       <p className="muted tiny">
-        {d.mode === "gm_world" && "The AI is the Game Master and invents places and characters as you play."}
-        {d.mode === "gm_cast" && "The AI is the Game Master and runs the cast you define below."}
+        {d.mode === "gm_world" && "The AI is the Aedo, your game master, and invents places and characters as you play."}
+        {d.mode === "gm_cast" && "The AI is the Aedo, your game master, and runs the cast you define below."}
         {d.mode === "character" && "The AI plays ONE character (the first one below). The story is about your relationship."}
       </p>
       <label className="lbl">Short description (shown in the picker) <DraftButton field="description" card={d} onText={(t) => set("description", t)} /></label>

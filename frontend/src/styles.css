@@ -1,20 +1,21 @@
 :root {
-  --bg: #faf9f5; --bg2: #f0eee6; --panel: #ffffff; --text: #1f1e1d; --muted: #6f6e69; --border: #e1ddd0;
-  --narr: #6b6962; --say: #1f1e1d; --think: #7650b0;
-  --accent: #c96442; --accent-text: #ffffff; --accent-soft: #f4e4db; --user: #ece8dc;
+  /* Calíope: black, orange and violet. Light theme leads with orange, dark theme with violet. */
+  --bg: #fbf7f2; --bg2: #f3ece3; --panel: #ffffff; --text: #1d1820; --muted: #6f6670; --border: #e6dccf;
+  --narr: #6b6460; --say: #1d1820; --think: #6d3cc2;
+  --accent: #d9661a; --accent-2: #6d3cc2; --accent-text: #ffffff; --accent-soft: #fbe6d4; --user: #f1e9df;
   --good: #2f855a; --bad: #c0392b; --warn: #b7791f; --shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   --serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 [data-theme="dark"] {
-  --bg: #262624; --bg2: #1f1e1d; --panel: #30302e; --text: #f3f2ec; --muted: #a2a09a; --border: #3e3d3a;
-  --narr: #a8a59d; --say: #f7f6f2; --think: #b9a3e8;
-  --accent: #d97757; --accent-text: #1f1e1d; --accent-soft: #3d2f29; --user: #3a3936;
-  --good: #5fbf8a; --bad: #e56b5d; --warn: #e0b04a; --shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  --bg: #0f0d16; --bg2: #151220; --panel: #1d1a29; --text: #f3effa; --muted: #a79fb6; --border: #352f46;
+  --narr: #a39db0; --say: #f7f5fb; --think: #f0a65a;
+  --accent: #a77bea; --accent-2: #f0a050; --accent-text: #140f1f; --accent-soft: #2e2445; --user: #262136;
+  --good: #66c797; --bad: #f0788a; --warn: #e3b766; --shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
-body { font: 14px/1.5 var(--sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+body { font: 14px/1.5 var(--sans); background: radial-gradient(circle at 85% -15%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 40%), radial-gradient(circle at -10% 110%, color-mix(in srgb, var(--accent-2) 8%, transparent), transparent 35%), var(--bg); background-attachment: fixed; color: var(--text); -webkit-font-smoothing: antialiased; }
 button { font: inherit; color: inherit; cursor: pointer; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 h1, h2, h3 { margin: 0; }
@@ -110,7 +111,7 @@ textarea.field { resize: vertical; }
 .send.stop { background: var(--text); color: var(--bg); font-size: 13px; }
 .composer-hint { max-width: 760px; margin: 5px auto 0; text-align: center; }
 .welcome { margin: auto; text-align: center; max-width: 440px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.welcome h1 { font-family: var(--serif); font-size: 34px; } .welcome-dice { font-size: 54px; }
+.welcome h1 { font-family: var(--serif); font-size: 34px; } .welcome-dice { width: 96px; height: 96px; image-rendering: pixelated; }
 
 /* side panel */
 .side-panel { width: var(--panel-w, 372px); flex-shrink: 0; border-left: 1px solid var(--border); background: var(--bg2); display: flex; flex-direction: column; min-height: 0; }
@@ -460,3 +461,7 @@ body.resizing { user-select: none; cursor: col-resize; }
 .lightbox { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.88); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: zoom-out; padding: 20px; }
 .lightbox img { max-width: 96vw; max-height: 90vh; object-fit: contain; border: none; border-radius: 8px; background: none; cursor: zoom-out; }
 .lightbox-cap { color: #eee; margin-top: 8px; font-weight: 600; }
+
+/* Calíope brand */
+.brand-icon { width: 24px; height: 24px; image-rendering: pixelated; vertical-align: -5px; border-radius: 5px; }
+.brand-name { font-family: var(--serif); font-weight: 700; background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }

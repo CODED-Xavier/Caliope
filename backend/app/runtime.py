@@ -339,7 +339,7 @@ async def _http_get(url: str) -> int:
 async def _http_json(url: str):
     import httpx
     async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as c:
-        r = await c.get(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "LocalRPG"})
+        r = await c.get(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "Caliope"})
         r.raise_for_status()
         return r.json()
 
@@ -348,7 +348,7 @@ async def _http_bytes(url: str, progress) -> bytes:
     import httpx
     buf = bytearray()
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=120.0), follow_redirects=True) as c:
-        async with c.stream("GET", url, headers={"User-Agent": "LocalRPG"}) as r:
+        async with c.stream("GET", url, headers={"User-Agent": "Caliope"}) as r:
             r.raise_for_status()
             total = int(r.headers.get("content-length") or 0)
             async for chunk in r.aiter_bytes(1 << 16):

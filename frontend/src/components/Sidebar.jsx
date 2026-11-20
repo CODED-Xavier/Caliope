@@ -23,7 +23,7 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, on
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-dice">🎲</span> Local RPG
+        <img className="brand-icon" src="/favicon.png" alt="" /> <span className="brand-name">Calíope</span>
         <button className="icon-btn theme-btn" onClick={onToggleTheme} title="Toggle light/dark">{theme === "dark" ? "☀" : "☾"}</button>
         <button className="icon-btn" onClick={() => onCollapse(true)} title="Hide the games list">«</button>
       </div>

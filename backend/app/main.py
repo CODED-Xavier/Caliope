@@ -30,7 +30,7 @@ from .rulebooks import RulebookError, ocr_available
 from .runtime import ENGINE_KEYS, EngineError
 from .modelhub import download_root, pick_model_file
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
-from .scenes import is_pollinations, polite_fetch
+from .scenes import PixAIError, is_pixai, is_pollinations, pixai_paint, polite_fetch
 from .playerlore import parse_suggestions, suggest_prompt
 from .checks import roll_line
 from . import shop
@@ -89,7 +89,7 @@ def background(coro) -> None:
     task.add_done_callback(app.state.tasks.discard)
 
 
-app = FastAPI(title="Local RPG Chat", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Calíope", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://127.0.0.1:3000"],
@@ -113,7 +113,7 @@ async def local_only(request: Request, call_next):
     """The app is only for this PC. Refuse requests that name another host (a web page that points its own
     domain at 127.0.0.1, "DNS rebinding"), and changes sent by other web sites open in the browser."""
     if _host_of(request.headers.get("host", "")) not in _LOCAL_HOSTS:
-        return JSONResponse({"detail": "Local RPG only answers on this PC (127.0.0.1)."}, status_code=403)
+        return JSONResponse({"detail": "Calíope only answers on this PC (127.0.0.1)."}, status_code=403)
     origin = request.headers.get("origin")
     if origin and request.method not in ("GET", "HEAD", "OPTIONS"):
         from urllib.parse import urlparse
@@ -545,12 +545,17 @@ async def uploaded_picture(name: str):
 async def portrait(url: str = Query(...)):
     """A character picture, downloaded once from its link and then served from this PC."""
     try:
-        if is_pollinations(url):  # a scene picture: painted on demand, one at a time, can take up to a minute
+        if is_pixai(url):  # a scene picture painted by PixAI with your key, then kept on this PC
+            s = svc().settings
+            async def fetch(u):
+                return await http_fetch(await pixai_paint(u, s.get("pixai_api_key"), s.get("pixai_model")), timeout=60.0)
+            path = await get_image(url, PORTRAIT_DIR, fetch=fetch, check=lambda u: u)
+        elif is_pollinations(url):  # a scene picture: painted on demand, one at a time, can take up to a minute
             fetch = lambda u: polite_fetch(u, lambda x: http_fetch(x, timeout=120.0))  # noqa: E731
             path = await get_image(url, PORTRAIT_DIR, fetch=fetch)
         else:
             path = await get_image(url, PORTRAIT_DIR)
-    except ImageError as exc:
+    except (ImageError, PixAIError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:  # network problems: the picture just doesn't show
         raise HTTPException(status_code=502, detail=f"Could not download the picture: {exc}") from exc

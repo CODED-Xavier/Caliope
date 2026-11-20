@@ -418,8 +418,8 @@ export default function App() {
           </>
         ) : (
           <div className="welcome">
-            <div className="welcome-dice">🎲</div>
-            <h1>Local RPG</h1>
+            <img className="welcome-dice" src="/favicon.png" alt="" />
+            <h1 className="brand-name">Calíope</h1>
             <p className="muted">Roleplay and tabletop adventures that run entirely on your PC.<br />No tokens, no limits, and it remembers everything.</p>
             <button className="btn primary big" onClick={() => setModal("new")}>＋ Start a new game</button>
             {!online && <p className="error-text small">The model server is offline. Start LM Studio's server, then check <a href="#" onClick={(e) => { e.preventDefault(); setModal("settings"); }}>Settings</a>.</p>}
