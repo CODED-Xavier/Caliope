@@ -20,7 +20,19 @@ def split_status(text: str) -> tuple[str, str | None]:
         return text or "", None
     m = matches[-1]
     block = _END_MARK.sub("", text[m.start():]).strip()
-    return text[: m.start()].rstrip(), block
+    # Story text after the block ("How do you answer Professor Artemis?") goes back to the story: after a blank
+    # line, a paragraph without "Label:" lines is not part of the status.
+    paras = re.split(r"\n\s*\n", block)
+    keep, tail = [paras[0]], []
+    for para in paras[1:]:
+        if tail or not re.search(r"^\s*[-*]?\s*[^:\n]{1,40}:", para, re.M):
+            tail.append(para)
+        else:
+            keep.append(para)
+    story = text[: m.start()].rstrip()
+    if tail:
+        story = (story + "\n\n" + "\n\n".join(tail)).strip()
+    return story, "\n\n".join(keep)
 
 
 def split_template(card_text: str) -> tuple[str, str | None]:

@@ -170,12 +170,31 @@ def portrait_instructions(npcs: list[dict], mode: str = "gm_world") -> str:
 
 
 def _mentioned(npc: dict, text: str) -> bool:
-    low = text.lower()
+    """Whole-word mention of the name (or its first long word), so "Pria" is not found inside "appropriate"."""
+    return _mentions(npc, text) > 0
+
+
+def _name_patterns(npc: dict) -> list[str]:
     name = npc["name"].lower()
-    if name in low:
-        return True
     words = [w for w in re.findall(r"[^\W_]+", name) if len(w) >= 4 and w not in ("professor", "lady", "lord", "sister")]
-    return any(re.search(rf"\b{re.escape(w)}\b", low) for w in words[:1])
+    return [rf"\b{re.escape(name)}\b"] + [rf"\b{re.escape(w)}\b" for w in words[:1]]
+
+
+def _mentions(npc: dict, text: str) -> int:
+    low = text.lower()
+    return max((len(re.findall(p, low)) for p in _name_patterns(npc)), default=0)
+
+
+def _interacts(npc: dict, text: str) -> bool:
+    """Met = really part of the scene: named twice, or named in a sentence where someone speaks or that involves the
+    player ("Lilia waves at you"). A name seen once in
+    the crowd ("Lilia stood with her arms crossed") is not a meeting yet."""
+    if _mentions(npc, text) >= 2:
+        return True
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
+        if _mentions(npc, sentence) and (re.search(r"[\"\u201c\u201d]", sentence) or re.search(r"\byou(r|rs)?\b|\bvoc[eê]\b", sentence, re.I)):
+            return True
+    return False
 
 
 def process_reply(text: str, npcs: list[dict]) -> tuple[str, dict, list[int]]:
@@ -192,5 +211,5 @@ def process_reply(text: str, npcs: list[dict]) -> tuple[str, dict, list[int]]:
         meta["portraits"] = shown
     shown_names = {k.split("|", 1)[0] for k in shown}
     met = [n["id"] for n in npcs if "id" in n and not n.get("met", True)
-           and (n["name"] in shown_names or _mentioned(n, story))]
+           and (n["name"] in shown_names or _interacts(n, story))]
     return story, meta, met
