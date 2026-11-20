@@ -26,7 +26,8 @@ from .maps import MapError, generate as generate_map
 from .jukebox import MOODS as MUSIC_MOODS
 from .jukebox import MusicError
 from .rulebooks import RulebookError, ocr_available
-from .runtime import ENGINE_KEYS, EngineError, find_models
+from .runtime import ENGINE_KEYS, EngineError
+from .modelhub import download_root
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import is_pollinations, polite_fetch
 from .dice import DiceError
@@ -132,6 +133,11 @@ async def get_settings():
 
 @app.put("/api/settings")
 async def put_settings(values: dict[str, Any] = Body(...)):
+    return apply_settings(values)
+
+
+def apply_settings(values: dict) -> dict:
+    """Save settings; reload or stop the built-in engine when one of its settings changed."""
     before = svc().settings.all()
     after = svc().settings.update(values)
     if any(before.get(k) != after.get(k) for k in ENGINE_KEYS):  # model, port, context... changed: reload the engine
@@ -731,7 +737,8 @@ async def engine_status():
 
 @app.get("/api/engine/models")
 async def engine_models():
-    return await asyncio.to_thread(find_models)
+    """Model pickers in Settings: every model that is not deactivated in the Models window."""
+    return [m for m in await asyncio.to_thread(svc().models.local) if not m["disabled"]]
 
 
 @app.post("/api/engine/start")
@@ -765,6 +772,70 @@ async def engine_download():
     rt.state, rt.message, rt.progress = "downloading", "Starting the download…", 0.0
     background(run())
     return rt.status()
+
+
+# ------------------------------------------------------------------ Models window
+@app.get("/api/models/library")
+async def models_local():
+    return {"models": await asyncio.to_thread(svc().models.local), "downloads": svc().models.list_downloads(),
+            "engine": svc().runtime.status(with_log=False), "folder": str(download_root())}
+
+
+@app.get("/api/models/search")
+async def models_search(q: str = ""):
+    return await svc().models.search(q)
+
+
+@app.get("/api/models/files")
+async def models_files(repo: str):
+    return await svc().models.files(repo)
+
+
+@app.post("/api/models/download")
+async def models_download(body: dict = Body(...)):
+    return svc().models.start_download(str(body.get("repo", "")), str(body.get("file", "")))
+
+
+@app.post("/api/models/download/cancel")
+async def models_download_cancel(body: dict = Body(...)):
+    svc().models.cancel(str(body.get("key", "")))
+    return svc().models.list_downloads()
+
+
+@app.post("/api/models/download/clear")
+async def models_download_clear(body: dict = Body(...)):
+    svc().models.forget(str(body.get("key", "")))
+    return svc().models.list_downloads()
+
+
+@app.post("/api/models/load")
+async def models_load(body: dict = Body(...)):
+    values = svc().models.load_values(str(body.get("path", "")), str(body.get("role", "story")))
+    if svc().settings.get("ai_engine") == "builtin" and all(svc().settings.get(k) == v for k, v in values.items()):
+        background(svc().runtime.start())  # same model: just (re)start it
+    apply_settings(values)
+    return svc().runtime.status(with_log=False)
+
+
+@app.post("/api/models/unload")
+async def models_unload(body: dict = Body(...)):
+    if str(body.get("role", "story")) == "embedding":
+        apply_settings({"engine_embedding_path": ""})
+    else:
+        await svc().runtime.stop()
+    return svc().runtime.status(with_log=False)
+
+
+@app.post("/api/models/active")
+async def models_active(body: dict = Body(...)):
+    svc().models.set_disabled(str(body.get("path", "")), not bool(body.get("active", True)))
+    return await asyncio.to_thread(svc().models.local)
+
+
+@app.post("/api/models/delete")
+async def models_delete(body: dict = Body(...)):
+    await svc().models.delete(str(body.get("path", "")))
+    return await asyncio.to_thread(svc().models.local)
 
 
 # ------------------------------------------------------------------ the interface

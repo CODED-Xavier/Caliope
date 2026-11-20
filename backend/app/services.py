@@ -15,6 +15,7 @@ from .maps import MapRepository
 from .memory import MemoryManager
 from .rulebooks import RulebookRepository
 from .runtime import EngineManager
+from .modelhub import ModelHub
 from .scenarios import ScenarioRepository
 from .skills import SkillManager
 
@@ -36,10 +37,13 @@ class Services:
         self.maps = MapRepository(self.db)
         self.music = MusicLibrary(self.db, Path(db_path).parent / "music")
         self.runtime = EngineManager(self.settings.all)
+        self.models = ModelHub(self.db, self.runtime, self.settings.all, self.settings.update)
         self.engine = ChatEngine(self.conversations, self.settings, self.llm, self.memory, self.skills, self.dice,
                                  rulebooks=self.rulebooks)
 
     async def close(self) -> None:
+        for key in list(self.models.downloads):
+            self.models.cancel(key)
         await self.runtime.stop()
         aclose = getattr(self.llm, "aclose", None)
         if aclose:

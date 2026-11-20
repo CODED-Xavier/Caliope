@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { MODE_LABELS, timeAgo } from "../utils.js";
 
-export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, onDelete, onSkills, onRulebooks, onSettings, health, theme, onToggleTheme }) {
+export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, onDelete, onSkills, onRulebooks, onModels, onSettings, health, theme, onToggleTheme }) {
   const online = health?.llm?.ok;
   const [filter, setFilter] = useState("");
   const shown = filter.trim() ? convs.filter((c) => (c.title || "").toLowerCase().includes(filter.trim().toLowerCase())) : convs;
@@ -35,9 +35,10 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, on
           <span className={`dot ${online ? "on" : "off"}`} />
           {online ? "Model server online" : "Model server offline"}
         </button>
-        <div className="row gap">
+        <div className="side-tools">
           <button className="btn ghost grow" onClick={onSkills}>🧩 Skills</button>
           <button className="btn ghost grow" onClick={onRulebooks} title="Rulebooks">📚 Rules</button>
+          <button className="btn ghost grow" onClick={onModels} title="Download and manage AI models">🧠 Models</button>
           <button className="btn ghost grow" onClick={onSettings}>⚙ Settings</button>
         </div>
       </div>

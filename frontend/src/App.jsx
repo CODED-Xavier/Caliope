@@ -6,6 +6,7 @@ import SidePanel from "./components/SidePanel.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import SkillsModal from "./components/SkillsModal.jsx";
 import RulebooksModal from "./components/RulebooksModal.jsx";
+import ModelsModal from "./components/ModelsModal.jsx";
 import { JukeboxModal, JukeboxPlayer } from "./components/Jukebox.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
 import { KIND_LABELS, MODE_LABELS } from "./utils.js";
@@ -346,7 +347,7 @@ export default function App() {
       style={{ "--story-font": `${view.fontSize}px`, "--panel-w": `${view.panelWidth}px` }}>
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => setModal("new")}
-        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onSettings={() => setModal("settings")}
+        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onModels={() => setModal("models")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
       <main className="main">
@@ -393,6 +394,7 @@ export default function App() {
           onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} onPinnedSave={savePinned}
           onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit} />
       )}
+      {modal === "models" && <ModelsModal onClose={() => { setModal(null); refreshHealth(); }} />}
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} />}
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}

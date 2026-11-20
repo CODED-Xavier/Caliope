@@ -218,6 +218,11 @@ the AI writes a short description of the place and the free **Pollinations.ai** 
 - Double-click LocalRPG.exe: a window shows the status and the app opens in your browser. Close that window to stop everything (the engine stops with it).
 - Copy the whole `LocalRPG` folder to move it; it needs no Python or Node.js.
 
+**Models window (🧠 Models in the sidebar).** Like LM Studio's model page, inside the app:
+- *My models*: every .gguf on this PC (LM Studio's folder included). **Load** / **Unload** in the built-in engine, **Use for memory** for embedding models, **Deactivate** to hide a model from the lists without deleting it, 🗑 to delete it (asks first; only inside the model folders).
+- *Find more*: searches Hugging Face for GGUF models; open a result to see each size (Q4_K_M, Q4_K_S…) with a short note on quality and whether it fits an 8 GB card.
+- *Downloads*: progress and speed; Cancel pauses (Download again resumes), and every file is checked against Hugging Face's published checksum. New models go to LM Studio's folder, so both programs share them.
+
 ## 5. Tests
 
 ```

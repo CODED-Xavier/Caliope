@@ -81,6 +81,16 @@ export const api = {
   engineStart: () => request("POST", "/api/engine/start"),
   engineStop: () => request("POST", "/api/engine/stop"),
   engineDownload: () => request("POST", "/api/engine/download"),
+  modelLibrary: () => request("GET", "/api/models/library"),
+  searchModels: (q) => request("GET", `/api/models/search?q=${encodeURIComponent(q)}`),
+  modelFiles: (repo) => request("GET", `/api/models/files?repo=${encodeURIComponent(repo)}`),
+  downloadModel: (repo, file) => request("POST", "/api/models/download", { repo, file }),
+  cancelDownload: (key) => request("POST", "/api/models/download/cancel", { key }),
+  clearDownload: (key) => request("POST", "/api/models/download/clear", { key }),
+  loadModel: (path, role) => request("POST", "/api/models/load", { path, role }),
+  unloadModel: (role) => request("POST", "/api/models/unload", { role }),
+  setModelActive: (path, active) => request("POST", "/api/models/active", { path, active }),
+  deleteModel: (path) => request("POST", "/api/models/delete", { path }),
   music: () => request("GET", "/api/music"),
   async uploadMusic(file, name, tags = []) {
     const qs = new URLSearchParams({ name, tags: tags.join(",") });

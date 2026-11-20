@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Any, Iterable
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS model_prefs (
+    path        TEXT PRIMARY KEY,
+    disabled    INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS tracks (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
