@@ -2,15 +2,28 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from .db import Database
 
-BASE_DIR = Path(__file__).resolve().parent.parent  # the backend/ folder
+# Two ways to run: from the source folder (Play.bat), or as the Windows program (LocalRPG.exe, built by
+# build-exe.bat). The program keeps its read-only parts inside its _internal folder and your saves next to it.
+FROZEN = bool(getattr(sys, "frozen", False))
+if FROZEN:
+    APP_HOME = Path(sys.executable).resolve().parent         # the folder that holds LocalRPG.exe
+    _BUNDLE = Path(getattr(sys, "_MEIPASS", APP_HOME))
+    BASE_DIR = APP_HOME
+    SEED_DIR = _BUNDLE / "app" / "seed"
+    FRONTEND_DIST = _BUNDLE / "frontend_dist"
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent       # the backend/ folder
+    APP_HOME = BASE_DIR.parent                              # the project folder
+    SEED_DIR = Path(__file__).resolve().parent / "seed"
+    FRONTEND_DIST = APP_HOME / "frontend" / "dist"
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "rpg.db"
 SKILLS_DIR = BASE_DIR / "skills"
-SEED_DIR = Path(__file__).resolve().parent / "seed"
 
 DEFAULT_SETTINGS: dict = {
     # --- Connection to the local model server (LM Studio by default) ---
@@ -26,7 +39,13 @@ DEFAULT_SETTINGS: dict = {
     "repeat_penalty": 1.08,
     "max_tokens": 800,            # hard cap for one reply (the "Reply length" setting is usually lower)
     "reply_length": "medium",     # short | medium | long
-    "context_window": 8192,   # must match the context length loaded in LM Studio
+    "context_window": 8192,   # must match the context length loaded in LM Studio (the built-in engine uses it directly)
+    # --- AI engine: LM Studio (default) or the built-in llama.cpp engine ---
+    "ai_engine": "lmstudio",      # lmstudio | builtin
+    "engine_model_path": "",      # .gguf file for the story model
+    "engine_embedding_path": "",  # optional .gguf embedding model (memory search by meaning)
+    "engine_port": 8091,
+    "engine_gpu_layers": "auto",  # auto | all | a number (lower it when video memory runs out)
     # --- Behaviour ---
     "response_language": "en",     # "en", "pt-BR" or "auto"
     "extra_instructions": "",      # appended to every system prompt
@@ -51,6 +70,15 @@ DEFAULT_SETTINGS: dict = {
     "scene_pictures": False,
     "scene_picture_style": "atmospheric fantasy painting, detailed, cinematic lighting",
 }
+
+
+def embedding_key(settings: dict) -> str:
+    """Name of the embedding model in use ('' = none). Stored vectors are tagged with it, so a different model
+    re-embeds instead of mixing incompatible vectors."""
+    if settings.get("ai_engine") == "builtin":
+        path = settings.get("engine_embedding_path") or ""
+        return "gguf:" + Path(path).stem if path else ""
+    return settings.get("embedding_model") or ""
 
 
 class SettingsStore:
@@ -97,6 +125,15 @@ class SettingsStore:
     @staticmethod
     def _coerce(key: str, value):
         default = DEFAULT_SETTINGS[key]
+        if key == "ai_engine" and value not in ("lmstudio", "builtin"):
+            raise ValueError("ai_engine must be 'lmstudio' or 'builtin'")
+        if key == "engine_gpu_layers":
+            value = str(value).strip().lower() or "auto"
+            if value not in ("auto", "all") and not value.isdigit():
+                raise ValueError("GPU layers must be auto, all or a number")
+            return value
+        if key == "engine_port" and not 1024 <= int(value) <= 65000:
+            raise ValueError("The engine port must be between 1024 and 65000")
         if isinstance(default, bool):
             if isinstance(value, str):
                 return value.strip().lower() in ("1", "true", "yes", "on")

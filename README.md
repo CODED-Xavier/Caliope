@@ -1,4 +1,4 @@
-# Local RPG Chat (v0.13: scene pictures)
+# Local RPG Chat (v1.0: built-in AI engine and Windows program)
 
 A chatbot for RPG and roleplay that runs 100% on your PC: no token limits, no subscription.
 It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
@@ -200,6 +200,23 @@ the AI writes a short description of the place and the free **Pollinations.ai** 
   with a small logo in the corner. It may refuse some dark scenes.
 - **Picture style** (in Settings) is added to every description: e.g. *oil painting*, *anime style*, *dark gothic illustration*.
 - Pictures are kept on your PC after the first time; the **Aa → Character pictures: Hidden** option hides them too.
+
+## 4i. Built-in AI engine and the Windows program (v1.0)
+
+**Built-in engine (no LM Studio needed).** Settings > Model > AI engine > *Built-in*.
+1. Press **Download engine** once (about 30 MB: llama.cpp's official Vulkan build for Windows, from its GitHub releases page; works on AMD cards like the RX 580).
+2. Pick the **Story model**. The list shows the .gguf files LM Studio already downloaded (nothing is copied), or paste any .gguf path.
+3. Optional: a **Memory search model** (e.g. nomic-embed-text) for search by meaning. It runs as a second small server.
+4. Save. The engine loads the model (10 to 60 s) and from then on starts with the app and stops when you close it.
+- Close LM Studio's model first (or the two will fight over the 8 GB of video memory).
+- If loading fails, open *Engine log*: "out of memory" means lower the **Context window** or set **GPU layers** to a number like 28.
+- The engine uses the Context window setting directly, keeps the whole context for the story (one slot), and reuses the unchanged start of the prompt between turns, like LM Studio.
+- Ports: 8091 (story) and 8092 (memory search). Change `engine_port` if something else uses them.
+
+**The Windows program.** Run **build-exe.bat** (after Play.bat ran once). It builds the interface, installs PyInstaller the first time, and makes the folder `LocalRPG\` with **LocalRPG.exe**.
+- The program keeps its own saves in `LocalRPG\data` (copied from Play.bat's `backend\data` the first time), the engine in `LocalRPG\engine`, skills in `LocalRPG\skills`. Rebuilding replaces only the program files, never these folders.
+- Double-click LocalRPG.exe: a window shows the status and the app opens in your browser. Close that window to stop everything (the engine stops with it).
+- Copy the whole `LocalRPG` folder to move it; it needs no Python or Node.js.
 
 ## 5. Tests
 

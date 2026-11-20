@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import Modal from "./Modal.jsx";
 import HelpTip from "./HelpTip.jsx";
 import KindPicker from "./KindPicker.jsx";
+import EnginePanel from "./EnginePanel.jsx";
 import { api } from "../api.js";
 
 function Row({ label, help, hint, children }) {
@@ -59,6 +60,13 @@ export default function SettingsModal({ onClose, onSaved }) {
       <p className="muted tiny">The type new cards start with. Every card can change its own type and details in the card editor.</p>
 
       <h3>Model</h3>
+      <Row label="AI engine" help="ai_engine">
+        <select className="field" value={s.ai_engine} onChange={(e) => set("ai_engine", e.target.value)}>
+          <option value="lmstudio">LM Studio (or another server)</option>
+          <option value="builtin">Built-in (no LM Studio needed)</option>
+        </select>
+      </Row>
+      {s.ai_engine === "builtin" ? <EnginePanel s={s} set={set} Row={Row} /> : (<>
       <Row label="Server address" help="llm_base_url" hint="LM Studio default: http://localhost:1234/v1">
         <input className="field" value={s.llm_base_url} onChange={(e) => set("llm_base_url", e.target.value)} />
       </Row>
@@ -74,6 +82,7 @@ export default function SettingsModal({ onClose, onSaved }) {
           {modelOptions(s.embedding_model).map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
       </Row>
+      </>)}
       <Row label="Context window" help="context_window">
         <input className="field num" value={s.context_window} onChange={num("context_window", int)} />
       </Row>

@@ -14,6 +14,7 @@ from .jukebox import MusicLibrary
 from .maps import MapRepository
 from .memory import MemoryManager
 from .rulebooks import RulebookRepository
+from .runtime import EngineManager
 from .scenarios import ScenarioRepository
 from .skills import SkillManager
 
@@ -34,10 +35,12 @@ class Services:
         self.combat = CombatEngine(self.dice)
         self.maps = MapRepository(self.db)
         self.music = MusicLibrary(self.db, Path(db_path).parent / "music")
+        self.runtime = EngineManager(self.settings.all)
         self.engine = ChatEngine(self.conversations, self.settings, self.llm, self.memory, self.skills, self.dice,
                                  rulebooks=self.rulebooks)
 
     async def close(self) -> None:
+        await self.runtime.stop()
         aclose = getattr(self.llm, "aclose", None)
         if aclose:
             await aclose()

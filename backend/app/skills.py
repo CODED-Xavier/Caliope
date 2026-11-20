@@ -28,6 +28,7 @@ from typing import Callable
 from .db import Database
 from .memory import _pack, _unpack, cosine
 from .util import now, slugify, tokenize, truncate
+from .config import embedding_key
 
 log = logging.getLogger("rpg.skills")
 
@@ -272,7 +273,7 @@ class SkillManager:
         return scores
 
     async def _skill_vectors(self, skills: list[Skill]) -> dict[str, list[float]] | None:
-        model = self._get().get("embedding_model") or ""
+        model = embedding_key(self._get()) or ""
         if not model:
             return None
         vectors: dict[str, list[float]] = {}

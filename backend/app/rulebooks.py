@@ -22,6 +22,7 @@ from typing import Callable
 
 from .db import Database
 from .util import now, tokenize, truncate
+from .config import embedding_key
 
 log = logging.getLogger("rpg.rulebooks")
 
@@ -288,7 +289,7 @@ class RulebookRepository:
 
     async def embed_book(self, book_id: int, batch: int = 32) -> int:
         """Add meaning-based search to a book (only when an embedding model is set)."""
-        model = self._get().get("embedding_model") or ""
+        model = embedding_key(self._get()) or ""
         if not model or self.llm is None:
             return 0
         rows = self.db.query("SELECT id, heading, text FROM rule_chunks WHERE book_id = ? AND (embedding IS NULL OR embed_model != ?)",
@@ -322,7 +323,7 @@ class RulebookRepository:
             return []
 
     async def search_semantic(self, book_ids: list[int], query: str, limit: int = 6) -> list[dict]:
-        model = self._get().get("embedding_model") or ""
+        model = embedding_key(self._get()) or ""
         if not model or not book_ids or self.llm is None or not query.strip():
             return []
         marks = ",".join("?" * len(book_ids))

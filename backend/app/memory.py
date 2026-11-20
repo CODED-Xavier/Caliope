@@ -17,6 +17,7 @@ from typing import Callable
 
 from .db import Database
 from .util import now, stem, tokenize
+from .config import embedding_key
 
 try:  # numpy makes semantic search fast; everything still works without it
     import numpy as np
@@ -61,7 +62,7 @@ class MemoryManager:
         if dup:
             return None
         vec = await self._embed_one(text)
-        model = self._get().get("embedding_model") or None
+        model = embedding_key(self._get()) or None
         cur = self.db.execute(
             "INSERT INTO memories(conversation_id, message_id, text, kind, importance, participants, embedding, embed_model, created_at) "
             "VALUES(?,?,?,?,?,?,?,?,?)",
@@ -77,7 +78,7 @@ class MemoryManager:
 
     async def reindex(self, conv_id: int | None = None) -> int:
         """Embed memories that have no vector for the current embedding model."""
-        model = self._get().get("embedding_model") or ""
+        model = embedding_key(self._get()) or ""
         if not model:
             return 0
         sql = "SELECT id, text FROM memories WHERE (embedding IS NULL OR embed_model IS NOT ?)"
@@ -146,7 +147,7 @@ class MemoryManager:
 
     async def search_semantic(self, conv_id: int, query: str, limit: int = 10) -> list[dict]:
         settings = self._get()
-        model = settings.get("embedding_model") or ""
+        model = embedding_key(settings) or ""
         if not model or not query.strip():
             return []
         rows = self.db.query(

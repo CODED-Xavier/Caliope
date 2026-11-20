@@ -99,17 +99,29 @@ class LLMClient:
             await self._client.aclose()
             self._client = None
 
+    def _builtin(self) -> bool:
+        return self._get().get("ai_engine") == "builtin"
+
     def _base(self) -> str:
-        return str(self._get()["llm_base_url"]).rstrip("/")
+        s = self._get()
+        if s.get("ai_engine") == "builtin":
+            return f"http://127.0.0.1:{int(s.get('engine_port', 8091))}/v1"
+        return str(s["llm_base_url"]).rstrip("/")
+
+    def _embed_base(self) -> str:
+        """The built-in engine runs the embedding model as a second server on the next port."""
+        s = self._get()
+        if s.get("ai_engine") == "builtin":
+            return f"http://127.0.0.1:{int(s.get('engine_port', 8091)) + 1}/v1"
+        return self._base()
 
     def _headers(self) -> dict:
         return {"Authorization": f"Bearer {self._get().get('api_key') or 'none'}"}
 
     def _unreachable(self, exc: Exception) -> LLMError:
-        return LLMError(
-            f"Cannot reach the model server at {self._base()}. "
-            f"Is LM Studio's local server running? ({exc.__class__.__name__}: {exc})"
-        )
+        hint = ("Is the built-in engine started? (Settings > AI engine)" if self._builtin()
+                else "Is LM Studio's local server running?")
+        return LLMError(f"Cannot reach the model server at {self._base()}. {hint} ({exc.__class__.__name__}: {exc})")
 
     # ------------------------------------------------------------------ models
     async def list_models(self) -> list[str]:
@@ -132,6 +144,8 @@ class LLMClient:
             return {"ok": False, "base_url": self._base(), "error": str(exc), "models": []}
 
     async def _resolve_model(self) -> str:
+        if self._builtin():
+            return "local"  # the built-in engine serves exactly one model and ignores the name
         configured = self._get().get("model") or ""
         if configured:
             return configured
@@ -219,6 +233,8 @@ class LLMClient:
                 "type": "json_schema",
                 "json_schema": {"name": "result", "schema": json_schema},
             }
+            if self._builtin():  # llama.cpp's documented form; harmless next to the OpenAI form
+                payload["response_format"]["schema"] = json_schema
         url = f"{self._base()}/chat/completions"
         try:
             resp = await client.post(url, json=payload, headers=self._headers())
@@ -240,7 +256,9 @@ class LLMClient:
     # -------------------------------------------------------------- embeddings
     async def embed(self, texts: list[str]) -> list[list[float]] | None:
         """Return one vector per text, or None if embeddings are unavailable."""
-        model = self._get().get("embedding_model") or ""
+        from .config import embedding_key
+
+        model = embedding_key(self._get())
         if not model or not texts:
             return None
         import httpx
@@ -248,8 +266,8 @@ class LLMClient:
         client = await self._http()
         try:
             resp = await client.post(
-                f"{self._base()}/embeddings",
-                json={"model": model, "input": texts},
+                f"{self._embed_base()}/embeddings",
+                json={"model": model.removeprefix("gguf:"), "input": texts},
                 headers=self._headers(),
                 timeout=60.0,
             )

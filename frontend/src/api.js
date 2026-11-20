@@ -76,6 +76,11 @@ export const api = {
   combatSuggest: (id, system) => request("POST", `/api/conversations/${id}/combat/suggest`, { system }),
   combatEdit: (id, cid, patch) => request("PATCH", `/api/conversations/${id}/combat/${cid}`, patch),
   paintScene: (convId, messageId, reroll = false) => request("POST", `/api/conversations/${convId}/messages/${messageId}/scene-picture`, { reroll }),
+  engine: () => request("GET", "/api/engine"),
+  engineModels: () => request("GET", "/api/engine/models"),
+  engineStart: () => request("POST", "/api/engine/start"),
+  engineStop: () => request("POST", "/api/engine/stop"),
+  engineDownload: () => request("POST", "/api/engine/download"),
   music: () => request("GET", "/api/music"),
   async uploadMusic(file, name, tags = []) {
     const qs = new URLSearchParams({ name, tags: tags.join(",") });

@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from .cardio import export_card, parse_card
-from .config import DB_PATH
+from .config import DB_PATH, FRONTEND_DIST
 from .conversations import NotFound
 from .drafts import draft_card_field, draft_player
 from .exporting import export_markdown
@@ -26,6 +26,7 @@ from .maps import MapError, generate as generate_map
 from .jukebox import MOODS as MUSIC_MOODS
 from .jukebox import MusicError
 from .rulebooks import RulebookError, ocr_available
+from .runtime import ENGINE_KEYS, EngineError, find_models
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import is_pollinations, polite_fetch
 from .dice import DiceError
@@ -43,8 +44,18 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.svc = Services()
+    app.state.tasks = set()
+    if app.state.svc.settings.get("ai_engine") == "builtin":
+        background(app.state.svc.runtime.start())  # the app opens at once; the model loads behind it
     yield
     await app.state.svc.close()
+
+
+def background(coro) -> None:
+    """Run a coroutine without waiting for it (kept referenced so it is not garbage-collected mid-way)."""
+    task = asyncio.create_task(coro)
+    app.state.tasks.add(task)
+    task.add_done_callback(app.state.tasks.discard)
 
 
 app = FastAPI(title="Local RPG Chat", version="0.1.0", lifespan=lifespan)
@@ -104,7 +115,8 @@ def stream_response(events: AsyncIterator[dict]) -> StreamingResponse:
 # ------------------------------------------------------------------ health/models
 @app.get("/api/health")
 async def health():
-    return {"backend": "ok", "llm": await svc().llm.health(), "skills": len(svc().skills.list())}
+    return {"backend": "ok", "llm": await svc().llm.health(), "skills": len(svc().skills.list()),
+            "engine": svc().runtime.status(with_log=False)}
 
 
 @app.get("/api/models")
@@ -120,7 +132,14 @@ async def get_settings():
 
 @app.put("/api/settings")
 async def put_settings(values: dict[str, Any] = Body(...)):
-    return svc().settings.update(values)
+    before = svc().settings.all()
+    after = svc().settings.update(values)
+    if any(before.get(k) != after.get(k) for k in ENGINE_KEYS):  # model, port, context... changed: reload the engine
+        if after.get("ai_engine") == "builtin":
+            background(svc().runtime.start())
+        elif before.get("ai_engine") == "builtin":
+            background(svc().runtime.stop())
+    return after
 
 
 @app.post("/api/settings/reset")
@@ -704,9 +723,52 @@ async def delete_skill(name: str):
     return svc().skills.list()
 
 
+# ------------------------------------------------------------------ built-in AI engine
+@app.get("/api/engine")
+async def engine_status():
+    return svc().runtime.status()
+
+
+@app.get("/api/engine/models")
+async def engine_models():
+    return await asyncio.to_thread(find_models)
+
+
+@app.post("/api/engine/start")
+async def engine_start():
+    if svc().settings.get("ai_engine") != "builtin":
+        raise HTTPException(status_code=400, detail="Switch the AI engine to 'Built-in' first.")
+    background(svc().runtime.start())
+    return svc().runtime.status()
+
+
+@app.post("/api/engine/stop")
+async def engine_stop():
+    await svc().runtime.stop()
+    return svc().runtime.status()
+
+
+@app.post("/api/engine/download")
+async def engine_download():
+    rt = svc().runtime
+    if rt.state == "downloading":
+        return rt.status()
+
+    async def run():
+        try:
+            await rt.download()
+            if svc().settings.get("ai_engine") == "builtin":
+                await rt.start()
+        except EngineError:
+            pass  # the status shows the reason
+
+    rt.state, rt.message, rt.progress = "downloading", "Starting the download…", 0.0
+    background(run())
+    return rt.status()
+
+
 # ------------------------------------------------------------------ the interface
 # After the interface is built (Play.bat does it), the backend serves it too, so one address does everything.
-FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 
 @app.get("/{path:path}", include_in_schema=False)
