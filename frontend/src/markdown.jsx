@@ -5,7 +5,7 @@ import React from "react";
 
 const INLINE = /(`[^`\n]+`|\*\*[^*\n]+?\*\*|~~[^~\n]+?~~|\*[^*\n]+?\*)/g;
 
-function inline(text, key) {
+function inlineBase(text, key) {
   return text.split(INLINE).map((part, i) => {
     if (!part) return null;
     const k = `${key}-${i}`;
@@ -17,6 +17,22 @@ function inline(text, key) {
   });
 }
 
+// Story mode: "speech" and 'thoughts' get their own colours; the rest (narration and *actions*) stays grey.
+// A thought may hold apostrophes inside words ('He's hiding something,').
+const VOICE = /("[^"\n]+"|\u201c[^\u201d\n]+\u201d|\u2018[^\u2019\n]+\u2019|(?<![\w'])'(?:[^'\n]|'(?=\w))+'(?!\w))/g;
+
+function storyInline(text, key) {
+  return text.split(VOICE).map((part, i) => {
+    if (!part) return null;
+    const k = `${key}-v${i}`;
+    if (/^["\u201c]/.test(part) && part.length > 2) return <span key={k} className="say">{inline(part, k)}</span>;
+    if (/^['\u2018]/.test(part) && part.length > 2) return <span key={k} className="think">{inline(part, k)}</span>;
+    return <React.Fragment key={k}>{inline(part, k)}</React.Fragment>;
+  });
+}
+
+const inline = inlineBase;
+
 const isFence = (l) => /^```/.test(l);
 const isHeading = (l) => /^#{1,4}\s+/.test(l);
 const isRule = (l) => /^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(l);
@@ -24,7 +40,8 @@ const isQuote = (l) => /^>\s?/.test(l);
 const isItem = (l) => /^\s*([-*+]|\d+\.)\s+/.test(l);
 const startsBlock = (l) => isFence(l) || isHeading(l) || isRule(l) || isQuote(l) || isItem(l);
 
-export const Markdown = React.memo(function Markdown({ text }) {
+export const Markdown = React.memo(function Markdown({ text, story = false }) {
+  const inline = story ? storyInline : inlineBase;
   const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
   const blocks = [];
   let i = 0;
@@ -73,5 +90,5 @@ export const Markdown = React.memo(function Markdown({ text }) {
       );
     }
   }
-  return <div className="md">{blocks}</div>;
+  return <div className={story ? "md story" : "md"}>{blocks}</div>;
 });

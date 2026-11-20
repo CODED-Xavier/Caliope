@@ -558,7 +558,7 @@ function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinned
 }
 
 /* ------------------------------------------------------------------ Panel */
-const TABS = [
+export const TABS = [
   ["status", "📜", "Status"],
   ["sheet", "🧙", "Sheet"],
   ["bag", "🎒", "Bag"],

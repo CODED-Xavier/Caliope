@@ -2,8 +2,9 @@ import React, { memo, useState } from "react";
 import { Markdown } from "../markdown.jsx";
 import { portraitSrc, splitStory } from "../portraits.js";
 
-function Portrait({ name, mood, url, small }) {
+function Portrait({ name, mood, url, small, size }) {
   const [failed, setFailed] = useState(false);
+  const [zoom, setZoom] = useState(false);
   if (failed) return null; // no internet or a broken link: just the text
   if (small) {
     return (
@@ -14,9 +15,16 @@ function Portrait({ name, mood, url, small }) {
     );
   }
   return (
-    <figure className="portrait-big">
-      <img src={portraitSrc(url)} alt={`${name} (${mood})`} loading="lazy" onError={() => setFailed(true)} />
+    <figure className={`portrait-big ${size === "full" ? "full" : ""}`}>
+      <img src={portraitSrc(url)} alt={`${name} (${mood})`} loading="lazy" onError={() => setFailed(true)}
+        onClick={() => setZoom(true)} title="Click to see it full size" />
       <figcaption>{name}{mood && mood !== "Standard" ? <span className="muted"> · {mood}</span> : null}</figcaption>
+      {zoom && (
+        <div className="lightbox" onClick={() => setZoom(false)} title="Click to close">
+          <img src={portraitSrc(url)} alt={`${name} (${mood})`} />
+          <div className="lightbox-cap">{name}{mood && mood !== "Standard" ? ` · ${mood}` : ""}</div>
+        </div>
+      )}
     </figure>
   );
 }
@@ -24,12 +32,12 @@ function Portrait({ name, mood, url, small }) {
 /** A reply with big character portraits above the part where each character speaks or acts. */
 const Story = memo(function Story({ text, npcs, known, portraitStyle = "big" }) {
   const parts = splitStory(String(text || ""), npcs || [], known || {}).filter((p) => portraitStyle !== "off" || p.type === "text");
-  if (parts.length === 1 && parts[0].type === "text") return <Markdown text={parts[0].text} />;
+  if (parts.length === 1 && parts[0].type === "text") return <Markdown text={parts[0].text} story />;
   return (
     <>
       {parts.map((p, i) => (p.type === "portrait"
-        ? <Portrait key={i} name={p.name} mood={p.mood} url={p.url} small={portraitStyle === "small"} />
-        : p.text.trim() ? <Markdown key={i} text={p.text} /> : null))}
+        ? <Portrait key={i} name={p.name} mood={p.mood} url={p.url} small={portraitStyle === "small"} size={portraitStyle} />
+        : p.text.trim() ? <Markdown key={i} text={p.text} story /> : null))}
     </>
   );
 });

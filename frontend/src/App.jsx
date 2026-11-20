@@ -6,15 +6,27 @@ import SidePanel from "./components/SidePanel.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import SkillsModal from "./components/SkillsModal.jsx";
 import RulebooksModal from "./components/RulebooksModal.jsx";
+import { TABS as PANEL_TABS } from "./components/SidePanel.jsx";
 import ModelsModal from "./components/ModelsModal.jsx";
 import { JukeboxModal, JukeboxPlayer } from "./components/Jukebox.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
 import { KIND_LABELS, MODE_LABELS } from "./utils.js";
 
-const VIEW_DEFAULTS = { fontSize: 16, wide: false, compact: false, follow: false, panelWidth: 372, portraits: "big" };
+const VIEW_DEFAULTS = { fontSize: 16, wide: false, compact: false, follow: false, panelWidth: 372, portraits: "full",
+  sideCollapsed: false, panelHidden: false,
+  storyColors: true, narr: "", say: "", think: "" };  // "" = the theme's colour
 function loadView() {
-  try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem("view") || "{}") }; } catch { return { ...VIEW_DEFAULTS }; }
+  try {
+    const saved = JSON.parse(localStorage.getItem("view") || "{}");
+    if (!("sideCollapsed" in saved) && saved.portraits === "big") saved.portraits = "full";  // the new default for older settings
+    return { ...VIEW_DEFAULTS, ...saved };
+  } catch { return { ...VIEW_DEFAULTS }; }
 }
+
+const DEFAULT_COLORS = {
+  dark: { narr: "#a8a59d", say: "#f7f6f2", think: "#b9a3e8" },
+  light: { narr: "#6b6962", say: "#1f1e1d", think: "#7650b0" },
+};
 
 /** "Aa" menu: how the story looks and behaves. Saved in this browser. */
 function ViewMenu({ view, setView, onClose }) {
@@ -35,11 +47,24 @@ function ViewMenu({ view, setView, onClose }) {
       <div className="row gap center">
         <span className="grow small">Character pictures</span>
         <select className="field" value={view.portraits} onChange={(e) => set("portraits", e.target.value)}>
-          <option value="big">Big</option>
+          <option value="full">Full width</option>
+          <option value="big">Medium</option>
           <option value="small">Small</option>
           <option value="off">Hidden</option>
         </select>
       </div>
+      <label className="check small"><input type="checkbox" checked={view.storyColors !== false} onChange={(e) => set("storyColors", e.target.checked)} />Colour the story: narration, “speech”, ‘thoughts’</label>
+      {view.storyColors !== false && (
+        <div className="row gap center story-colors">
+          {[["narr", "Narration"], ["say", "Speech"], ["think", "Thoughts"]].map(([k, label]) => (
+            <label key={k} className="tiny muted color-pick">
+              <input type="color" value={view[k] || DEFAULT_COLORS[document.documentElement.dataset.theme === "light" ? "light" : "dark"][k]}
+                onChange={(e) => set(k, e.target.value)} />{label}
+            </label>
+          ))}
+          {(view.narr || view.say || view.think) && <button className="link-btn tiny" onClick={() => setView({ ...view, narr: "", say: "", think: "" })}>default</button>}
+        </div>
+      )}
       <label className="check small"><input type="checkbox" checked={view.wide} onChange={(e) => set("wide", e.target.checked)} />Wider story column</label>
       <label className="check small"><input type="checkbox" checked={view.compact} onChange={(e) => set("compact", e.target.checked)} />Compact (less spacing)</label>
       <label className="check small"><input type="checkbox" checked={view.follow} onChange={(e) => set("follow", e.target.checked)} />Follow the text while it is written</label>
@@ -65,7 +90,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [modal, setModal] = useState(null); // "new" | "settings" | "skills"
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpenState] = useState(() => !loadView().panelHidden);
   const [tab, setTab] = useState("sheet");
   const [health, setHealth] = useState(null);
   const [memoryKey, setMemoryKey] = useState(0);
@@ -78,6 +103,8 @@ export default function App() {
   useEffect(() => { loadSettingsFlags(); }, []);
   useEffect(() => { api.music().then((r) => setTracks(r.tracks)).catch(() => {}); }, []);
   const setView = (v) => { setViewState(v); try { localStorage.setItem("view", JSON.stringify(v)); } catch { /* private mode */ } };
+  const setPanelOpen = (open) => { setPanelOpenState(open); setView({ ...loadView(), panelHidden: !open }); };
+  const setSideCollapsed = (c) => setView({ ...loadView(), sideCollapsed: c });
 
   const abortRef = useRef(null);
   const activeRef = useRef(null);
@@ -349,11 +376,14 @@ export default function App() {
 
   return (
     <div className={`app ${view.wide ? "wide" : ""} ${view.compact ? "compact" : ""}`}
-      style={{ "--story-font": `${view.fontSize}px`, "--panel-w": `${view.panelWidth}px` }}>
+      style={{ "--story-font": `${view.fontSize}px`, "--panel-w": `${view.panelWidth}px`,
+        ...(view.narr ? { "--narr": view.narr } : {}), ...(view.say ? { "--say": view.say } : {}), ...(view.think ? { "--think": view.think } : {}) }}
+      data-story-colors={view.storyColors === false ? "off" : "on"}>
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => setModal("new")}
         onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onModels={() => setModal("models")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+        collapsed={view.sideCollapsed} onCollapse={setSideCollapsed}
       />
       <main className="main">
         {game ? (
@@ -375,7 +405,7 @@ export default function App() {
                 {viewOpen && <ViewMenu view={view} setView={setView} onClose={() => setViewOpen(false)} />}
               </div>
               <button className="btn small" onClick={undo} disabled={busy} title="Remove the last exchange">↶ Undo</button>
-              <button className="btn small" onClick={() => setPanelOpen(!panelOpen)}>{panelOpen ? "Hide panel" : "Show panel"}</button>
+              <button className="btn small" onClick={() => setPanelOpen(!panelOpen)} title="Show or hide the sheet panel">{panelOpen ? "Hide panel ⇥" : "⇤ Show panel"}</button>
             </div>
             <Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
@@ -394,6 +424,14 @@ export default function App() {
           </div>
         )}
       </main>
+      {game && !panelOpen && (
+        <aside className="panel-rail">
+          <button className="icon-btn" title="Show the panel" onClick={() => setPanelOpen(true)}>⇤</button>
+          {PANEL_TABS.map(([k, icon, label]) => (
+            <button key={k} className="icon-btn rail-tab" title={label} onClick={() => { setTab(k); setPanelOpen(true); }}>{icon}</button>
+          ))}
+        </aside>
+      )}
       {game && panelOpen && <div className="panel-resizer" onMouseDown={startResize} title="Drag to resize the panel" />}
       {game && panelOpen && (
         <SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onPay={payGold} onPower={usePower} onRest={restNow} busy={busy} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}
