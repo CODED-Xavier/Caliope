@@ -32,6 +32,7 @@ from .runtime import ENGINE_KEYS, EngineError
 from .modelhub import download_root, pick_model_file
 from .picker import pick_folder
 from . import backups, cardpics, r2
+from .voice import CATALOG as VOICE_CATALOG, VoiceError
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import PixAIError, is_pixai, is_pollinations, pixai_paint, polite_fetch
 from .playerlore import parse_suggestions, suggest_prompt
@@ -147,6 +148,11 @@ def svc() -> Services:
 @app.exception_handler(NotFound)
 async def _not_found(_: Request, exc: NotFound):
     return JSONResponse({"detail": str(exc)}, status_code=404)
+
+
+@app.exception_handler(VoiceError)
+async def _voice_error(_: Request, exc: VoiceError):
+    return JSONResponse({"detail": str(exc)}, status_code=400)
 
 
 @app.exception_handler(ValueError)  # also covers DiceError and SkillError
@@ -525,6 +531,45 @@ async def import_card(body: dict[str, Any] = Body(...)):
     if str(body.get("name", "")).strip():
         data["name"] = str(body["name"]).strip()
     return svc().scenarios.create(data)
+
+
+# ------------------------------------------------------------------ narration voice (Piper)
+@app.get("/api/voice")
+async def voice_status():
+    return svc().voice.status()
+
+
+@app.post("/api/voice/install")
+async def voice_install(body: dict = Body(...)):
+    """Download the voice program (once) and a voice, in the background; poll GET /api/voice."""
+    voice = str(body.get("voice", ""))
+    if voice not in VOICE_CATALOG:
+        raise ValueError("Unknown voice.")
+    async def run():
+        try:
+            await svc().voice.install(voice)
+        except VoiceError as exc:  # shown in the Settings list
+            logging.getLogger("rpg").warning("Voice download failed: %s", exc)
+    background(run())
+    await asyncio.sleep(0.05)
+    return svc().voice.status()
+
+
+@app.post("/api/voice/remove")
+async def voice_remove(body: dict = Body(...)):
+    return svc().voice.remove(str(body.get("voice", "")))
+
+
+@app.get("/api/voice/speak/{message_id}")
+async def voice_speak(message_id: int, voice: str = Query("")):
+    """The message read aloud (a .wav made once, then kept)."""
+    s = svc()
+    msg = s.conversations.get_message(message_id)
+    name = voice or s.settings.get("voice_name")
+    if not name:
+        raise ValueError("Pick a narration voice in Settings first.")
+    path = await asyncio.to_thread(s.voice.speak, msg["content"], name, float(s.settings.get("voice_speed") or 1.0))
+    return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "no-cache"})
 
 
 # ------------------------------------------------------------------ backups and .caliope card files

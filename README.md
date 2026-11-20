@@ -282,6 +282,9 @@ Play.bat and Caliope.exe open the game in a window of its own (Microsoft Edge's 
 - **Daily backups**: once a day all your games, characters, memories and cards are copied to `data\backups\rpg-<date>.db`; the last 7 are kept (Settings > Backups: turn off, change the number, *Back up now*, *Open folder*). To restore: close Calíope, rename `data\rpg.db` (keep it), copy a backup into `data`, rename it `rpg.db`, start again. Pictures from folders and music are files in `data`, not inside the backup.
 - **📦 .caliope files**: in the New game list, 📦 saves a card with all its pictures in one file. *Import a card* reads `.caliope` files back (pictures included), so you can share a card with a friend without GitHub or the cloud. Pictures that are only public links stay links.
 
+## 4s. Narration voice (v2.5)
+Settings > *Narration voice*: download the voice program (Piper, from its official GitHub, about 25 MB) and a voice (about 60 MB each, from Hugging Face): Lessac, Amy, Ryan (English US), Alan (English UK) or Faber (Português do Brasil). Pick it as *Voice for 🔊*. Then 🔊 on any reply reads it aloud (⏹ stops), or turn on *Read every new reply aloud*. It runs on the processor, so the story model keeps the graphics card; each reply is read once and kept (`data\voice\cache`). Status blocks, portrait tags and markdown marks are skipped.
+
 ## 5. Tests
 
 ```

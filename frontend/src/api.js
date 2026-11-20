@@ -117,6 +117,9 @@ export const api = {
     if (!res.ok) throw new Error(await errorMessage(res));
     return res.json();
   },
+  voice: () => request("GET", "/api/voice"),
+  voiceInstall: (voice) => request("POST", "/api/voice/install", { voice }),
+  voiceRemove: (voice) => request("POST", "/api/voice/remove", { voice }),
   backups: () => request("GET", "/api/backups"),
   backupNow: () => request("POST", "/api/backups/now"),
   openBackups: () => request("POST", "/api/backups/open"),

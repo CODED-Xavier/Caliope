@@ -504,3 +504,5 @@ body.resizing { user-select: none; cursor: col-resize; }
 .bag-pic img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; cursor: zoom-in; background: var(--bg2); }
 .bag-pic figcaption { padding: 4px 6px; }
 .bag-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice-row { padding: 3px 0; border-bottom: 1px dashed var(--border); }
+.icon-btn.speaking { color: var(--accent); }

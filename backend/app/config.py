@@ -72,6 +72,9 @@ DEFAULT_SETTINGS: dict = {
     "rules_char_budget": 1400,        # characters of rulebook passages added to a turn (about 350 tokens)
     # --- Scene pictures (optional, uses the free Pollinations.ai service over the internet) ---
     "scene_pictures": False,
+    "voice_name": "",             # narration voice (Piper), e.g. en_US-lessac-medium; empty = off
+    "voice_speed": 1.0,
+    "voice_auto": False,          # read every new reply aloud
     "backups": True,              # a copy of all games every day in data/backups
     "backups_keep": 7,
     "auto_keep_pictures": True,   # the first scene picture of each place goes in the map bag

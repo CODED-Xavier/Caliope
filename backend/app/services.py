@@ -19,6 +19,7 @@ from .runtime import EngineManager
 from .modelhub import ModelHub
 from .muse import Muse
 from .cantos import CantoBook
+from .voice import VoiceManager
 from .scenarios import ScenarioRepository
 from .skills import SkillManager
 
@@ -46,6 +47,7 @@ class Services:
         self.engine = ChatEngine(self.conversations, self.settings, self.llm, self.memory, self.skills, self.dice,
                                  rulebooks=self.rulebooks)
         self.cantos = CantoBook(self.db, self.llm)
+        self.voice = VoiceManager()
         self.engine.cantos = self.cantos
 
     async def close(self) -> None:

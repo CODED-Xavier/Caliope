@@ -137,6 +137,8 @@ export default function SettingsModal({ onClose, onSaved }) {
           </Row>
         </>)}
       </>)}
+      <h3>Narration voice <HelpTip id="voice" /></h3>
+      <VoicePanel s={s} set={set} Row={Row} />
       <h3>Backups</h3>
       <Row label="Back up every day" help="backups">
         <input type="checkbox" checked={s.backups !== false} onChange={(e) => set("backups", e.target.checked)} />
@@ -225,5 +227,56 @@ function BackupBox() {
       <button className="btn small" onClick={now}>Back up now</button>
       <button className="btn small" onClick={open} title={info?.folder}>Open folder</button>
     </div>
+  );
+}
+
+
+function VoicePanel({ s, set, Row }) {
+  const [st, setSt] = useState(null);
+  const [err, setErr] = useState("");
+  const load = () => api.voice().then(setSt).catch((e) => setErr(e.message));
+  useEffect(() => { load(); }, []);
+  const busy = st && (st.engine_progress != null || st.voices.some((v) => v.progress != null));
+  useEffect(() => {
+    if (!busy) return undefined;
+    const t = setInterval(load, 1500);
+    return () => clearInterval(t);
+  }, [busy]); // eslint-disable-line
+  if (!st) return <div className="muted small">{err || "Loading…"}</div>;
+  const installed = st.voices.filter((v) => v.installed);
+  const act = async (fn) => { setErr(""); try { setSt(await fn()); } catch (e) { setErr(e.message); } };
+  return (
+    <>
+      {!st.supported && <div className="muted small">The voice program is downloaded for Windows only.</div>}
+      {st.engine_progress != null && <div className="small"><span className="spinner" /> Downloading the voice program… {Math.round(st.engine_progress * 100)}%</div>}
+      {st.voices.map((v) => (
+        <div key={v.id} className="row gap center voice-row">
+          <span className="small grow">{v.label}</span>
+          {v.progress != null ? <span className="tiny muted">{Math.round(v.progress * 100)}%</span>
+            : v.installed ? (
+              <>
+                <span className="tiny ok-text">✓ ready</span>
+                <button className="icon-btn" title="Delete this voice" onClick={() => act(() => api.voiceRemove(v.id))}>🗑</button>
+              </>
+            ) : <button className="btn small" disabled={busy || !st.supported} onClick={() => act(() => api.voiceInstall(v.id))}>Download (~60 MB)</button>}
+          {v.error && <span className="tiny error-text" title={v.error}>failed</span>}
+        </div>
+      ))}
+      <Row label="Voice for 🔊" help="voice">
+        <select className="field" value={s.voice_name || ""} onChange={(e) => set("voice_name", e.target.value)}>
+          <option value="">(off)</option>
+          {installed.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+        </select>
+      </Row>
+      {s.voice_name && (<>
+        <Row label={`Speed ${Number(s.voice_speed || 1).toFixed(2)}×`} help="voice">
+          <input type="range" min="0.6" max="1.6" step="0.05" value={s.voice_speed || 1} onChange={(e) => set("voice_speed", parseFloat(e.target.value))} />
+        </Row>
+        <Row label="Read every new reply aloud" help="voice">
+          <input type="checkbox" checked={!!s.voice_auto} onChange={(e) => set("voice_auto", e.target.checked)} />
+        </Row>
+      </>)}
+      {err && <div className="error-text small">{err}</div>}
+    </>
   );
 }

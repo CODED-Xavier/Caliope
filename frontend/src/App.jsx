@@ -101,7 +101,22 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [tracks, setTracks] = useState([]);
   const [scenePictures, setScenePictures] = useState(false);
-  const loadSettingsFlags = () => api.settings().then((s) => setScenePictures(!!s.scene_pictures)).catch(() => {});
+  const [voice, setVoice] = useState({ name: "", auto: false });
+  const loadSettingsFlags = () => api.settings().then((s) => { setScenePictures(!!s.scene_pictures); setVoice({ name: s.voice_name || "", auto: !!s.voice_auto }); }).catch(() => {});
+  // The narration voice: one reply at a time; clicking 🔊 on the reply that is playing stops it.
+  const audioRef = useRef(null);
+  const lastReplyRef = useRef(null);
+  const [speaking, setSpeaking] = useState(null);
+  const playVoice = (messageId) => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    if (speaking === messageId) { setSpeaking(null); return; }
+    const a = new Audio(`/api/voice/speak/${messageId}`);
+    audioRef.current = a;
+    setSpeaking(messageId);
+    a.onended = () => { if (audioRef.current === a) { audioRef.current = null; setSpeaking(null); } };
+    a.onerror = () => { if (audioRef.current === a) { audioRef.current = null; setSpeaking(null); setError("The voice could not read this message. Check Settings > Narration voice."); } };
+    a.play().catch(() => {});
+  };
   useEffect(() => { loadSettingsFlags(); }, []);
   useEffect(() => { api.music().then((r) => setTracks(r.tracks)).catch(() => {}); }, []);
   const setView = (v) => { setViewState(v); try { localStorage.setItem("view", JSON.stringify(v)); } catch { /* private mode */ } };
@@ -190,6 +205,7 @@ export default function App() {
         if (!rafRef.current) rafRef.current = requestAnimationFrame(flushTokens);
         break;
       case "assistant_message":
+        lastReplyRef.current = ev.message.id;
         if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
         bufferRef.current = "";
         setGame((g) => (g ? { ...g, messages: [...g.messages, ev.message] } : g));
@@ -235,8 +251,10 @@ export default function App() {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setStream({ text: "", phase: "thinking", context: null });
+    lastReplyRef.current = null;
     try {
       await streamPost(path, body, handleEvent, ctrl.signal);
+      if (voice.auto && voice.name && lastReplyRef.current) playVoice(lastReplyRef.current);
     } catch (e) {
       if (e.name !== "AbortError") setError(e.message);
     } finally {
@@ -425,7 +443,8 @@ export default function App() {
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
               onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt}
               follow={view.follow} portraitStyle={view.portraits} searchOpen={searchOpen}
-              scenePictures={scenePictures} onPaint={paintScene} onCheck={rollCheck} onBuy={buyOffer} onCloseSearch={() => setSearchOpen(false)} />
+              scenePictures={scenePictures} onPaint={paintScene} onCheck={rollCheck} onBuy={buyOffer}
+              voiceOn={!!voice.name} speaking={speaking} onSpeak={playVoice} onCloseSearch={() => setSearchOpen(false)} />
           </>
         ) : (
           <div className="welcome">
