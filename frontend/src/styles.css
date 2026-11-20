@@ -417,3 +417,16 @@ body.resizing { user-select: none; cursor: col-resize; }
 .status-edit .lbl { display: flex; flex-direction: column; gap: 2px; }
 .pay-box { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .quest-suggest { margin-top: 4px; padding: 4px 6px; background: var(--bg2); border-radius: 6px; }
+
+/* ---- resources and abilities ---- */
+.ability-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.enemy-stats.caster { background: var(--bg2); border-radius: 6px; padding: 2px 4px; }
+.res-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.res-name { width: 70px; font-size: 13px; }
+.res-bar { flex: 1; height: 10px; background: var(--bg2); border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+.res-fill { height: 100%; background: #6b6bd6; }
+.res-num { min-width: 56px; text-align: center; font-size: 12.5px; }
+.ability-card { display: flex; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px dashed var(--border); }
+.powers-editor { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.powers-editor .card { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.powers-editor input[type=color] { width: 30px; height: 28px; padding: 0; border: none; background: none; }

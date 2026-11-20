@@ -33,6 +33,7 @@ from .scenes import is_pollinations, polite_fetch
 from .playerlore import parse_suggestions, suggest_prompt
 from .checks import roll_line
 from . import shop
+from . import resources
 from . import statusbook
 from . import worldtime
 from .dice import DiceError
@@ -285,7 +286,7 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
                                             body.get("map") if isinstance(body.get("map"), dict) else None)
     elif action == "act":
         prepare = lambda st: s.combat.player_action(st, body.get("move", "attack"), str(body.get("target", "")),  # noqa: E731
-                                                    str(body.get("advantage", "")))
+                                                    str(body.get("advantage", "")), str(body.get("ability", "")))
     elif action == "enemies":
         prepare = s.combat.enemies_act
     elif action == "end":
@@ -553,6 +554,12 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
     return full_conversation(conv["id"])
 
 
+def _card_has_resources(conv_id: int) -> bool:
+    sid = svc().conversations.get(conv_id)["scenario_id"]
+    card = svc().scenarios.get(sid) if sid else None
+    return bool(card and card["data"].get("resources"))
+
+
 def not_busy(conv_id: int) -> None:
     if svc().engine.is_busy(conv_id):
         raise BusyError("Wait for the current reply to finish.")
@@ -570,6 +577,7 @@ def full_conversation(conv_id: int) -> dict:
         "features": resolve_features(s.conversations.get(conv_id)["scenario"], s.settings.all()),
         "status_fields": statusbook.custom_fields(statusbook.template_of(s.conversations.get(conv_id)["scenario"]) or ""),
         "status_by_app": bool(s.engine._status_template(s.conversations.get(conv_id)["scenario"], s.settings.all())),
+        "card_has_resources": _card_has_resources(conv_id),
     }
 
 
@@ -697,6 +705,74 @@ async def pay_someone(conv_id: int, body: dict[str, Any] = Body(...)):
     args = (int(body.get("amount", 0) or 0), str(body.get("to", "")), str(body.get("why", "")), currency)
     shop.pay(s.conversations.get_state(conv_id), *args)
     return stream_response(s.engine.send(conv_id, "", prepare=lambda st: shop.pay(st, *args), kind="trade"))
+
+
+@app.post("/api/conversations/{conv_id}/ability")
+async def use_ability(conv_id: int, body: dict[str, Any] = Body(...)):
+    """Use an ability from the sheet outside a fight: the app pays its cost, rolls it and tells the GM."""
+    s = svc()
+    state = s.conversations.get_state(conv_id)
+    if (state.get("combat") or {}).get("active"):
+        raise ValueError("A fight is going on: use the ability from the Combat tab.")
+    ability = next((a for a in state.get("abilities") or [] if a["id"] == str(body.get("ability", ""))), None)
+    if not ability:
+        raise ValueError("That ability is not on your sheet.")
+    why = resources.can_pay(state, ability["costs"])
+    if why:
+        raise ValueError(why)
+    return stream_response(s.engine.send(conv_id, str(body.get("text", "")),
+                                         prepare=lambda st: resources.use_outside_combat(st, ability, s.dice), kind="ability"))
+
+
+@app.post("/api/conversations/{conv_id}/rest")
+async def rest(conv_id: int, body: dict[str, Any] = Body(...)):
+    """Short rest (an hour) or long rest (a night): refills resources by their rules; a long rest also heals."""
+    s = svc()
+    kind = "long" if body.get("kind") == "long" else "short"
+    cal = s.conversations.get(conv_id)["scenario"].get("calendar") or {}
+    if cal.get("enabled"):  # with a calendar the clock moves too
+        return stream_response(s.engine.send(conv_id, "/wait 8 hours" if kind == "long" else "/wait 1 hour"))
+
+    def prepare(st):
+        back = resources.regenerate(st, f"{kind}_rest")
+        if kind == "long" and st["player"]["hp"]["current"] < st["player"]["hp"]["max"]:
+            st["player"]["hp"]["current"] = st["player"]["hp"]["max"]
+            back.append(f"HP {st['player']['hp']['max']}/{st['player']['hp']['max']}")
+        what = "A night's rest" if kind == "long" else "A short rest"
+        return st, f"\U0001F6CC {what}." + (f" Recovered: {', '.join(back)}." if back else "")
+    return stream_response(s.engine.send(conv_id, "", prepare=prepare, kind="rest"))
+
+
+@app.post("/api/conversations/{conv_id}/resources/sync")
+async def sync_resources(conv_id: int):
+    """Bring the card's current resources and powers into this game (a card edited after the game started).
+    Pools that already exist keep their current value."""
+    s = svc()
+    not_busy(conv_id)
+    conv = s.conversations.get(conv_id)
+    card = s.scenarios.get(conv["scenario_id"]) if conv["scenario_id"] else None
+    if not card or not card["data"].get("resources"):
+        raise ValueError("The card has no resources yet. Add them in the card editor (Resources and powers).")
+    state = s.conversations.get_state(conv_id)
+    pools = resources.start_pools(card["data"]["resources"])
+    for name, p in pools.items():
+        old = (state.get("resources") or {}).get(name)
+        if old:
+            p["current"] = min(p["max"], old["current"])
+    state["resources"] = pools
+    state["abilities"] = [dict(a) for a in card["data"].get("abilities") or []]
+    s.conversations.save_state(conv_id, state)
+    return state
+
+
+@app.post("/api/resources/suggest")
+async def suggest_resources(body: dict[str, Any] = Body(...)):
+    """The AI proposes resources (Mana, Aura...) and abilities for a card; the card editor shows them to confirm."""
+    card = body.get("card") if isinstance(body.get("card"), dict) else {}
+    info = card.get("information") or {}
+    text = "\n\n".join(str(x) for x in (card.get("name"), card.get("world"), card.get("system_rules"), info.get("description"),
+                                         info.get("scenario"), info.get("post_history")) if x)
+    return await resources.suggest(svc().llm, text)
 
 
 @app.post("/api/conversations/{conv_id}/regenerate")

@@ -12,6 +12,7 @@ from .state import new_state
 from .portraits import process_reply
 from .util import clamp, now, render_macros
 from .playerlore import clean_entries
+from .resources import start_pools
 from . import statusbook
 from .cards import resolve_features
 from .worldtime import format_now, time_label, weather_on
@@ -60,6 +61,9 @@ class ConversationRepository:
                 if key in PLAYER_FIELDS and value not in (None, ""):
                     template[key] = value
             state = new_state(template, player_name or (player or {}).get("name"))
+            if data.get("resources"):
+                state["resources"] = start_pools(data["resources"])
+                state["abilities"] = [dict(a) for a in data.get("abilities") or []]
             cal = data.get("calendar") or {}
             if cal.get("enabled") and cal.get("months"):
                 state["clock"] = {"minutes": 0, "seed": random.randrange(1, 1_000_000)}

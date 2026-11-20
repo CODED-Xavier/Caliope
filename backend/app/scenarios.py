@@ -18,6 +18,7 @@ from .portraits import _url, normalize_portraits  # noqa: F401  (kept here for o
 from .status import split_template
 from .util import extract_json, now, slugify, truncate
 from .worldtime import normalize_calendar
+from .resources import normalize_abilities, normalize_resources
 
 MODES = ("gm_world", "gm_cast", "character")
 
@@ -153,6 +154,8 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "lorebook": normalize_lorebook(raw.get("lorebook")),
         "calendar": normalize_calendar(raw.get("calendar")),
         "currency": truncate(str(raw.get("currency") or "gold").strip(), 20) or "gold",
+        "resources": normalize_resources(raw.get("resources")),
+        "abilities": normalize_abilities(raw.get("abilities"), normalize_resources(raw.get("resources"))),
         "alternate_openings": [_clip(x, 6000) for x in raw.get("alternate_openings", [])[:10] if str(x).strip()] if isinstance(raw.get("alternate_openings"), list) else [],
         "opening_message": str(raw.get("opening_message", "")),
         "player": raw.get("player") if isinstance(raw.get("player"), dict) else {},

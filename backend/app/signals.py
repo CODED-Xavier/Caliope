@@ -38,11 +38,14 @@ COMMON = STOPWORDS | {"not", "yes", "now", "then", "still", "just", "even", "onl
                       "ainda", "depois", "antes", "aqui", "ali", "talvez", "senhor", "senhora", "deus"}
 
 
-def needs_tracking(player_text: str, reply: str, known: list[str]) -> bool:
+def needs_tracking(player_text: str, reply: str, known: list[str], resources: list[str] | None = None) -> bool:
     """True when the exchange probably changed something the tracker records."""
     text = f"{player_text}\n{reply}"
     if CHANGE_WORDS.search(text) or NAMED.search(reply or ""):
         return True
+    low = text.lower()
+    if any(re.search(rf"\b{re.escape(r.lower())}\b", low) for r in resources or []):
+        return True  # the story mentions the player's Mana, Aura...
     names = {w.lower() for n in known for w in re.findall(r"\w+", n)}
     unknown = [w for w in CAPITAL.findall(reply or "") if w.lower() not in names and w.lower() not in COMMON]
     counts: dict[str, int] = {}

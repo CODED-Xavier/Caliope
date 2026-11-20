@@ -59,7 +59,65 @@ function StatusTab({ messages, every, byApp, fields, values, onPatch }) {
 }
 
 /* ------------------------------------------------------------------ Sheet */
-function SheetTab({ state, onPatch, mode, kind }) {
+/** Mana, Aura...: bars kept by the app, the powers that spend them, and rests that refill them. */
+function ResourcesBox({ state, onPatch, onPower, onRest, busy, convId, onState }) {
+  const pools = state.resources || {};
+  const names = Object.keys(pools);
+  const [err, setErr] = useState("");
+  const sync = async () => { setErr(""); try { onState(await api.syncResources(convId)); } catch (e) { setErr(e.message); } };
+  if (!names.length) {
+    return (
+      <div className="muted tiny">
+        <button className="link-btn tiny" onClick={sync}>↻ Get resources and powers from the card</button> (Mana, Aura… set in the card editor)
+        {err && <div className="error-text small">{err}</div>}
+      </div>
+    );
+  }
+  const inFight = !!state.combat?.active;
+  return (
+    <>
+      <div className="section-title">Resources <HelpTip id="resources" /></div>
+      {names.map((n) => {
+        const p = pools[n];
+        return (
+          <div className="res-row" key={n}>
+            <span className="res-name">{n}</span>
+            <div className="res-bar"><div className="res-fill" style={{ width: `${(p.current / Math.max(1, p.max)) * 100}%`, background: p.color || undefined }} /></div>
+            <button className="icon-btn" onClick={() => onPatch({ resources: { [n]: { current: Math.max(0, p.current - 1) } } })}>−</button>
+            <span className="res-num">{p.current}/{p.max}</span>
+            <button className="icon-btn" onClick={() => onPatch({ resources: { [n]: { current: Math.min(p.max, p.current + 1) } } })}>＋</button>
+          </div>
+        );
+      })}
+      {(state.abilities || []).length > 0 && (
+        <>
+          <div className="section-title">Powers</div>
+          {state.abilities.map((a) => {
+            const short = Object.entries(a.costs || {}).find(([k, v]) => (pools[k]?.current ?? 0) < v);
+            return (
+              <div className="ability-card" key={a.id}>
+                <div className="grow small">
+                  <strong>{a.name}</strong> <span className="muted tiny">· {Object.entries(a.costs || {}).map(([k, v]) => `${v} ${k}`).join(", ") || "free"}{a.dice ? ` · ${a.dice}` : ""}</span>
+                  {a.description && <div className="muted tiny">{a.description}</div>}
+                </div>
+                <button className="btn small" disabled={busy || inFight || !!short} onClick={() => onPower(a.id)}
+                  title={inFight ? "In a fight, use it from the Combat tab" : short ? `Not enough ${short[0]}` : "Use it now: the app pays the cost and tells the GM"}>Use</button>
+              </div>
+            );
+          })}
+        </>
+      )}
+      <div className="row gap">
+        <button className="btn small grow" disabled={busy || inFight} onClick={() => onRest("short")} title="About an hour of rest">☕ Short rest</button>
+        <button className="btn small grow" disabled={busy || inFight} onClick={() => onRest("long")} title="A night's sleep: refills more and heals">🛌 Long rest</button>
+      </div>
+      <button className="link-btn tiny" disabled={busy} onClick={sync} title="After editing the card's resources or powers">↻ Update from the card</button>
+      {err && <div className="error-text small">{err}</div>}
+    </>
+  );
+}
+
+function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, onState }) {
   const p = state.player;
   const [picOpen, setPicOpen] = useState(false);
   const numbers = kind !== "roleplay";
@@ -104,6 +162,8 @@ function SheetTab({ state, onPatch, mode, kind }) {
           </div>
         ))}
       </div></>}
+
+      <ResourcesBox state={state} onPatch={onPatch} onPower={onPower} onRest={onRest} busy={busy} convId={convId} onState={onState} />
 
       <div className="section-title">Scene</div>
       <label className="lbl">Location</label>
@@ -509,11 +569,12 @@ const TABS = [
   ["journal", "📖", "Journal"],
 ];
 
-export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onPay, onCombat, onCombatEdit, style }) {
+export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onPay, onPower, onRest, onCombat, onCombatEdit, style }) {
   const { state, npcs, conversation } = game;
   const mode = conversation.scenario?.mode;
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
-  const allowed = [...(game.features?.panels || TABS.map(([k]) => k)), ...(state.combat?.active ? ["combat"] : [])];
+  const allowed = [...(game.features?.panels || TABS.map(([k]) => k)), ...(state.combat?.active ? ["combat"] : []),
+    ...(Object.keys(state.resources || {}).length || game.card_has_resources ? ["sheet"] : [])];  // resources live on the sheet
   const tabs = TABS.filter(([k]) => allowed.includes(k));
   const active = tabs.some(([k]) => k === tab) ? tab : tabs[0]?.[0];
   return (
@@ -530,7 +591,8 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         {active === "status" && <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every}
           byApp={!!game.status_by_app} fields={game.status_fields}
           values={state.card_status} onPatch={onPatch} />}
-        {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} />}
+        {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} onPower={onPower} onRest={onRest} busy={!canRoll}
+          convId={conversation.id} onState={onStateLoaded} />}
         {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} />}
         {active === "map" && <MapTab state={state} />}

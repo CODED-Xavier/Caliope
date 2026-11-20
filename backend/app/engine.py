@@ -17,6 +17,7 @@ from typing import AsyncIterator
 
 from .appearance import appearance_seed
 from .checks import find_checks
+from . import resources
 from .shop import find_offers, is_trade
 from . import statusbook
 from .signals import needs_tracking, quiet_minutes
@@ -174,7 +175,21 @@ class ChatEngine:
             worldtime.advance(st, cal, minutes)
             st["date_label"] = worldtime.format_now(cal, worldtime.clock_of(st))
             passed = worldtime.events_between(st, cal, before, worldtime.clock_of(st))
-            return st, worldtime.skip_note(cal, before, worldtime.clock_of(st), passed, spec, (st.get("clock") or {}).get("seed", 0))
+            note = worldtime.skip_note(cal, before, worldtime.clock_of(st), passed, spec, (st.get("clock") or {}).get("seed", 0))
+            back = []
+            rest = resources.rest_kind(minutes)
+            if rest:  # resting refills the pools (each has its own rule)
+                back += resources.regenerate(st, rest)
+            if rest == "long_rest":
+                hp = st["player"]["hp"]
+                if hp["current"] < hp["max"]:
+                    hp["current"] = hp["max"]
+                    back.append(f"HP {hp['max']}/{hp['max']}")
+            days = worldtime.day_index(cal, worldtime.clock_of(st)) - worldtime.day_index(cal, before)
+            back += resources.regenerate(st, "day", days)
+            if back:
+                note += " Recovered: " + ", ".join(dict.fromkeys(back)) + "."
+            return st, note
 
         return prepare, ("" if text.lower().startswith("/wait") else text)
 
@@ -384,7 +399,7 @@ class ChatEngine:
         scenario_name = conv["scenario"].get("name", "")
         if conv["title"] in DEFAULT_TITLES or conv["title"] == scenario_name:
             said = strip_thoughts(text)  # thoughts and GM messages never end up in the title
-            if said and not said.startswith(("\U0001F3B2", "\u2694")):
+            if said and not said.startswith(("\U0001F3B2", "\u2694", "\u2728", "\U0001F6D2", "\U0001F4B0", "\u23f3", "\U0001F6CC")):
                 self.repo.rename(conv_id, truncate(f"{scenario_name}: {said}" if scenario_name else said, 60))
 
     async def _reply(self, conv_id: int, user_msg: dict) -> AsyncIterator[dict]:
@@ -506,7 +521,8 @@ class ChatEngine:
             pending = int(st.get("untracked", 0)) + 1  # exchanges the tracker has not read yet, this one included
             if skip_ok:
                 known = [n["name"] for n in npcs] + [state["player"].get("name") or ""] + [l["name"] for l in st.get("locations", [])]
-                run = needs_tracking(user_msg["content"], reply, known) or pending >= interval + 1
+                run = (needs_tracking(user_msg["content"], reply, known, list(st.get("resources") or {}))
+                       or pending >= interval + 1)
             else:
                 run = self.repo.count_replies(conv_id) % interval == 0
             count, exchanges = self._tracking_context(conv_id, min(pending, 4) if skip_ok else interval)
@@ -668,6 +684,9 @@ class ChatEngine:
         state["date_label"] = worldtime.format_now(cal, after)
         if worldtime.day_index(cal, after) != worldtime.day_index(cal, before):
             changes.append("New day: " + worldtime.format_date(cal, worldtime.now(cal, after)))
+            back = resources.regenerate(state, "day", worldtime.day_index(cal, after) - worldtime.day_index(cal, before))
+            if back:
+                changes.append("Recovered: " + ", ".join(back))
         if state.get("weather") and state.get("weather") != weather:
             changes.append(f"Weather: {state['weather']}")
         return changes
@@ -685,10 +704,12 @@ class ChatEngine:
         cal_on = bool(cal.get("enabled") and cal.get("months"))
         tpl = self._status_template(scenario, settings)
         status_lines = statusbook.tracker_lines(state, tpl) if tpl else ""
+        res_line = resources.tracker_line(state)
         prompt = self.prompts.analysis_messages(scenario=scenario, state=state, npcs=npcs, exchanges=exchanges, tracker=tracker,
-                                                calendar=cal if cal_on else None, status_fields=status_lines)
+                                                calendar=cal if cal_on else None, status_fields=status_lines, resource_line=res_line)
         try:
-            raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker, cal_on, bool(status_lines)), temperature=0.2,
+            raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker, cal_on, bool(status_lines), bool(res_line)),
+                                      temperature=0.2,
                                       max_tokens=700 if tracker == "full" else 450)
         except LLMError as exc:
             log.warning("State analysis failed: %s", exc)
@@ -721,6 +742,8 @@ class ChatEngine:
         new_state["untracked"] = 0
         if status_lines:
             changes += statusbook.apply_changes(new_state, tpl, updates.get("status_changes", []))
+        if res_line and not any(resources.is_ability(u) or "\u2694" in u for u, _ in exchanges):
+            changes += resources.apply_tracker(new_state, updates.get("resource_changes", []))  # the app counted ✨/⚔ turns
         if cal_on:
             changes += self._move_clock(new_state, cal, updates)
         self.repo.save_state(conv_id, new_state)

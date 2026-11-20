@@ -12,6 +12,16 @@ from .appearance import normalize_appearance
 from .portraits import normalize_portraits
 from .util import as_int, clamp, deep_merge, truncate
 
+
+def normalize_pools(raw):  # imported late: resources imports state
+    from .resources import normalize_pools as f
+    return f(raw)
+
+
+def normalize_abilities(raw):
+    from .resources import normalize_abilities as f
+    return f(raw)
+
 DEFAULT_STATE: dict = {
     "player": {
         "name": "Player",
@@ -41,6 +51,8 @@ DEFAULT_STATE: dict = {
     "date_label": "",     # "Sunday, 3 Frostmoon, 812 AE · 19:40 (evening)" when the card has a calendar
     "events": [],         # appointments: [{"id", "day", "hour", "text"}]
     "untracked": 0,       # replies the tracker skipped (quiet turns) and will read next time
+    "resources": {},      # Mana, Aura...: {"Mana": {"current", "max", "regen", "color"}} (app/resources.py)
+    "abilities": [],      # the player's abilities that spend them
     "card_status": {},    # the card's own INFO-block fields (Tier, EXP...) kept by the app (app/statusbook.py)
 }
 
@@ -99,6 +111,8 @@ def _calendar_part(merged: dict) -> dict:
                            "date": truncate(str(e.get("date", "")), 60)})
     return {"clock": {"minutes": max(0, as_int(clock.get("minutes", 0))), "seed": as_int(clock.get("seed", 0))}, "events": events[:40],
             "untracked": max(0, as_int(merged.get("untracked", 0))),
+            "resources": normalize_pools(merged.get("resources")),
+            "abilities": normalize_abilities(merged.get("abilities")),
             "card_status": {truncate(str(k), 40): truncate(str(v), 160) for k, v in list(
                 (merged.get("card_status") if isinstance(merged.get("card_status"), dict) else {}).items())[:40]},
             "date_label": truncate(str(merged.get("date_label") or ""), 120)}
@@ -127,6 +141,9 @@ def normalize_updates(raw) -> dict:
         "new_npcs": [],
         "memories": [],
         "minutes_passed": max(0, as_int(raw.get("minutes_passed", 0))),
+        "resource_changes": [{"resource": str(c.get("resource", "")), "delta": as_int(c.get("delta", 0)),
+                              "reason": truncate(str(c.get("reason", "")), 80)}
+                             for c in _list(raw.get("resource_changes")) if isinstance(c, dict)],
         "status_changes": [{"field": str(c.get("field", "")), "value": str(c.get("value", ""))}
                            for c in _list(raw.get("status_changes")) if isinstance(c, dict)],
         "appointments": [],

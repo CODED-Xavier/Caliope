@@ -249,6 +249,13 @@ Each card can have its own calendar: week days, months and their lengths, what a
 - **Quests:** the AI can add quests, but only suggests when one is completed or failed; you confirm it in the Bag tab.
 - **Exact prompt size:** the app learns how many characters make one token for your model from the server's real counts, so it keeps as much history as really fits.
 
+## 4m. Resources and powers (Mana, Aura, Stamina...)
+
+Card editor > **Resources and powers**: the card's pools (name, maximum, colour, how they refill: per round, short rest, night, new day; −1 = all of it) and the powers that spend them (attack, heal or effect; cost, damage or healing dice, range). **✨ Suggest from the card** lets the AI propose them for the setting; you change anything.
+- The **Sheet** shows bars, the powers with a **Use** button (refused without enough) and **Short rest / Long rest** (with a calendar they pass 1 or 8 hours; a long rest also heals). A game started before you added them: *Get resources and powers from the card*.
+- **In fights** the powers are buttons in the Combat tab: the app pays the cost, rolls the hit and damage or the healing, and pools that refill per round do so. Enemy casters (*＋ casts spells* in the fight form, or suggested by the AI) spend from their own pool and fall back to weapons when it runs dry.
+- When the story spends a resource without a button ("you pour your aura into the barrier"), the tracker subtracts it. The GM always sees your pools and is told to show a drained character as drained.
+
 ## 5. Tests
 
 ```

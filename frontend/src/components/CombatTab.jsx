@@ -92,6 +92,18 @@ function StartForm({ convId, kind, busy, onStart }) {
               <label key={k} className="tiny muted">{label}<input className="field num" style={{ width: w }} value={e[k] ?? ""} onChange={(ev) => setEnemy(i, k, ev.target.value)} /></label>
             ))}
           </div>
+          {e.spell ? (
+            <div className="row gap enemy-stats caster">
+              <label className="tiny muted">Spell<input className="field" style={{ width: 96 }} value={e.spell.name || ""} onChange={(ev) => setEnemy(i, "spell", { ...e.spell, name: ev.target.value })} /></label>
+              <label className="tiny muted">Cost<input className="field num" style={{ width: 40 }} value={e.spell.cost ?? ""} onChange={(ev) => setEnemy(i, "spell", { ...e.spell, cost: ev.target.value })} /></label>
+              <label className="tiny muted">Damage<input className="field num" style={{ width: 60 }} value={e.spell.damage ?? ""} onChange={(ev) => setEnemy(i, "spell", { ...e.spell, damage: ev.target.value })} /></label>
+              <label className="tiny muted">Range<input className="field num" style={{ width: 40 }} value={e.spell.range ?? ""} onChange={(ev) => setEnemy(i, "spell", { ...e.spell, range: ev.target.value })} /></label>
+              <label className="tiny muted">{e.mp_name || "Mana"}<input className="field num" style={{ width: 44 }} value={e.mp ?? ""} onChange={(ev) => setEnemy(i, "mp", ev.target.value)} /></label>
+              <button className="icon-btn" title="Not a caster" onClick={() => setEnemies(enemies.map((x, j) => { if (j !== i) return x; const { spell, mp, mp_name, ...rest } = x; return rest; }))}>✕</button>
+            </div>
+          ) : (
+            <button className="link-btn tiny" onClick={() => setEnemies(enemies.map((x, j) => (j === i ? { ...x, mp: 10, mp_name: "Mana", spell: { name: "Spell", cost: 3, damage: system === "pool" ? 2 : "2d6", range: 12 } } : x)))}>＋ casts spells (uses a power pool)</button>
+          )}
         </div>
       ))}
       <button className="btn small" onClick={() => setEnemies([...enemies, { ...BLANK[system] }])}>＋ Add enemy</button>
@@ -175,7 +187,7 @@ function Grid({ combat, selected, onSelect, onMove }) {
 }
 
 /* ---------------------------------------------------------------- active fight */
-function FightView({ combat, busy, onAction, onEdit }) {
+function FightView({ combat, busy, onAction, onEdit, pools, abilities }) {
   const people = useMemo(() => combat.order.map((id) => combat.combatants.find((c) => c.id === id)), [combat]);
   const enemies = people.filter((c) => c.side === "enemy" && c.hp > 0);
   const [target, setTarget] = useState(enemies[0]?.id || "");
@@ -208,6 +220,7 @@ function FightView({ combat, busy, onAction, onEdit }) {
               <span className="small hp-num">{c.hp}/{c.max_hp}</span>
               <button className="icon-btn" title="+1 HP" onClick={(e) => { e.stopPropagation(); onEdit(c.id, { hp: c.hp + 1 }); }}>＋</button>
             </div>
+            {c.spell && <div className="tiny muted">🔮 {c.mp_name} {c.mp}/{c.mp_max} · {c.spell.name} costs {c.spell.cost}</div>}
             <div className="hpbar small-bar"><div className="hpfill" style={{ width: `${(c.hp / c.max_hp) * 100}%`, background: c.hp / c.max_hp < 0.3 ? "var(--bad)" : c.hp / c.max_hp < 0.6 ? "var(--warn)" : "var(--good)" }} /></div>
             {selected === c.id && (
               <div className="conds">
@@ -236,6 +249,20 @@ function FightView({ combat, busy, onAction, onEdit }) {
           <button className="btn primary grow" disabled={busy || !target} onClick={() => onAction({ action: "act", move: "attack", target, advantage: adv })}>⚔ Attack</button>
           <button className="btn" disabled={busy} onClick={() => onAction({ action: "act", move: "dodge" })} title="Attacks against you have disadvantage until your next turn">🛡 Dodge</button>
         </div>
+        {abilities?.length > 0 && (
+          <div className="ability-row">
+            {abilities.map((a) => {
+              const short = Object.entries(a.costs || {}).find(([k, v]) => (pools?.[k]?.current ?? 0) < v);
+              return (
+                <button key={a.id} className={`btn small ${a.kind === "attack" ? "primary" : ""}`} disabled={busy || !!short || (a.kind === "attack" && !target)}
+                  title={short ? `Not enough ${short[0]}` : `${a.description || a.name}${a.dice ? ` (${a.dice})` : ""}`}
+                  onClick={() => onAction({ action: "act", move: "ability", ability: a.id, target, advantage: adv })}>
+                  {a.kind === "heal" ? "💚" : a.kind === "attack" ? "✨" : "🔮"} {a.name} · {Object.entries(a.costs || {}).map(([k, v]) => `${v} ${k}`).join(", ") || "free"}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <div className="row gap">
           <input className="field grow" placeholder="Something else (a spell, a trick, fleeing…)" value={other} onChange={(e) => setOther(e.target.value)} />
           <button className="btn" disabled={busy || !other.trim()} onClick={() => { onAction({ action: "act", move: "other", text: other.trim() }); setOther(""); }}>Do it</button>
@@ -252,7 +279,7 @@ function FightView({ combat, busy, onAction, onEdit }) {
 
 export default function CombatTab({ game, busy, onCombat, onCombatEdit }) {
   const combat = game.state.combat;
-  if (combat?.active) return <FightView combat={combat} busy={busy} onAction={onCombat} onEdit={onCombatEdit} />;
+  if (combat?.active) return <FightView combat={combat} busy={busy} onAction={onCombat} onEdit={onCombatEdit} pools={game.state.resources} abilities={game.state.abilities} />;
   return (
     <>
       {combat && !combat.active && combat.log?.length > 0 && (

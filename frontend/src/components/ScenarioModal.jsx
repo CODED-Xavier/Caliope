@@ -8,6 +8,7 @@ import { portraitSrc } from "../portraits.js";
 import { api } from "../api.js";
 import { KIND_LABELS, MODE_LABELS } from "../utils.js";
 import { CalendarEditor } from "./Calendar.jsx";
+import PowersEditor from "./Powers.jsx";
 
 const LOOKS = [["race", "Race / species"], ["hair", "Hair"], ["eyes", "Eyes"], ["build", "Build"], ["skin", "Skin"], ["outfit", "Style / outfit"], ["extra", "Other details"]];
 const MAX_SKILLS = 3;
@@ -365,6 +366,7 @@ function Editor({ initial, id, onCancel, onSaved }) {
       <InformationEditor info={d.information} onChange={(v) => set("information", v)} />
       <LorebookEditor book={d.lorebook} onChange={(v) => set("lorebook", v)} />
       <CalendarEditor value={d.calendar} onChange={(v) => set("calendar", v)} />
+      <PowersEditor card={d} onChange={(patch) => setD((p) => ({ ...p, ...patch }))} />
       <div className="row gap center">
         <label className="small">Money is called <HelpTip id="currency" /></label>
         <input className="field" style={{ width: 140 }} value={d.currency || "gold"} onChange={(e) => set("currency", e.target.value)} />

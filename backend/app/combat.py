@@ -76,6 +76,15 @@ def _combatant(raw: dict, side: str, system: str, index: int) -> dict:
         "range": max(1, min(30, as_int(raw.get("range", 1), 1))),   # squares: 1 = melee, more = ranged
         "speed": max(1, min(12, as_int(raw.get("speed", 6), 6))),   # squares per turn (6 = 30 ft)
     }
+    spell = raw.get("spell") if isinstance(raw.get("spell"), dict) else None
+    if spell and str(spell.get("name", "")).strip():
+        mp_max = max(1, min(999, as_int(raw.get("mp", raw.get("mp_max", 10)), 10)))
+        c["mp_name"] = truncate(str(raw.get("mp_name") or "Mana").strip(), 16) or "Mana"
+        c["mp_max"] = mp_max
+        c["mp"] = mp_max if raw.get("mp_current") is None else int(clamp(as_int(raw["mp_current"], mp_max), 0, mp_max))
+        c["spell"] = {"name": truncate(str(spell["name"]).strip(), 30), "cost": max(1, min(999, as_int(spell.get("cost", 3), 3))),
+                      "damage": _dice_ok(spell.get("damage"), "2d6") if system != "pool" else str(max(0, min(10, as_int(spell.get("damage", 2), 2)))),
+                      "range": max(1, min(30, as_int(spell.get("range", 12), 12)))}
     if system == "pool":
         c["pool"] = max(1, min(20, as_int(raw.get("pool", 4), 4)))
         c["defense"] = max(1, min(20, as_int(raw.get("defense", c["pool"]), c["pool"])))
@@ -208,11 +217,11 @@ class CombatEngine:
             if cur["hp"] > 0:
                 return
 
-    def _attack(self, combat: dict, att: dict, target: dict, advantage: str = "") -> str:
+    def _attack(self, combat: dict, att: dict, target: dict, advantage: str = "", head: str = "") -> str:
         """One attack, written as a block:  header / 🎲 roll / 💥 damage."""
         tiles = combat["grid"].get("tiles") or []
         cover = has_cover(tiles, att["x"], att["y"], target["x"], target["y"])
-        head = f"**{att['name']} attacks {target['name']}**"
+        head = head or f"**{att['name']} attacks {target['name']}**"
         if combat["system"] == "pool":
             a = self.roll_pool(att["pool"] - (2 if "prone" in att["conditions"] else 0))
             d = self.roll_pool(target["defense"] + (2 if "dodging" in target["conditions"] else 0) + (1 if cover else 0))
@@ -267,7 +276,7 @@ class CombatEngine:
         return ""
 
     # ------------------------------------------------------------------ actions
-    def player_action(self, state: dict, action: str, target_id: str = "", advantage: str = "") -> tuple[dict, str]:
+    def player_action(self, state: dict, action: str, target_id: str = "", advantage: str = "", ability_id: str = "") -> tuple[dict, str]:
         """The player's action, then every other combatant until it is the player's turn again (one GM reply per round)."""
         combat = state.get("combat") or {}
         if not combat.get("active"):
@@ -290,6 +299,8 @@ class CombatEngine:
             lines.append(f"**{me['name']} dodges**\n🛡 Attacks against {me['name']} have disadvantage until their next turn.")
         elif action == "other":
             lines.append(f"**{me['name']} acts**\n✋ See the player's message above.")
+        elif action == "ability":
+            lines.append(self._use_ability(state, combat, me, ability_id, target_id, advantage))
         else:
             raise CombatError("Unknown action.")
         if not self._finished(combat):
@@ -297,6 +308,36 @@ class CombatEngine:
             lines += self._others_until_player(combat)
         self._sync_player(state)
         return self._wrap(state, lines, round_no)
+
+    def _use_ability(self, state: dict, combat: dict, me: dict, ability_id: str, target_id: str, advantage: str) -> str:
+        """The player spends a resource on an ability: an attack, a heal or another effect."""
+        from .resources import ResourceError, cost_text, pay, pools_line
+        ability = next((a for a in state.get("abilities") or [] if a["id"] == ability_id), None)
+        if not ability:
+            raise CombatError("That ability is not on your sheet.")
+        target = None
+        if ability["kind"] == "attack":
+            target = self._get(combat, target_id)
+            if target["hp"] <= 0:
+                raise CombatError(f"{target['name']} is already down.")
+        try:
+            pay(state, ability["costs"])
+        except ResourceError as exc:
+            raise CombatError(str(exc)) from exc
+        spent = f" (\u2212{cost_text(ability['costs'])} \u2192 {pools_line(state)})" if ability["costs"] else ""
+        if ability["kind"] == "attack":
+            att = dict(me)
+            if ability["bonus"] is not None:
+                att["attack_bonus"] = ability["bonus"]
+            if ability["dice"]:
+                att["damage"] = ability["dice"] if combat["system"] != "pool" else str(self.dice.roll(ability["dice"]).total)
+            return self._attack(combat, att, target, advantage if advantage in ("advantage", "disadvantage") else "",
+                                head=f"**{me['name']} uses {ability['name']} on {target['name']}**{spent}")
+        if ability["kind"] == "heal" and ability["dice"]:
+            r = self.dice.roll(ability["dice"])
+            me["hp"] = min(me["max_hp"], me["hp"] + max(0, r.total))
+            return f"**{me['name']} uses {ability['name']}**{spent}\n\U0001F49A heals {r.total} ({ability['dice']}) \u2192 {me['hp']}/{me['max_hp']} HP"
+        return f"**{me['name']} uses {ability['name']}**{spent}\n\u2728 {ability['description'] or 'See the player message.'}"
 
     def enemies_act(self, state: dict) -> tuple[dict, str]:
         combat = state.get("combat") or {}
@@ -327,7 +368,10 @@ class CombatEngine:
             if foes:
                 target = min(foes, key=lambda f: (distance(c["x"], c["y"], f["x"], f["y"]), f["hp"]))
                 moved = ""
-                if distance(c["x"], c["y"], target["x"], target["y"]) > c.get("range", 1):
+                spell = c.get("spell")
+                casting = bool(spell and c.get("mp", 0) >= spell["cost"])
+                reach = max(c.get("range", 1), spell["range"]) if casting else c.get("range", 1)
+                if distance(c["x"], c["y"], target["x"], target["y"]) > reach:
                     occupied = {(o["x"], o["y"]) for o in combat["combatants"] if o["hp"] > 0 and o["id"] != c["id"]}
                     nx, ny = path_step(combat["grid"].get("tiles") or [], (c["x"], c["y"]), (target["x"], target["y"]),
                                        occupied, c.get("speed", 6))
@@ -335,8 +379,17 @@ class CombatEngine:
                         steps = distance(c["x"], c["y"], nx, ny)
                         c["x"], c["y"] = nx, ny
                         moved = f"🏃 {c['name']} moves {steps} squares ({steps * 5} ft) toward {target['name']}."
-                if distance(c["x"], c["y"], target["x"], target["y"]) <= c.get("range", 1):
-                    block = self._attack(combat, c, target)
+                if casting and distance(c["x"], c["y"], target["x"], target["y"]) <= spell["range"]:
+                    c["mp"] -= spell["cost"]
+                    block = self._attack(combat, {**c, "damage": spell["damage"]}, target, head=(
+                        f"**{c['name']} casts {spell['name']} at {target['name']}** ({c['mp_name']} {c['mp']}/{c['mp_max']})"))
+                    if moved:
+                        head, _, rest = block.partition("\n")
+                        block = f"{head}\n{moved}\n{rest}"
+                    lines.append(block)
+                elif distance(c["x"], c["y"], target["x"], target["y"]) <= c.get("range", 1):
+                    drained = f" ({c['mp_name']} spent: no more {spell['name']})" if spell and not casting else ""
+                    block = self._attack(combat, c, target, head=f"**{c['name']} attacks {target['name']}**{drained}")
                     if moved:  # header first, then the move, then the roll
                         head, _, rest = block.partition("\n")
                         block = f"{head}\n{moved}\n{rest}"
@@ -348,6 +401,11 @@ class CombatEngine:
 
     def _wrap(self, state: dict, lines: list[str], round_no: int) -> tuple[dict, str]:
         combat = state["combat"]
+        if combat["round"] > round_no:  # new round(s): resources that refill every round do so
+            from .resources import regenerate
+            back = regenerate(state, "round", combat["round"] - round_no)
+            if back:
+                lines.append("\U0001F504 " + ", ".join(back))
         done = self._finished(combat)
         text = f"⚔️ **Round {round_no}**\n\n" + "\n\n".join(lines)
         if done:
@@ -392,7 +450,8 @@ def describe_combat(combat: dict) -> str:
         c = next(x for x in combat["combatants"] if x["id"] == cid)
         state = "DOWN" if c["hp"] <= 0 else f"{c['hp']}/{c['max_hp']} HP"
         conds = f" [{', '.join(c['conditions'])}]" if c["conditions"] else ""
-        lines.append(f"- {c['name']} ({c['side']}): {state}{conds}")
+        mp = f", {c['mp_name']} {c['mp']}/{c['mp_max']} ({c['spell']['name']} costs {c['spell']['cost']})" if c.get("spell") else ""
+        lines.append(f"- {c['name']} ({c['side']}): {state}{mp}{conds}")
     return "\n".join(lines)
 
 
@@ -432,7 +491,8 @@ async def _suggest(llm, system: str, scene: str, rules: str = "", with_map: bool
         fields = ("name, count, hp (5e hit points), ac (armor class), attack_bonus, damage (dice like 1d6+2), init_bonus (DEX modifier)")
     prompt = (
         "You prepare a fight for a tabletop roleplaying game. Read the scene and list the enemies who fight the player now.\n"
-        f"Answer with ONE JSON object: {{\"enemies\": [ {{{fields}, range (1 = melee, 12+ for bows and spells)}} ]"
+        f"Answer with ONE JSON object: {{\"enemies\": [ {{{fields}, range (1 = melee, 12+ for bows and spells), and ONLY for "
+        f"casters: mp (their mana or other power pool), mp_name, spell {{name, cost, damage, range}} }} ]"
         + (f", \"map\": {{\"type\": one of {list(TYPES)}, \"features\": up to 3 of {list(FEATURES)}}}" if with_map else "")
         + "}. Use plausible, fair numbers for a level-appropriate fight. Group identical enemies with count. At most 6 entries.\n"
         + (f"\nRulebook passages that may help:\n{truncate(rules, 1800)}\n" if rules else "")
@@ -448,9 +508,10 @@ async def _suggest(llm, system: str, scene: str, rules: str = "", with_map: bool
         if isinstance(raw_item, dict) and str(raw_item.get("name", "")).strip():
             c = _combatant(raw_item, "enemy", system, 0)
             c["count"] = max(1, min(8, as_int(raw_item.get("count", 1), 1)))
-            for k in ("id", "side", "conditions", "x", "y", "init", "current_hp"):
+            for k in ("id", "side", "conditions", "x", "y", "init", "current_hp", "mp_current"):
                 c.pop(k, None)
             c["hp"] = c.pop("max_hp")
+            c.pop("mp_max", None)  # "mp" stays: the caster's full pool
             out.append(c)
     if not out:
         raise CombatError("The model did not suggest any enemies. Fill them in yourself.")

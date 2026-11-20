@@ -11,6 +11,8 @@ from .writing import RULES as WRITING_RULES
 from .writing import for_model
 from .playerlore import always_section, triggered
 from .worldtime import CALENDAR_RULES, gm_notes
+from .resources import RESOURCE_RULES
+from .resources import gm_notes as resource_notes
 
 LANGUAGE_DIRECTIVES = {
     "en": "Write everything in English.",
@@ -194,7 +196,7 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
 
 SECTION_ORDER = [
     "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario",
-    "lore_always", "player_lore", "calendar", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
+    "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
     "player", "pinned", "opening", "summary",
 ]
 
@@ -242,6 +244,8 @@ class PromptBuilder:
             sections["rules"] = sections["rules"].replace(TIME_RULE, CAL_TIME_RULE)
         if player_lore:
             sections["player_lore"] = always_section(player_lore)
+        if state.get("resources"):
+            sections["resources"] = "## Resources\n" + RESOURCE_RULES
         if house_rules:
             sections["house_rules"] = "## House rules (they win over the rulebook)\n" + "\n\n".join(
                 (f"{name}:\n" if len(house_rules) > 1 else "") + text for name, text in house_rules)
@@ -262,6 +266,9 @@ class PromptBuilder:
         used_memories = fit_memories(memories, mem_budget)
         met = [n for n in npcs if n.get("met", True)]
         extra = self._card_volatile(scenario, lore[1], status_due, macro, app_status)
+        res_notes = resource_notes(state, state.get("abilities") or [])
+        if res_notes:
+            extra = "## Resources (kept by the app)\n" + res_notes + ("\n\n" + extra if extra else "")
         if cal_on:
             extra = "## Date and time (kept by the app)\n" + gm_notes(state, cal) + ("\n\n" + extra if extra else "")
         lore_hits = triggered(player_lore or [], [h["content"] for h in reversed(history)], int(ctx * 0.06))
@@ -457,7 +464,8 @@ class PromptBuilder:
 
     # ----------------------------------------------------- analysis / summarizing
     def analysis_messages(self, *, scenario: dict, state: dict, npcs: list[dict], exchanges: list[tuple[str, str]],
-                          tracker: str = "full", calendar: dict | None = None, status_fields: str = "") -> list[dict]:
+                          tracker: str = "full", calendar: dict | None = None, status_fields: str = "",
+                          resource_line: str = "") -> list[dict]:
         """Ask the model what changed in the latest exchange(s). `lite` skips HP, gold, items and quests."""
         mode = scenario.get("mode", "gm_world")
         npc_names = ", ".join(n["name"] for n in npcs) or "none yet"
@@ -491,6 +499,8 @@ class PromptBuilder:
         ]
         if status_fields:
             lines.append(status_fields)
+        if resource_line:
+            lines.append(resource_line)
         if full:
             lines += ["- new_locations: newly mentioned places (name, description, connects_to: names of existing places)."]
         lines += [
@@ -572,9 +582,9 @@ _APPOINTMENT = {"type": "object", "properties": {"text": {"type": "string"}, "wh
                                                 "days_from_now": {"type": "integer"}}, "required": ["text", "when", "days_from_now"]}
 
 
-def analysis_schema(tracker: str, calendar: bool = False, status: bool = False) -> dict:
+def analysis_schema(tracker: str, calendar: bool = False, status: bool = False, resources: bool = False) -> dict:
     base = ANALYSIS_SCHEMA if tracker == "full" else ANALYSIS_SCHEMA_LITE
-    if not calendar and not status:
+    if not calendar and not status and not resources:
         return base
     props = dict(base["properties"])
     required = list(base["required"])
@@ -588,4 +598,9 @@ def analysis_schema(tracker: str, calendar: bool = False, status: bool = False) 
         props["status_changes"] = {"type": "array", "items": {"type": "object", "properties": {
             "field": {"type": "string"}, "value": {"type": "string"}}, "required": ["field", "value"]}}
         required.append("status_changes")
+    if resources:
+        props["resource_changes"] = {"type": "array", "items": {"type": "object", "properties": {
+            "resource": {"type": "string"}, "delta": {"type": "integer"}, "reason": {"type": "string"}},
+            "required": ["resource", "delta", "reason"]}}
+        required.append("resource_changes")
     return {"type": "object", "properties": props, "required": required}

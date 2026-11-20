@@ -226,6 +226,8 @@ export default function App() {
     try { const state = await api.combatEdit(activeId, cid, patch); setGame((g) => (g ? { ...g, state } : g)); } catch (e) { setError(e.message); }
   };
   const buyOffer = (messageId, index) => runTurn(`/api/conversations/${activeRef.current}/buy`, { message_id: messageId, index, qty: 1 });
+  const usePower = (id) => runTurn(`/api/conversations/${activeRef.current}/ability`, { ability: id });
+  const restNow = (kind) => runTurn(`/api/conversations/${activeRef.current}/rest`, { kind });
   const payGold = (body) => runTurn(`/api/conversations/${activeRef.current}/pay`, body);
   const rollCheck = (messageId, index, mode) => runTurn(`/api/conversations/${activeRef.current}/check`, { message_id: messageId, index, mode });
   const continueReply = () => runTurn(`/api/conversations/${activeRef.current}/continue`, {});
@@ -394,7 +396,7 @@ export default function App() {
       </main>
       {game && panelOpen && <div className="panel-resizer" onMouseDown={startResize} title="Drag to resize the panel" />}
       {game && panelOpen && (
-        <SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onPay={payGold} busy={busy} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}
+        <SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onPay={payGold} onPower={usePower} onRest={restNow} busy={busy} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}
           onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} onPinnedSave={savePinned}
           onStateLoaded={(st) => setGame((g) => (g ? { ...g, state: st } : g))}
           onLoreSaved={(conv) => setGame((g) => (g ? { ...g, conversation: { ...g.conversation, player_lore: conv.player_lore } } : g))}
