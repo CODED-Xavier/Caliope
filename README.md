@@ -278,6 +278,10 @@ Play.bat and Caliope.exe open the game in a window of its own (Microsoft Edge's 
 - **📜 Recap** (top of the chat): "Previously, in…", written only when you click it and never added to the story.
 - **🎒 Map bag** (Map tab): scene pictures you keep, with place, in-game date and Canto. The first picture of each place is kept on its own; 📌 on any scene picture keeps it; click to see it big, ✎ to name it. The Map tab appears for any game with scene pictures.
 
+## 4r. Backups and .caliope card files (v2.4)
+- **Daily backups**: once a day all your games, characters, memories and cards are copied to `data\backups\rpg-<date>.db`; the last 7 are kept (Settings > Backups: turn off, change the number, *Back up now*, *Open folder*). To restore: close Calíope, rename `data\rpg.db` (keep it), copy a backup into `data`, rename it `rpg.db`, start again. Pictures from folders and music are files in `data`, not inside the backup.
+- **📦 .caliope files**: in the New game list, 📦 saves a card with all its pictures in one file. *Import a card* reads `.caliope` files back (pictures included), so you can share a card with a friend without GitHub or the cloud. Pictures that are only public links stay links.
+
 ## 5. Tests
 
 ```

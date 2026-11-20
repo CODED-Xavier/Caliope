@@ -137,6 +137,14 @@ export default function SettingsModal({ onClose, onSaved }) {
           </Row>
         </>)}
       </>)}
+      <h3>Backups</h3>
+      <Row label="Back up every day" help="backups">
+        <input type="checkbox" checked={s.backups !== false} onChange={(e) => set("backups", e.target.checked)} />
+      </Row>
+      <Row label="Days to keep" help="backups">
+        <input className="field num" style={{ width: 64 }} value={s.backups_keep ?? 7} onChange={(e) => set("backups_keep", Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 7)))} />
+      </Row>
+      <BackupBox />
       <h3>Pictures in the cloud (optional)</h3>
       <div className="muted tiny">Your private Cloudflare R2 bucket for card pictures. Leave empty to keep pictures only on this PC.</div>
       <Row label="R2 account ID" help="r2">
@@ -199,6 +207,23 @@ function SecretField({ value, onChange }) {
       <input className="field grow" type={show ? "text" : "password"} value={value} autoComplete="off" spellCheck={false}
         onChange={(e) => onChange(e.target.value)} />
       <button type="button" className="btn small" onClick={() => setShow((v) => !v)}>{show ? "Hide" : "Show"}</button>
+    </div>
+  );
+}
+
+
+function BackupBox() {
+  const [info, setInfo] = useState(null);
+  const [note, setNote] = useState("");
+  useEffect(() => { api.backups().then(setInfo).catch(() => {}); }, []);
+  const now = async () => { try { const r = await api.backupNow(); setInfo((i) => ({ ...i, backups: r.backups })); setNote("Backup saved."); } catch (e) { setNote(e.message); } };
+  const open = async () => { try { await api.openBackups(); } catch (e) { setNote(e.message); } };
+  const last = info?.backups?.[0];
+  return (
+    <div className="row gap center" style={{ margin: "4px 0 10px" }}>
+      <span className="muted small grow">{last ? `Last backup: ${last.date} (${info.backups.length} kept)` : "No backup yet."}{note && ` · ${note}`}</span>
+      <button className="btn small" onClick={now}>Back up now</button>
+      <button className="btn small" onClick={open} title={info?.folder}>Open folder</button>
     </div>
   );
 }

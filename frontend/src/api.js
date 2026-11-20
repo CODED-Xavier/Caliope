@@ -112,6 +112,14 @@ export const api = {
   cardPicturesScan: (id, folder) => request("POST", `/api/scenarios/${id}/pictures/scan`, { folder }),
   cardPicturesApply: (id, folder, overrides) => request("POST", `/api/scenarios/${id}/pictures/apply`, { folder, overrides, update_games: true }),
   cardPicturesToR2: (id) => request("POST", `/api/scenarios/${id}/pictures/r2`),
+  async importCaliope(file) {
+    const res = await fetch("/api/cards/import-caliope", { method: "POST", headers: { "Content-Type": "application/zip" }, body: file });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    return res.json();
+  },
+  backups: () => request("GET", "/api/backups"),
+  backupNow: () => request("POST", "/api/backups/now"),
+  openBackups: () => request("POST", "/api/backups/open"),
   music: () => request("GET", "/api/music"),
   async uploadMusic(file, name, tags = []) {
     const qs = new URLSearchParams({ name, tags: tags.join(",") });

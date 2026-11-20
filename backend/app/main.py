@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import logging
 from contextlib import aclosing, asynccontextmanager
@@ -11,7 +12,7 @@ from typing import Any, AsyncIterator
 
 from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
 from .cardio import export_card, parse_card
 from .cards import resolve_features
@@ -30,7 +31,7 @@ from .rulebooks import RulebookError, ocr_available
 from .runtime import ENGINE_KEYS, EngineError
 from .modelhub import download_root, pick_model_file
 from .picker import pick_folder
-from . import cardpics, r2
+from . import backups, cardpics, r2
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import PixAIError, is_pixai, is_pollinations, pixai_paint, polite_fetch
 from .playerlore import parse_suggestions, suggest_prompt
@@ -58,8 +59,23 @@ async def lifespan(app: FastAPI):
     if app.state.svc.settings.get("ai_engine") == "builtin":
         background(app.state.svc.runtime.start())  # the app opens at once; the model loads behind it
     background(catch_up_embeddings())
+    background(daily_backups())
     yield
     await app.state.svc.close()
+
+
+async def daily_backups() -> None:
+    """A copy of every game once a day (the first time the app runs that day, and on long sessions past midnight)."""
+    while True:
+        s = svc()
+        if s.settings.get("backups"):
+            try:
+                made = await asyncio.to_thread(backups.backup_now, s.db.conn, s.db._lock, s.db.path, int(s.settings.get("backups_keep") or 7))
+                if made:
+                    logging.getLogger("rpg").info("Backup saved: %s", made["name"])
+            except Exception as exc:  # never stop the app over a backup
+                logging.getLogger("rpg").warning("Backup failed: %s", exc)
+        await asyncio.sleep(3600)
 
 
 async def catch_up_embeddings() -> None:
@@ -322,7 +338,7 @@ async def list_music():
 
 
 MB = 1024 * 1024
-UPLOAD_LIMITS = {"picture": 8 * MB, "music": 100 * MB, "rulebook": 200 * MB, "skills": 25 * MB}
+UPLOAD_LIMITS = {"picture": 8 * MB, "music": 100 * MB, "rulebook": 200 * MB, "skills": 25 * MB, "card": 300 * MB}
 
 
 async def read_body(request: Request, kind: str) -> bytes:
@@ -509,6 +525,53 @@ async def import_card(body: dict[str, Any] = Body(...)):
     if str(body.get("name", "")).strip():
         data["name"] = str(body["name"]).strip()
     return svc().scenarios.create(data)
+
+
+# ------------------------------------------------------------------ backups and .caliope card files
+@app.get("/api/backups")
+async def backups_list():
+    return {"folder": str(backups.backup_dir(svc().db.path)), "backups": backups.list_backups(svc().db.path)}
+
+
+@app.post("/api/backups/now")
+async def backups_now():
+    s = svc()
+    made = await asyncio.to_thread(backups.backup_now, s.db.conn, s.db._lock, s.db.path, int(s.settings.get("backups_keep") or 7), None, True)
+    return {"made": made, "backups": backups.list_backups(s.db.path)}
+
+
+@app.post("/api/backups/open")
+async def backups_open():
+    """Open the backups folder in Windows Explorer (this PC only)."""
+    folder = backups.backup_dir(svc().db.path)
+    folder.mkdir(parents=True, exist_ok=True)
+    if not hasattr(os, "startfile"):
+        raise ValueError(f"Open this folder yourself: {folder}")
+    os.startfile(str(folder))  # noqa: S606 (a local folder of this app)
+    return {"opened": str(folder)}
+
+
+@app.get("/api/scenarios/{scenario_id}/export.caliope")
+async def export_caliope(scenario_id: int):
+    """The card and its pictures in one .caliope file, to share it without GitHub or the cloud."""
+    sc, _ = _card_names(scenario_id)
+    raw = await asyncio.to_thread(backups.pack_card, sc["data"], sc["name"],
+                                  {"/api/cardpics/": CARDPIC_DIR, "/api/uploads/": UPLOAD_DIR}, PORTRAIT_DIR)
+    fname = re.sub(r"[^A-Za-z0-9 _-]+", "", sc["name"]).strip() or "card"
+    return Response(raw, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{fname}.caliope"'})
+
+
+@app.post("/api/cards/import-caliope")
+async def import_caliope(request: Request):
+    raw = await read_body(request, "card")
+    created = svc().scenarios.create({"name": "Importing…"})
+    try:
+        name, data = await asyncio.to_thread(backups.unpack_card, raw, CARDPIC_DIR / str(created["id"]) / "imported",
+                                             f"/api/cardpics/{created['id']}/imported")
+    except Exception:
+        svc().scenarios.delete(created["id"])
+        raise
+    return svc().scenarios.update(created["id"], {**data, "name": name})
 
 
 # ------------------------------------------------------------------ Cantos, recap and the map bag
@@ -732,7 +795,7 @@ def _urls(p: dict) -> list[str]:
 
 @app.get("/api/cardpics/{scenario_id}/{who}/{name}")
 async def card_picture(scenario_id: int, who: str, name: str):
-    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", who) or not re.fullmatch(r"\d{1,2}\.(png|jpg|webp|gif)", name):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", who) or not re.fullmatch(r"\d{1,4}\.(png|jpg|webp|gif)", name):
         raise HTTPException(status_code=404, detail="Picture not found")
     path = CARDPIC_DIR / str(scenario_id) / who / name
     if not path.is_file():

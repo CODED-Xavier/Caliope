@@ -81,6 +81,11 @@ function ImportView({ onCancel, onImported }) {
   const readFile = async (file) => {
     setError(""); setPreview(null);
     if (!file) return;
+    if (/\.caliope$/i.test(file.name)) { // a Calíope card file: the card and its pictures, imported as they are
+      setBusy(true);
+      try { onImported(await api.importCaliope(file)); } catch (e) { setError(e.message); setBusy(false); }
+      return;
+    }
     try {
       const obj = JSON.parse(await file.text());
       const r = await api.previewCard(obj);
@@ -99,8 +104,9 @@ function ImportView({ onCancel, onImported }) {
 
   return (
     <>
-      <p className="muted small">Import a character card in JSON format (Character Card V2, the format used by SillyTavern and most card sites), or a card exported from this app.</p>
-      <input type="file" accept=".json,application/json" onChange={(e) => readFile(e.target.files?.[0])} />
+      <p className="muted small">Import a <b>.caliope</b> card file (a card with all its pictures, from 📦 in the card list), or a character card in JSON format (Character Card V2, the format used by SillyTavern and most card sites).</p>
+      <input type="file" accept=".json,.caliope,application/json" onChange={(e) => readFile(e.target.files?.[0])} />
+      {busy && !preview && <div className="muted small"><span className="spinner" /> Importing the card and its pictures…</div>}
       {error && <div className="error-text small">{error}</div>}
       {preview && (
         <>
@@ -497,6 +503,7 @@ export default function ScenarioModal({ onClose, onStart }) {
             <div className="row gap center">
               <div className="scn-name grow">{s.name}</div>
               <button className="icon-btn" title="Characters" onClick={(e) => { e.stopPropagation(); api.scenario(s.id).then((full) => { setCast({ name: s.name, npcs: full.data.npcs }); setView("cast"); }).catch((er) => setError(er.message)); }}>👥</button>
+              <a className="icon-btn" title="Share as a .caliope file (the card with all its pictures)" href={`/api/scenarios/${s.id}/export.caliope`} download onClick={(e) => e.stopPropagation()}>📦</a>
               <a className="icon-btn" title="Export as a character card (JSON)" href={api.exportCardUrl(s.id)} download onClick={(e) => e.stopPropagation()}>⤓</a>
               <button className="icon-btn" title="Edit" onClick={(e) => { e.stopPropagation(); edit(s.id); }}>✎</button>
               <button className="icon-btn" title="Delete" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete card "${s.name}"? Your saved games stay.`)) api.deleteScenario(s.id).then(() => load()).catch((er) => setError(er.message)); }}>🗑</button>
