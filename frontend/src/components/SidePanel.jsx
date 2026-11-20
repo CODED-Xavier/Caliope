@@ -3,6 +3,38 @@ import { api } from "../api.js";
 import { NumberField, TextField } from "./Fields.jsx";
 import HelpTip from "./HelpTip.jsx";
 import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
+import { latestStatus, portraitSrc } from "../portraits.js";
+
+/* ----------------------------------------------------------------- Status */
+function StatusTab({ messages, every }) {
+  const status = latestStatus(messages);
+  if (!status) {
+    return (
+      <div className="tab-body">
+        <div className="muted small">No status yet. This card's AI writes a status block {every ? `every ${every} replies` : "now and then"}, and it shows up here instead of in the story.</div>
+      </div>
+    );
+  }
+  const lines = status.text.split("\n").map((l) => l.replace(/\*\*/g, "").trim()).filter((l) => l && !/^\[?INFO\]?$/i.test(l));
+  return (
+    <div className="tab-body status-tab">
+      {lines.map((line, i) => {
+        const cells = line.split(/\s+\|\s+/);
+        return (
+          <div className="status-line" key={i}>
+            {cells.map((c, j) => {
+              const k = c.indexOf(":");
+              return k > 0 && k < 40
+                ? <span className="status-cell" key={j}><span className="status-key">{c.slice(0, k)}</span>{c.slice(k + 1)}</span>
+                : <span className="status-cell" key={j}>{c}</span>;
+            })}
+          </div>
+        );
+      })}
+      <div className="muted tiny">Written by the AI{every ? ` every ${every} replies` : ""}. The app's own relationship meters are in the People tab.</div>
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ Sheet */
 function SheetTab({ state, onPatch, mode, kind }) {
@@ -135,9 +167,12 @@ const looksSummary = (app) => ["race", "hair", "eyes"].map((k) => (app || {})[k]
 
 function NpcCard({ npc, onUpdate, onDelete }) {
   const [open, setOpen] = useState(false);
+  const pics = npc.portraits || { default: "", moods: [] };
+  const thumb = pics.moods?.[0]?.url || pics.default;
   return (
     <div className={`npc ${npc.is_main ? "main" : ""} ${npc.active ? "" : "inactive"}`}>
       <div className="row gap center" onClick={() => setOpen(!open)} style={{ cursor: "pointer" }}>
+        {thumb && <img className="npc-thumb" src={portraitSrc(thumb)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
         <div className="grow">
           <div className="npc-name">{npc.name}{npc.is_main && <span className="tag">main</span>}</div>
           <div className="small" style={{ color: relationshipColor(npc.relationship) }}>
@@ -165,6 +200,23 @@ function NpcCard({ npc, onUpdate, onDelete }) {
           <TextField multiline value={npc.personality} onCommit={(v) => onUpdate(npc.id, { personality: v })} />
           <label className="lbl">Speech style</label>
           <TextField value={npc.speech_style} onCommit={(v) => onUpdate(npc.id, { speech_style: v })} />
+          <label className="lbl">Portrait link <HelpTip id="portraits" /></label>
+          <TextField value={pics.default || ""} placeholder="https://… (PNG, JPG or WebP)"
+            onCommit={(v) => onUpdate(npc.id, { portraits: { ...pics, default: v } })} />
+          {pics.moods?.length > 0 && (
+            <div className="mood-strip">
+              {pics.moods.map((m) => (
+                <figure key={m.n} title={m.url}>
+                  <img src={portraitSrc(m.url)} alt={m.label} loading="lazy" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+                  <figcaption className="tiny">{m.label}</figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
+          <label className="check small"><input type="checkbox" checked={npc.in_prompt !== false} onChange={(e) => onUpdate(npc.id, { in_prompt: e.target.checked })} />
+            Profile always in the prompt <HelpTip id="in_prompt" /></label>
+          <label className="check small"><input type="checkbox" checked={npc.met !== false} onChange={(e) => onUpdate(npc.id, { met: e.target.checked })} />
+            Already met</label>
           <label className="lbl">Notes (the AI sees these)</label>
           <TextField multiline rows={2} value={npc.notes} onCommit={(v) => onUpdate(npc.id, { notes: v })} />
           <div className="row gap">
@@ -179,11 +231,20 @@ function NpcCard({ npc, onUpdate, onDelete }) {
 
 function PeopleTab({ npcs, onUpdate, onDelete, onAdd }) {
   const [name, setName] = useState("");
+  const met = npcs.filter((n) => n.met !== false);
+  const unmet = npcs.filter((n) => n.met === false);
   return (
     <div className="tab-body">
-      <div className="section-title">Characters ({npcs.length})</div>
-      {npcs.length === 0 && <div className="muted small">No characters met yet. They appear here as the story introduces them.</div>}
-      {npcs.map((n) => <NpcCard key={n.id} npc={n} onUpdate={onUpdate} onDelete={onDelete} />)}
+      <div className="section-title">Characters ({met.length})</div>
+      {met.length === 0 && <div className="muted small">No characters met yet. They appear here as the story introduces them.</div>}
+      {met.map((n) => <NpcCard key={n.id} npc={n} onUpdate={onUpdate} onDelete={onDelete} />)}
+      {unmet.length > 0 && (
+        <details className="unmet">
+          <summary className="section-title">Not met yet ({unmet.length})</summary>
+          <div className="muted tiny">Characters from the card. They move up when they first show up in the story.</div>
+          {unmet.map((n) => <NpcCard key={n.id} npc={n} onUpdate={onUpdate} onDelete={onDelete} />)}
+        </details>
+      )}
       <form className="row gap" onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; onAdd({ name: name.trim() }); setName(""); }}>
         <input className="field grow" placeholder="Add a character…" value={name} onChange={(e) => setName(e.target.value)} />
         <button className="btn small" type="submit">Add</button>
@@ -382,6 +443,7 @@ function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinned
 
 /* ------------------------------------------------------------------ Panel */
 const TABS = [
+  ["status", "📜", "Status"],
   ["sheet", "🧙", "Sheet"],
   ["bag", "🎒", "Bag"],
   ["people", "👥", "People"],
@@ -408,6 +470,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         <button className="icon-btn close-panel" onClick={onClose} title="Hide panel">✕</button>
       </div>
       <div className="tab-scroll">
+        {active === "status" && <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every} />}
         {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} />}
         {active === "bag" && <BagTab state={state} onPatch={onPatch} />}
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} />}

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 KINDS = ("roleplay", "adventure")
 TRACKERS = ("off", "lite", "full")
-PANELS = ("sheet", "bag", "people", "map", "dice", "journal")
+PANELS = ("sheet", "bag", "people", "map", "dice", "journal", "status")
 
 PROFILES = {
     "roleplay": {
@@ -18,12 +18,14 @@ PROFILES = {
         "tracker_interval": 2,        # run the tracker every N replies (it then reads all N exchanges)
         "panels": ["sheet", "people", "dice", "journal"],
         "appearance_hints": True,
+        "relationships": "app",       # "app": the app's -100..+100 scale wins over any scale written in the card
     },
     "adventure": {
         "tracker": "full",            # also HP, gold, items and quests
         "tracker_interval": 1,
         "panels": ["sheet", "bag", "people", "map", "dice", "journal"],
         "appearance_hints": True,
+        "relationships": "app",
     },
 }
 
@@ -50,6 +52,8 @@ def normalize_features(raw) -> dict:
             out["panels"] = panels
     if isinstance(raw.get("appearance_hints"), bool):
         out["appearance_hints"] = raw["appearance_hints"]
+    if raw.get("relationships") in ("app", "card"):
+        out["relationships"] = raw["relationships"]
     return out
 
 

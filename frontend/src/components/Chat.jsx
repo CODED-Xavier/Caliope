@@ -1,7 +1,9 @@
 import React, { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Markdown } from "../markdown.jsx";
+import { hideStatus } from "../portraits.js";
+import Story from "./Story.jsx";
 
-const Message = memo(function Message({ m, isLast, isLastAssistant, onRegenerate, canAct, lastContext, onEdit, onResend, onRewind }) {
+const Message = memo(function Message({ m, npcs, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind }) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -53,6 +55,7 @@ const Message = memo(function Message({ m, isLast, isLastAssistant, onRegenerate
       )}
       {canAct && <button className="icon-btn" title="Edit this message" onClick={startEdit}>✎</button>}
       {canAct && !isUser && isLast && !isOpening && <button className="icon-btn" title="Regenerate this reply" onClick={onRegenerate}>↻</button>}
+      {canAct && !isUser && isLast && !isOpening && <button className="btn small continue-btn" title="Keep writing this reply from where it stopped" onClick={onContinue}>Continue ▸</button>}
       {canAct && !isLast && <button className="icon-btn" title="Rewind: delete everything after this message" onClick={() => onRewind(m.id, false)}>⏪</button>}
       {canAct && !isOpening && <button className="icon-btn" title="Delete this message and everything after it" onClick={() => onRewind(m.id, true)}>🗑</button>}
     </div>
@@ -81,7 +84,7 @@ const Message = memo(function Message({ m, isLast, isLastAssistant, onRegenerate
       {isOpening && <div className="tag">Opening scene</div>}
       {editing ? editor : (
         <>
-          <Markdown text={m.content} />
+          <Story text={m.content} npcs={npcs} known={m.meta?.portraits} />
           {m.meta?.edited && <span className="muted tiny edited"> (edited)</span>}
           {m.meta?.interrupted && <div className="muted small">⏹ Stopped early</div>}
           {changes.length > 0 && (
@@ -110,7 +113,10 @@ const Message = memo(function Message({ m, isLast, isLastAssistant, onRegenerate
 
 const PHASES = { thinking: "Thinking…", writing: "", saved: "", updating: "Updating sheet and memories…" };
 
-export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onDismissError, onEdit, onResend, onRewind }) {
+// While a reply is being written: hide the status block and any half-written portrait tag at the end.
+const liveText = (t) => hideStatus(t).replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, "");
+
+export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind }) {
   const [text, setText] = useState("");
   const scrollRef = useRef(null);
   const nearBottom = useRef(true);
@@ -148,8 +154,8 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
       }}>
         <div className="chat-inner">
           {messages.map((m, i) => (
-            <Message key={m.id} m={m} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
-              onRegenerate={onRegenerate} canAct={!busy} lastContext={busy ? null : lastContext}
+            <Message key={m.id} m={m} npcs={game.npcs} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
+              onRegenerate={onRegenerate} onContinue={onContinue} canAct={!busy} lastContext={busy ? null : lastContext}
               onEdit={onEdit} onResend={onResend} onRewind={onRewind} />
           ))}
           {!busy && messages.length > 0 && messages[messages.length - 1].role === "user" && (
@@ -160,7 +166,8 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
           )}
           {stream && (
             <div className="msg assistant streaming">
-              {stream.text ? <Markdown text={stream.text} /> : null}
+              {stream.continuing && <div className="muted tiny">continuing…</div>}
+              {stream.text ? <Story text={liveText(stream.text)} npcs={game.npcs} /> : null}
               {stream.phase === "writing" && <span className="cursor">▍</span>}
               {PHASES[stream.phase] && <div className="muted small phase"><span className="spinner" /> {PHASES[stream.phase]}</div>}
               {stream.context && stream.context.memories.length > 0 && (

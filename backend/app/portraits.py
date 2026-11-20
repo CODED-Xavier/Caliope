@@ -1,0 +1,161 @@
+"""Big character portraits shown above the part of a reply where that character speaks or acts.
+
+The model marks a portrait with a line like  [[show: Lilia Valenheart | Happy]]. Some cards instead ask
+for a markdown image  ![Lilia - Happy](https://...)  and small models often garble those links, so the
+app never trusts the link: it reads the name and the mood, finds the right picture in the character's
+portrait list, and rewrites the line as a clean [[show: ...]] tag. At most two portraits per reply.
+"""
+from __future__ import annotations
+
+import re
+
+MAX_PER_REPLY = 2
+
+# Words the model may use for a mood -> the number most cards use (1=Standard ... 6=Blushing).
+MOOD_WORDS = {
+    1: ("standard", "neutral", "default", "normal", "calm", "serious"),
+    2: ("happy", "smile", "smiling", "joy", "joyful", "glad", "cheerful", "excited"),
+    3: ("sad", "upset", "crying", "worried", "hurt"),
+    4: ("angry", "annoyed", "mad", "irritated", "frustrated"),
+    5: ("disgusted", "very angry", "furious", "rage", "contempt"),
+    6: ("blushing", "blush", "embarrassed", "shy", "flustered", "love"),
+}
+
+_SHOW = re.compile(r"\[\[\s*show\s*:\s*([^|\]\n]+?)\s*(?:\|\s*([^\]\n]*?)\s*)?\]\]", re.I)
+_IMG = re.compile(r"!\[([^\]\n]*)\]\(([^)\s]*)\)")
+_DASH = re.compile(r"\s+[-–—:|]\s+|\s*[–—|]\s*")
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+
+def find_character(npcs: list[dict], name: str) -> dict | None:
+    """The character a name refers to: exact name, then a unique first-name / part match."""
+    target = _norm(name)
+    if not target:
+        return None
+    for n in npcs:
+        if _norm(n["name"]) == target:
+            return n
+    parts = [n for n in npcs if target in _norm(n["name"]).split() or _norm(n["name"]).startswith(target + " ")]
+    if len(parts) == 1:
+        return parts[0]
+    first = target.split()[0]
+    parts = [n for n in npcs if _norm(n["name"]).split()[:1] == [first]]
+    return parts[0] if len(parts) == 1 else None
+
+
+def pick_mood(portraits: dict, mood: str) -> tuple[str, str]:
+    """(mood label, picture URL) for a mood word or number. Falls back to the standard picture."""
+    moods = portraits.get("moods") or []
+    want = _norm(mood)
+    if moods:
+        number = int(want) if want.isdigit() else None
+        if number is None:
+            for m in moods:  # the card's own label first ("Disgusted/Very Angry" matches "disgusted")
+                labels = [_norm(x) for x in re.split(r"[/,]", m["label"])]
+                if want and (want == _norm(m["label"]) or want in labels):
+                    return m["label"], m["url"]
+            for n, words in MOOD_WORDS.items():
+                if want in words or any(w in want for w in words if len(w) > 3):
+                    number = n
+                    break
+        for m in moods:
+            if m["n"] == (number or 1):
+                return m["label"], m["url"]
+        return moods[0]["label"], moods[0]["url"]
+    return ("Standard", portraits.get("default", "")) if portraits.get("default") else ("", "")
+
+
+def _from_url(npcs: list[dict], url: str) -> tuple[dict | None, str]:
+    """Guess the character (and mood number) from a link like .../Lilia/2.png or .../Lilia.png."""
+    m = re.search(r"/([^/]+?)/(\d)\.\w+$", url) or re.search(r"/([^/]+?)\.\w+$", url)
+    if not m:
+        return None, ""
+    who = re.sub(r"[_%20]+", " ", m.group(1))
+    return find_character(npcs, who), (m.group(2) if m.lastindex and m.lastindex >= 2 else "")
+
+
+def resolve_portraits(text: str, npcs: list[dict], max_n: int = MAX_PER_REPLY) -> tuple[str, dict[str, str]]:
+    """Rewrite portrait marks as clean tags. Returns (new text, {"Name|Mood": picture URL})."""
+    shown: dict[str, str] = {}
+    people: set[str] = set()
+
+    def tag(npc: dict | None, mood: str) -> str:
+        if not npc or not npc.get("portraits"):
+            return ""
+        label, url = pick_mood(npc["portraits"], mood)
+        if not url:
+            return ""
+        key = f"{npc['name']}|{label}"
+        if npc["name"] not in people and len(people) >= max_n:
+            return ""  # only the two most important characters get a picture
+        people.add(npc["name"])
+        shown[key] = url
+        return f"\n[[show: {npc['name']} | {label}]]\n"
+
+    def img_sub(m: re.Match) -> str:
+        alt, url = m.group(1), m.group(2)
+        bits = _DASH.split(alt, maxsplit=1)
+        npc = find_character(npcs, bits[0]) if bits and bits[0] else None
+        mood = bits[1] if len(bits) > 1 else ""
+        if npc is None:
+            npc, number = _from_url(npcs, url)
+            mood = mood or number
+        return tag(npc, mood)
+
+    # Both forms in reading order, so "the first two" means the first two that appear.
+    combined = re.compile(f"{_SHOW.pattern}|{_IMG.pattern}", re.I)
+
+    def any_sub(m: re.Match) -> str:
+        if m.group(1) is not None:
+            return tag(find_character(npcs, m.group(1)), m.group(2) or "")
+        return img_sub(_IMG.match(m.group(0)))
+
+    out = combined.sub(any_sub, text or "")
+    out = re.sub(r"\n{3,}", "\n\n", out).strip()
+    return out, shown
+
+
+def portrait_instructions(npcs: list[dict]) -> str:
+    """Prompt text that tells the model how to show portraits (only when some characters have pictures)."""
+    names = [n["name"] for n in npcs if n.get("active", True) and n.get("portraits") and
+             (n["portraits"].get("default") or n["portraits"].get("moods"))]
+    if not names:
+        return ""
+    return (
+        "## Portraits\n"
+        "To show a character's portrait, write a line  [[show: Name | Mood]]  right before the paragraph where that "
+        "character speaks or acts. Moods: Standard, Happy, Sad, Angry, Disgusted, Blushing. Show at most 2 portraits per "
+        "reply: the 2 most important characters of the scene, the second one only when its part starts. Never write "
+        "image links or URLs; the app inserts the pictures.\n"
+        "Characters with portraits: " + ", ".join(names)
+    )
+
+
+def _mentioned(npc: dict, text: str) -> bool:
+    low = text.lower()
+    name = npc["name"].lower()
+    if name in low:
+        return True
+    words = [w for w in re.findall(r"[^\W_]+", name) if len(w) >= 4 and w not in ("professor", "lady", "lord", "sister")]
+    return any(re.search(rf"\b{re.escape(w)}\b", low) for w in words[:1])
+
+
+def process_reply(text: str, npcs: list[dict]) -> tuple[str, dict, list[int]]:
+    """Finish a reply from the model: take out the INFO block, clean the portrait tags, and find the
+    characters the player meets for the first time. Returns (story text, meta to store, ids now met)."""
+    from .status import split_status
+
+    story, block = split_status(text)
+    story, shown = resolve_portraits(story, npcs)
+    meta: dict = {}
+    if block:
+        meta["status"] = block
+    if shown:
+        meta["portraits"] = shown
+    shown_names = {k.split("|", 1)[0] for k in shown}
+    met = [n["id"] for n in npcs if "id" in n and not n.get("met", True)
+           and (n["name"] in shown_names or _mentioned(n, story))]
+    return story, meta, met

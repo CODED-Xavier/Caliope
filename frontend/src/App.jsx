@@ -108,6 +108,15 @@ export default function App() {
         setGame((g) => (g ? { ...g, messages: [...g.messages, ev.message] } : g));
         setStream((s) => (s ? { ...s, text: "", phase: "saved" } : s));
         break;
+      case "continue_start":
+        setStream((s) => (s ? { ...s, continuing: true } : s));
+        break;
+      case "message_updated":
+        if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
+        bufferRef.current = "";
+        setGame((g) => (g ? { ...g, messages: g.messages.map((m) => (m.id === ev.message.id ? ev.message : m)) } : g));
+        setStream((s) => (s ? { ...s, text: "", phase: "saved" } : s));
+        break;
       case "analysis_start":
         setStream((s) => (s ? { ...s, phase: "updating" } : s));
         break;
@@ -151,6 +160,7 @@ export default function App() {
 
   const send = (text) => runTurn(`/api/conversations/${activeRef.current}/chat`, { content: text });
   const regenerate = () => runTurn(`/api/conversations/${activeRef.current}/regenerate`, {});
+  const continueReply = () => runTurn(`/api/conversations/${activeRef.current}/continue`, {});
   const stop = () => abortRef.current?.abort();
 
   const undo = async () => {
@@ -200,7 +210,7 @@ export default function App() {
     localStorage.setItem("activeConv", String(data.conversation.id));
     setGame(data);
     setLastContext(null);
-    setTab("sheet");
+    setTab(data.features?.panels?.[0] || "sheet");
     refreshConvs();
   };
 
@@ -250,7 +260,7 @@ export default function App() {
               <button className="btn small" onClick={() => setPanelOpen(!panelOpen)}>{panelOpen ? "Hide panel" : "Show panel"}</button>
             </div>
             <Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
-              onSend={send} onStop={stop} onRegenerate={regenerate} onDismissError={() => setError("")}
+              onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
               onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} />
           </>
         ) : (

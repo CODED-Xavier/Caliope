@@ -118,3 +118,11 @@ def as_int(value: Any, default: int = 0) -> int:
         return int(float(value))
     except (TypeError, ValueError):
         return default
+
+
+def render_macros(text: str, user: str, char: str) -> str:
+    """Replace the card macros {{user}} / {{char}} (and <USER> / <BOT>) with real names."""
+    if not text:
+        return text
+    out = re.sub(r"\{\{\s*user\s*\}\}|<USER>", lambda _: user, text, flags=re.I)
+    return re.sub(r"\{\{\s*char\s*\}\}|<BOT>", lambda _: char, out, flags=re.I)

@@ -67,6 +67,11 @@ export const api = {
   deleteScenario: (id) => request("DELETE", `/api/scenarios/${id}`),
   generateScenario: (body) => request("POST", "/api/scenarios/generate", body),
 
+  previewCard: (card) => request("POST", "/api/cards/preview", { card }),
+  importCard: (card, skip = [], name = "") => request("POST", "/api/cards/import", { card, skip, name }),
+  exportCardUrl: (id) => `/api/scenarios/${id}/export`,
+  continueUrl: (id) => `/api/conversations/${id}/continue`,
+
   conversations: () => request("GET", "/api/conversations"),
   conversation: (id) => request("GET", `/api/conversations/${id}`),
   createConversation: (body) => request("POST", "/api/conversations", body),
