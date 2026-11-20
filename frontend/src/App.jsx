@@ -199,6 +199,9 @@ export default function App() {
       case "scene_picture":
         setGame((g) => (g ? { ...g, messages: g.messages.map((m) => (m.id === ev.message_id ? { ...m, meta: { ...m.meta, scene_picture: ev.picture } } : m)) } : g));
         break;
+      case "user_updated": // a re-sent message after the app took its old dice/purchase result out
+        setGame((g) => (g ? { ...g, messages: g.messages.map((m) => (m.id === ev.message.id ? ev.message : m)) } : g));
+        break;
       case "message_updated":
         if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
         bufferRef.current = "";

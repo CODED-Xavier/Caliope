@@ -26,10 +26,13 @@ and every fix has a regression test (`backend/tests/test_audit.py`, plus `test_w
 | 16 | Prompt efficiency (medium) | With a card like Lumencia, the fixed part of the prompt was ~4,400 of 8,192 tokens, leaving room for only 3–4 exchanges of history. About 630 of those tokens were the card's *example messages*, which only matter until the story has its own style. | Example messages are sent for the first 6 replies only, which frees ~300–800 tokens per turn for history. |
 | 17 | Built-in engine | The engine log was appended forever, read whole every 1.5 s by the settings window, and a file handle leaked on each restart. | One log per start (the previous one is kept as `engine.log.1`), only the last 8 KB is read, and the handle is closed. |
 
+## Fixed later (leftovers)
+
+- **Memory search** keeps each game's vectors in memory between turns (re-checked by count and newest id, cleared on add/delete/reindex). Only the best hits' texts are read.
+- **Re-sending an edited fight, trade, ability, rest or time-skip message** now undoes its old result (dice, gold, HP, clock) and sends only your words. A time skip still in the new words is applied again. A message that was only the app's result can't be re-sent; use Undo and act again.
+- **Uploads have size limits**, checked while reading: pictures 8 MB, songs 100 MB, rulebooks 200 MB, skill zips 25 MB.
+
 ## Not changed (noted for later)
 
 - **Token estimate:** the app estimates ~3.4 characters per token. That's safe, but ~15% pessimistic for English with Llama-3 tokenizers, so history is trimmed a bit earlier than needed. The built-in engine has a `/tokenize` endpoint that could make this exact.
-- **Memory search** loads all of a game's memory vectors each turn. That's fine up to several thousand memories; a per-game cache would help beyond that.
-- **Editing and re-sending a fight-action message** keeps the action's effects while the text changes. It's rare and can be undone.
-- **Raw uploads** (pictures, songs, rulebooks) have no request-size limit before reading. They're local-only, and the origin check above blocks other sites.
 - The real llama.cpp engine, PyInstaller build, FastAPI routes and Hugging Face downloads were checked by reading and with stand-ins. FastAPI isn't installed in the test environments, so the first real run is still on your PC.

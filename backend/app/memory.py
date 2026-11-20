@@ -49,6 +49,17 @@ class MemoryManager:
         self.db = db
         self.llm = llm
         self._get = get_settings
+        # (conv_id, model) -> (key, ids, matrix, norms): vectors stay in RAM between turns so long games
+        # don't re-read and re-stack every embedding on each message. `key` is (count, max id) and is
+        # re-checked on every search, so a change made elsewhere is noticed too.
+        self._vec_cache: dict[tuple[int, str], tuple] = {}
+
+    def _forget_vectors(self, conv_id: int | None = None) -> None:
+        if conv_id is None:
+            self._vec_cache.clear()
+        else:
+            for k in [k for k in self._vec_cache if k[0] == conv_id]:
+                self._vec_cache.pop(k, None)
 
     # ------------------------------------------------------------------ writing
     async def add(self, conv_id: int, text: str, kind: str = "event", importance: int = 3, message_id: int | None = None,
@@ -70,6 +81,7 @@ class MemoryManager:
              json.dumps([p for p in (participants or []) if p][:4], ensure_ascii=False) if participants else "",
              _pack(vec) if vec else None, model if vec else None, now()),
         )
+        self._forget_vectors(conv_id)
         return cur.lastrowid
 
     async def _embed_one(self, text: str) -> list[float] | None:
@@ -96,6 +108,7 @@ class MemoryManager:
             for r, v in zip(batch, vecs):
                 self.db.execute("UPDATE memories SET embedding = ?, embed_model = ? WHERE id = ?", (_pack(v), model, r["id"]))
                 done += 1
+        self._forget_vectors(conv_id)
         return done
 
     # ---------------------------------------------------------------- admin/CRUD
@@ -112,9 +125,11 @@ class MemoryManager:
 
     def delete(self, memory_id: int) -> None:
         self.db.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+        self._forget_vectors()
 
     def delete_by_message(self, message_id: int) -> None:
         self.db.execute("DELETE FROM memories WHERE message_id = ?", (message_id,))
+        self._forget_vectors()
 
     # ---------------------------------------------------------------- retrieval
     @staticmethod
@@ -150,35 +165,49 @@ class MemoryManager:
         model = embedding_key(settings) or ""
         if not model or not query.strip():
             return []
-        rows = self.db.query(
-            "SELECT id, text, kind, importance, message_id, participants, embedding FROM memories "
-            "WHERE conversation_id = ? AND embedding IS NOT NULL AND embed_model = ?",
-            (conv_id, model),
-        )
-        if not rows:
+        where = "WHERE conversation_id = ? AND embedding IS NOT NULL AND embed_model = ?"
+        info = self.db.query_one(f"SELECT COUNT(*) AS n, MAX(id) AS m FROM memories {where}", (conv_id, model))
+        if not info or not info["n"]:
             return []
         qv = await self._embed_one(query)
         if not qv:
             return []
         min_sim = float(settings.get("memory_min_similarity", 0.4))
-        scored: list[tuple[float, dict]] = []
+        scored: list[tuple[float, int]] = []  # (similarity, memory id)
         if np is not None:
-            try:
-                mat = np.vstack([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
-                q = np.asarray(qv, dtype=np.float32)
-                sims = (mat @ q) / (np.linalg.norm(mat, axis=1) * np.linalg.norm(q) + 1e-9)
-                scored = [(float(s), r) for s, r in zip(sims, rows)]
-            except ValueError:  # mixed dimensions
-                scored = []
+            key = (info["n"], info["m"])
+            cached = self._vec_cache.get((conv_id, model))
+            if not cached or cached[0] != key:
+                rows = self.db.query(f"SELECT id, embedding FROM memories {where}", (conv_id, model))
+                try:
+                    mat = np.vstack([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+                    cached = (key, [r["id"] for r in rows], mat, np.linalg.norm(mat, axis=1))
+                except ValueError:  # mixed dimensions
+                    cached = (key, None, None, None)
+                self._vec_cache[(conv_id, model)] = cached
+            _, ids, mat, norms = cached
+            q = np.asarray(qv, dtype=np.float32)
+            if ids is not None and mat.shape[1] == q.shape[0]:
+                sims = (mat @ q) / (norms * np.linalg.norm(q) + 1e-9)
+                scored = list(zip(sims.tolist(), ids))
         if not scored:
-            scored = [(cosine(_unpack(r["embedding"]), qv), r) for r in rows if len(r["embedding"]) // 4 == len(qv)]
-        scored = [(s, r) for s, r in scored if s >= min_sim]
+            rows = self.db.query(f"SELECT id, embedding FROM memories {where}", (conv_id, model))
+            scored = [(cosine(_unpack(r["embedding"]), qv), r["id"]) for r in rows if len(r["embedding"]) // 4 == len(qv)]
+        scored = [(s, i) for s, i in scored if s >= min_sim]
         scored.sort(key=lambda t: t[0], reverse=True)
+        top = scored[:limit]
+        if not top:
+            return []
+        marks = ",".join("?" * len(top))
+        found = {r["id"]: r for r in self.db.query(
+            f"SELECT id, text, kind, importance, message_id, participants FROM memories WHERE id IN ({marks})",
+            [i for _, i in top])}
         out = []
-        for s, r in scored[:limit]:
-            item = {k: v for k, v in r.items() if k != "embedding"}
-            item["similarity"] = s
-            out.append(item)
+        for s, i in top:
+            if i in found:
+                item = dict(found[i])
+                item["similarity"] = float(s)
+                out.append(item)
         return out
 
     def search_by_characters(self, conv_id: int, names: list[str], limit: int = 10) -> list[dict]:

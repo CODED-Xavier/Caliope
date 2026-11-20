@@ -319,10 +319,32 @@ async def list_music():
     return {"tracks": svc().music.list(), "moods": list(MUSIC_MOODS)}
 
 
+MB = 1024 * 1024
+UPLOAD_LIMITS = {"picture": 8 * MB, "music": 100 * MB, "rulebook": 200 * MB, "skills": 25 * MB}
+
+
+async def read_body(request: Request, kind: str) -> bytes:
+    """The raw upload, refused with 413 as soon as it passes the size limit (it is never held whole in memory)."""
+    limit = UPLOAD_LIMITS[kind]
+    too_big = HTTPException(413, f"The file is too large (limit {limit // MB} MB).")
+    try:
+        if int(request.headers.get("content-length") or 0) > limit:
+            raise too_big
+    except ValueError:
+        pass
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > limit:
+            raise too_big
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 @app.post("/api/music/upload")
 async def upload_music(request: Request, name: str = Query(""), tags: str = Query("")):
     """A song from this PC, sent as the raw request body."""
-    return svc().music.add_file(await request.body(), name, tags.split(","))
+    return svc().music.add_file(await read_body(request, "music"), name, tags.split(","))
 
 
 @app.post("/api/music")
@@ -420,7 +442,7 @@ async def _import_book(book_id: int, data: bytes, filename: str) -> None:
 @app.post("/api/rulebooks")
 async def upload_rulebook(request: Request, name: str = Query(""), system: str = Query("other"), filename: str = Query("")):
     """Upload a PDF, .txt or .md as the raw request body. Reading runs in the background; poll GET /api/rulebooks."""
-    data = await request.body()
+    data = await read_body(request, "rulebook")
     if not data:
         raise RulebookError("The file is empty.")
     book = svc().rulebooks.create(name or filename.rsplit(".", 1)[0] or "Rulebook", system, filename)
@@ -504,7 +526,7 @@ UPLOAD_DIR = PORTRAIT_DIR / "uploads"
 @app.post("/api/uploads")
 async def upload_picture(request: Request):
     """A picture from this PC (sent as the raw request body). Returns a link the app can use as a portrait."""
-    data = await request.body()
+    data = await read_body(request, "picture")
     try:
         name = save_upload(data, UPLOAD_DIR)
     except ImageError as exc:
@@ -946,7 +968,7 @@ async def install_skill(body: dict[str, Any] = Body(...)):
 @app.post("/api/skills/install-zip")
 async def install_skill_zip(request: Request):
     """Upload a .zip as the raw request body (Content-Type: application/zip)."""
-    names = svc().skills.install_from_zip_bytes(await request.body(), "zip upload")
+    names = svc().skills.install_from_zip_bytes(await read_body(request, "skills"), "zip upload")
     return {"installed": names, "skills": svc().skills.list()}
 
 

@@ -239,13 +239,18 @@ class ConversationRepository:
         self.db.execute("UPDATE messages SET content = ? WHERE id = ?", (content, message_id))
         return self.get_message(message_id)
 
-    def update_message_meta(self, message_id: int, patch: dict) -> None:
+    def update_message_meta(self, message_id: int, patch: dict, drop: tuple | list = ()) -> None:
         row = self.db.query_one("SELECT meta FROM messages WHERE id = ?", (message_id,))
         if not row:
             return
         meta = json.loads(row["meta"] or "{}")
         meta.update(patch)
+        for key in drop:
+            meta.pop(key, None)
         self.db.execute("UPDATE messages SET meta = ? WHERE id = ?", (json.dumps(meta, ensure_ascii=False), message_id))
+
+    def set_message_snapshot(self, message_id: int, snap: dict | None) -> None:
+        self.db.execute("UPDATE messages SET snapshot = ? WHERE id = ?", (pack_snapshot(snap), message_id))
 
     def delete_message(self, message_id: int) -> None:
         self.db.execute("DELETE FROM messages WHERE id = ?", (message_id,))

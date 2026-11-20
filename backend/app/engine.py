@@ -58,6 +58,20 @@ def scene_names(npcs: list[dict], *texts: str) -> list[str]:
     return names
 
 
+PREPARE_KINDS = ("combat", "time_skip", "trade", "ability", "rest")
+_APP_MARKS = ("⚔", "🎲", "✨", "🛒", "💰", "⏳", "🛌", "🏁")
+
+
+def strip_app_line(content: str, meta: dict) -> str:
+    """The player's own words of a message the app added a result to (dice, purchase, time skip)."""
+    line = (meta or {}).get("app_line") or ""
+    if line and line in content:
+        return content.replace(line, "").strip()
+    # older messages: drop the paragraphs that start with one of the app's marks
+    keep = [p for p in content.split("\n\n") if not p.strip().startswith(_APP_MARKS)]
+    return "\n\n".join(keep).strip()
+
+
 def trim_incomplete(text: str) -> str:
     """If the reply was cut off by the length limit, go back to the last finished sentence."""
     t = text.strip()
@@ -148,7 +162,7 @@ class ChatEngine:
                     return
                 self.repo.save_state(conv_id, new_state)
                 text = f"{text}\n\n{line}".strip() if text else line
-                meta = {"snapshot": before, kind: True}
+                meta = {"snapshot": before, kind: True, "app_line": line}
                 yield {"type": "state", "state": new_state, "npcs": self.repo.list_npcs(conv_id), "changes": []}
             user_msg = self.repo.add_message(conv_id, "user", text, meta)
             self._auto_title(conv_id, text)
@@ -356,14 +370,38 @@ class ChatEngine:
             if not content:
                 yield {"type": "error", "message": "A message cannot be empty."}
                 return
+            snap = self.repo.get_message(message_id, with_snapshot=True).get("snapshot")
+            if snap:  # a fight action, trade, ability, rest or time skip: its dice and effects are undone
+                content = strip_app_line(content, msg["meta"])
+                if not content:
+                    yield {"type": "error", "message": "This message is only the app's result (dice, purchase, rest…). "
+                                                       "Use Undo or Rewind and take the action again to roll fresh."}
+                    return
             self._truncate_after(conv_id, message_id, inclusive=False)
             conv = self.repo.get(conv_id)
             if conv["summary"] and conv["summary_upto"] >= message_id:
                 self.repo.set_summary(conv_id, "", 0)
+            if snap:
+                self.repo.restore_snapshot(conv_id, snap)
+                self.repo.set_message_snapshot(message_id, None)
+                self.repo.update_message_meta(message_id, {}, drop=PREPARE_KINDS + ("app_line",))
+                try:  # new words that still skip time ("I sleep until dawn") move the clock again
+                    prepare, own = self._time_skip(conv_id, content)
+                except ValueError:
+                    prepare = None
+                if prepare is not None:
+                    before = self.repo.capture_snapshot(conv_id)
+                    new_state, line = prepare(self.repo.get_state(conv_id))
+                    self.repo.save_state(conv_id, new_state)
+                    content = f"{own}\n\n{line}".strip() if own else line
+                    self.repo.set_message_snapshot(message_id, before)
+                    self.repo.update_message_meta(message_id, {"time_skip": True, "app_line": line})
+                yield {"type": "state", "state": self.repo.get_state(conv_id), "npcs": self.repo.list_npcs(conv_id), "changes": []}
             self.repo.update_message(message_id, content)
             self.repo.update_message_meta(message_id, {"edited": True})
             user_msg = self.repo.get_message(message_id)
             yield {"type": "rolled_back", "last_message_id": message_id}
+            yield {"type": "user_updated", "message": user_msg}
             async with aclosing(self._reply(conv_id, user_msg)) as turn:
                 async for event in turn:
                     yield event
