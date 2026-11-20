@@ -78,7 +78,8 @@ def normalize_state(state: dict) -> dict:
     return new_state(
         {**merged["player"], **{k: merged[k] for k in TOP_LEVEL_FROM_PLAYER}},
         None,
-    ) | {"notes": str(merged.get("notes", "")), "setup": merged.get("setup") if merged.get("setup") in ("app", "card") else ""}
+    ) | {"notes": str(merged.get("notes", "")), "setup": merged.get("setup") if merged.get("setup") in ("app", "card") else ""} | (
+        {"combat": merged["combat"]} if isinstance(merged.get("combat"), dict) else {})  # a fight in progress survives sheet edits
 
 
 # ---------------------------------------------------------------- model updates

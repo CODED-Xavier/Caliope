@@ -10,7 +10,7 @@ from __future__ import annotations
 
 KINDS = ("roleplay", "adventure")
 TRACKERS = ("off", "lite", "full")
-PANELS = ("sheet", "bag", "people", "map", "dice", "journal", "status")
+PANELS = ("sheet", "bag", "people", "map", "dice", "journal", "status", "combat")
 
 PROFILES = {
     "roleplay": {
@@ -23,7 +23,7 @@ PROFILES = {
     "adventure": {
         "tracker": "full",            # also HP, gold, items and quests
         "tracker_interval": 1,
-        "panels": ["sheet", "bag", "people", "map", "dice", "journal"],
+        "panels": ["sheet", "bag", "people", "map", "combat", "dice", "journal"],
         "appearance_hints": True,
         "relationships": "app",
     },

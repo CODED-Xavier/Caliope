@@ -18,6 +18,11 @@ from .config import DB_PATH
 from .conversations import NotFound
 from .drafts import draft_card_field, draft_player
 from .exporting import export_markdown
+from .combat import CombatError, player_defaults, suggest_fight
+from .maps import FEATURES as MAP_FEATURES
+from .maps import TILES as MAP_TILES
+from .maps import TYPES as MAP_TYPES
+from .maps import MapError, generate as generate_map
 from .rulebooks import RulebookError, ocr_available
 from .images import UPLOAD_NAME, ImageError, get_image, save_upload
 from .dice import DiceError
@@ -161,6 +166,106 @@ async def delete_scenario(scenario_id: int):
     if not svc().scenarios.delete(scenario_id):
         raise NotFound(f"Scenario {scenario_id} not found")
     return {"deleted": True}
+
+
+# ------------------------------------------------------------------ combat
+@app.get("/api/conversations/{conv_id}/combat/defaults")
+async def combat_defaults(conv_id: int, system: str = Query("d20")):
+    """The player's fight numbers taken from the sheet (the start form shows them so you can change them)."""
+    return player_defaults(svc().conversations.get_state(conv_id), system)
+
+
+@app.post("/api/conversations/{conv_id}/combat/suggest")
+async def combat_suggest(conv_id: int, body: dict[str, Any] = Body(default={})):
+    """The AI reads the last messages and proposes the enemies (you confirm them in the form)."""
+    s = svc()
+    system = body.get("system", "d20")
+    msgs = s.conversations.list_messages(conv_id)[-6:]
+    scene = "\n\n".join(f"{'PLAYER' if m['role'] == 'user' else 'GM'}: {m['content']}" for m in msgs)
+    rules = ""
+    scenario = s.conversations.get(conv_id)["scenario"]
+    ids = s.rulebooks.ready_ids(scenario.get("rulebooks") or [])
+    if ids:
+        found = await s.rulebooks.search(ids, msgs[-1]["content"] if msgs else "", k=2)
+        rules = "\n\n".join(f"{f['heading']}: {f['text']}" for f in found)
+    return {"system": system, **(await suggest_fight(s.llm, system, scene, rules))}
+
+
+@app.post("/api/conversations/{conv_id}/combat")
+async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
+    """start | act | enemies | end. The app rolls, updates the fight, and sends the result to the GM, who narrates it."""
+    s = svc()
+    action = body.get("action")
+    if action == "start":
+        prepare = lambda st: s.combat.start(st, body.get("system", "d20"), body.get("enemies") or [],  # noqa: E731
+                                            body.get("allies") or [], body.get("player") or {}, body.get("grid") or {},
+                                            body.get("map") if isinstance(body.get("map"), dict) else None)
+    elif action == "act":
+        prepare = lambda st: s.combat.player_action(st, body.get("move", "attack"), str(body.get("target", "")),  # noqa: E731
+                                                    str(body.get("advantage", "")))
+    elif action == "enemies":
+        prepare = s.combat.enemies_act
+    elif action == "end":
+        prepare = lambda st: s.combat.end(st, str(body.get("reason", "")))  # noqa: E731
+    else:
+        raise CombatError("Unknown combat action.")
+    return stream_response(s.engine.send(conv_id, str(body.get("text", "")), prepare=prepare))
+
+
+@app.patch("/api/conversations/{conv_id}/combat/{cid}")
+async def combat_edit(conv_id: int, cid: str, body: dict[str, Any] = Body(...)):
+    """Change HP, conditions or a position by hand (no message is sent)."""
+    s = svc()
+    if s.engine.is_busy(conv_id):
+        raise CombatError("Wait for the current reply to finish.")
+    state = s.combat.edit(s.conversations.get_state(conv_id), cid, body.get("hp"), body.get("conditions"), body.get("x"), body.get("y"))
+    s.conversations.save_state(conv_id, state)
+    return state
+
+
+# ------------------------------------------------------------------ battle maps
+@app.exception_handler(MapError)
+async def _map_error(_: Request, exc: MapError):
+    return JSONResponse({"detail": str(exc)}, status_code=400)
+
+
+@app.get("/api/maps")
+async def list_maps():
+    """Your saved maps, plus what the editor and generators offer."""
+    return {"maps": svc().maps.list(), "types": list(MAP_TYPES), "features": list(MAP_FEATURES),
+            "tiles": {k: v["name"] for k, v in MAP_TILES.items()}}
+
+
+@app.post("/api/maps/generate")
+async def make_map(body: dict[str, Any] = Body(default={})):
+    """A map made by code from a type (forest, dungeon...). Same seed, same map."""
+    import random as _r
+    seed = body.get("seed")
+    seed = int(seed) if str(seed or "").lstrip("-").isdigit() else _r.randrange(1_000_000)
+    tiles = generate_map(str(body.get("type", "field")), int(body.get("w", 12) or 12), int(body.get("h", 8) or 8), seed,
+                         [f for f in body.get("features", []) if isinstance(f, str)])
+    return {"tiles": tiles, "seed": seed}
+
+
+@app.post("/api/maps")
+async def create_map(body: dict[str, Any] = Body(...)):
+    return svc().maps.save(body)
+
+
+@app.put("/api/maps/{map_id}")
+async def update_map(map_id: int, body: dict[str, Any] = Body(...)):
+    return svc().maps.save(body, map_id)
+
+
+@app.delete("/api/maps/{map_id}")
+async def delete_map(map_id: int):
+    svc().maps.delete(map_id)
+    return {"deleted": True}
+
+
+@app.exception_handler(CombatError)
+async def _combat_error(_: Request, exc: CombatError):
+    return JSONResponse({"detail": str(exc)}, status_code=400)
 
 
 # ------------------------------------------------------------------ rulebooks

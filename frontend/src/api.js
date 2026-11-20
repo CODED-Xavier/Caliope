@@ -72,6 +72,14 @@ export const api = {
     if (!res.ok) throw new Error(await errorMessage(res));
     return res.json();
   },
+  combatDefaults: (id, system) => request("GET", `/api/conversations/${id}/combat/defaults?system=${system}`),
+  combatSuggest: (id, system) => request("POST", `/api/conversations/${id}/combat/suggest`, { system }),
+  combatEdit: (id, cid, patch) => request("PATCH", `/api/conversations/${id}/combat/${cid}`, patch),
+  maps: () => request("GET", "/api/maps"),
+  generateMap: (body) => request("POST", "/api/maps/generate", body),
+  createMap: (body) => request("POST", "/api/maps", body),
+  updateMap: (id, body) => request("PUT", `/api/maps/${id}`, body),
+  deleteMap: (id) => request("DELETE", `/api/maps/${id}`),
   rulebooks: () => request("GET", "/api/rulebooks"),
   async uploadRulebook(file, name, system) {
     const qs = new URLSearchParams({ name, system, filename: file.name });

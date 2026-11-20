@@ -172,7 +172,7 @@ export default function App() {
         setStream((s) => (s ? { ...s, phase: "updating" } : s));
         break;
       case "state":
-        setGame((g) => (g ? { ...g, state: ev.state, npcs: ev.npcs } : g));
+        setGame((g) => (g ? { ...g, state: ev.state, npcs: ev.npcs || g.npcs } : g));
         setMemoryKey((k) => k + 1);
         break;
       case "summary":
@@ -211,6 +211,10 @@ export default function App() {
 
   const send = (text) => runTurn(`/api/conversations/${activeRef.current}/chat`, { content: text });
   const regenerate = () => runTurn(`/api/conversations/${activeRef.current}/regenerate`, {});
+  const combatAction = (body) => runTurn(`/api/conversations/${activeRef.current}/combat`, body);
+  const combatEdit = async (cid, patch) => {
+    try { const state = await api.combatEdit(activeId, cid, patch); setGame((g) => (g ? { ...g, state } : g)); } catch (e) { setError(e.message); }
+  };
   const continueReply = () => runTurn(`/api/conversations/${activeRef.current}/continue`, {});
   const stop = () => abortRef.current?.abort();
 
@@ -368,7 +372,8 @@ export default function App() {
       {game && panelOpen && <div className="panel-resizer" onMouseDown={startResize} title="Drag to resize the panel" />}
       {game && panelOpen && (
         <SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}
-          onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} onPinnedSave={savePinned} />
+          onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} onPinnedSave={savePinned}
+          onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit} />
       )}
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={refreshHealth} />}

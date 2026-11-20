@@ -3,6 +3,7 @@ import { api } from "../api.js";
 import { NumberField, TextField } from "./Fields.jsx";
 import HelpTip from "./HelpTip.jsx";
 import MoodEditor from "./MoodEditor.jsx";
+import CombatTab from "./CombatTab.jsx";
 import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
 import { latestStatus, portraitSrc } from "../portraits.js";
 
@@ -453,15 +454,16 @@ const TABS = [
   ["bag", "🎒", "Bag"],
   ["people", "👥", "People"],
   ["map", "🗺", "Map"],
+  ["combat", "⚔", "Combat"],
   ["dice", "🎲", "Dice"],
   ["journal", "📖", "Journal"],
 ];
 
-export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave }) {
+export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onCombat, onCombatEdit, style }) {
   const { state, npcs, conversation } = game;
   const mode = conversation.scenario?.mode;
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
-  const allowed = game.features?.panels || TABS.map(([k]) => k);
+  const allowed = [...(game.features?.panels || TABS.map(([k]) => k)), ...(state.combat?.active ? ["combat"] : [])];
   const tabs = TABS.filter(([k]) => allowed.includes(k));
   const active = tabs.some(([k]) => k === tab) ? tab : tabs[0]?.[0];
   return (
@@ -480,6 +482,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         {active === "bag" && <BagTab state={state} onPatch={onPatch} />}
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} />}
         {active === "map" && <MapTab state={state} />}
+        {active === "combat" && <CombatTab game={game} busy={!canRoll} onCombat={onCombat} onCombatEdit={onCombatEdit} />}
         {active === "dice" && <DiceTab onRollToChat={onRollToChat} canRoll={canRoll} />}
         {active === "journal" && <JournalTab convId={conversation.id} summary={conversation.summary} refreshKey={memoryKey}
           pinned={conversation.pinned_memory} pinnedLimit={game.pinned_limit || 2000} onPinnedSave={onPinnedSave} />}

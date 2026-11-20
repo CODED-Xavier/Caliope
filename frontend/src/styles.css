@@ -300,3 +300,44 @@ body.resizing { user-select: none; cursor: col-resize; }
 .modal-body > * { flex-shrink: 0; }
 .brand { display: flex; align-items: center; gap: 6px; }
 .brand .theme-btn { margin-left: auto; }
+
+/* ---------- v0.11.0: combat ---------- */
+.enemy-row { border: 1px solid var(--border); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 4px; background: var(--panel); }
+.enemy-stats { flex-wrap: wrap; }
+.enemy-stats label { display: flex; flex-direction: column; gap: 2px; }
+.grid-wrap { margin: 4px 0 8px; }
+.battle-grid { width: 100%; height: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; display: block; }
+.grid-cell { fill: transparent; stroke: var(--border); stroke-width: 1; cursor: pointer; }
+.grid-cell:hover { fill: color-mix(in srgb, var(--accent) 14%, transparent); }
+.token { cursor: pointer; }
+.turn-order { display: flex; flex-direction: column; gap: 5px; }
+.fighter { border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; background: var(--panel); cursor: pointer; }
+.fighter.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.fighter.targeted { background: color-mix(in srgb, var(--bad) 7%, var(--panel)); }
+.fighter.down { opacity: .5; }
+.dot-side { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.hp-num { min-width: 46px; text-align: center; font-variant-numeric: tabular-nums; }
+.small-bar { height: 5px; margin-top: 3px; }
+.conds { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.action-bar { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.action-bar select.grow { flex: 1 1 auto; min-width: 0; width: auto; }
+.action-bar select:not(.grow) { flex: 0 0 auto; width: auto; }
+
+/* ---------- v0.11.0: maps, editor, combat cards, custom moods ---------- */
+.battle-grid.preview { max-height: 220px; }
+.battle-grid.editing { cursor: crosshair; user-select: none; }
+.map-editor { display: grid; grid-template-columns: 200px 1fr; gap: 14px; }
+.map-lib { display: flex; flex-direction: column; gap: 4px; }
+.map-item { display: flex; align-items: center; gap: 4px; border-radius: 6px; padding: 2px 4px; }
+.map-item.active { background: var(--bg2); }
+.link-btn { background: none; border: none; color: var(--text); text-align: left; cursor: pointer; padding: 4px 2px; font: inherit; }
+.map-work { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.palette { display: flex; flex-wrap: wrap; gap: 4px; }
+.pal { display: flex; align-items: center; gap: 4px; border: 1px solid var(--border); background: var(--panel); border-radius: 6px; padding: 2px 6px 2px 2px; cursor: pointer; color: var(--text); }
+.pal.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pal-swatch { width: 22px; height: 22px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; border: 1px solid var(--border); }
+@media (max-width: 760px) { .map-editor { grid-template-columns: 1fr; } }
+.msg.user .bubble.combat-card { max-width: 100%; text-align: left; background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--bad); font-size: 14px; }
+.msg.user .bubble.combat-card .md p { margin: 0 0 8px; }
+.mood-slot.add-mood { cursor: pointer; border-style: dashed; color: var(--muted); font: inherit; }

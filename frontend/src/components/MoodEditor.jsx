@@ -12,11 +12,12 @@ export default function MoodEditor({ portraits, onChange, compact, mainOnly }) {
   const [busy, setBusy] = useState(null);
   const fileRef = useRef(null);
   const target = useRef(null);
+  const pendingLabel = useRef("");
 
   const urlFor = (n) => (n === 0 ? pics.default : (pics.moods.find((m) => m.n === n) || {}).url || "");
   const setSlot = (n, url) => {
     if (n === 0) return onChange({ ...pics, default: url });
-    const label = (STANDARD_MOODS.find(([k]) => k === n) || [n, `Mood ${n}`])[1];
+    const label = (STANDARD_MOODS.find(([k]) => k === n) || [n, pendingLabel.current || `Mood ${n}`])[1];
     const others = pics.moods.filter((m) => m.n !== n);
     const moods = url ? [...others, { n, label: (pics.moods.find((m) => m.n === n) || {}).label || label, url }] : others;
     onChange({ ...pics, moods: moods.sort((a, b) => (a.n ?? 99) - (b.n ?? 99)) });
@@ -31,11 +32,27 @@ export default function MoodEditor({ portraits, onChange, compact, mainOnly }) {
     const n = target.current;
     if (!file || n === null) return;
     setBusy(n); setError("");
-    try { setSlot(n, (await api.uploadPicture(file)).url); } catch (e) { setError(e.message); } finally { setBusy(null); }
+    try { setSlot(n, (await api.uploadPicture(file)).url); } catch (e) { setError(e.message); } finally { setBusy(null); pendingLabel.current = ""; }
   };
   const pick = (n) => { target.current = n; fileRef.current.value = ""; fileRef.current.click(); };
 
-  const slots = mainOnly ? [[0, "Picture"]] : [[0, "Main"], ...STANDARD_MOODS];
+  const standardNs = STANDARD_MOODS.map(([n]) => n);
+  const custom = pics.moods.filter((m) => !standardNs.includes(m.n)).map((m) => [m.n, m.label]);
+  const slots = mainOnly ? [[0, "Picture"]] : [[0, "Main"], ...STANDARD_MOODS, ...custom];
+  const addMood = () => {
+    if (pics.moods.length >= 12) { setError("At most 12 moods per character."); return; }
+    const label = (window.prompt("Name of the new mood (for example Smug, Crying, Scared):") || "").trim().slice(0, 30);
+    if (!label) return;
+    if (pics.moods.some((m) => m.label.toLowerCase() === label.toLowerCase()) || STANDARD_MOODS.some(([, l]) => l.toLowerCase() === label.toLowerCase())) {
+      setError("That mood already exists."); return;
+    }
+    const n = Math.max(6, ...pics.moods.map((m) => m.n || 0)) + 1;
+    setError("");
+    target.current = n;
+    pendingLabel.current = label;
+    fileRef.current.value = "";
+    fileRef.current.click();
+  };
   return (
     <div className={`mood-editor ${compact ? "compact" : ""}`}>
       <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => upload(e.target.files?.[0])} />
@@ -57,6 +74,12 @@ export default function MoodEditor({ portraits, onChange, compact, mainOnly }) {
           </div>
         );
       })}
+      {!mainOnly && (
+        <button type="button" className="mood-slot add-mood" onClick={addMood} title="A mood with your own name, for example Smug or Crying">
+          <div className="mood-pic"><span>＋</span></div>
+          <div className="mood-label tiny">Add mood</div>
+        </button>
+      )}
       {error && <div className="error-text tiny mood-error">{error}</div>}
     </div>
   );

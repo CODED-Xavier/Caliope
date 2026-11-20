@@ -97,14 +97,16 @@ class ChatEngine:
         return self._locks.setdefault(conv_id, asyncio.Lock())
 
     # ------------------------------------------------------------------ public
-    async def send(self, conv_id: int, text: str) -> AsyncIterator[dict]:
+    async def send(self, conv_id: int, text: str, prepare=None) -> AsyncIterator[dict]:
+        """`prepare(state) -> (state, text)` runs inside the turn lock before the message is saved (used by
+        combat: the app rolls and changes the state, then the result is sent to the GM as this message)."""
         try:
             self.repo.get(conv_id)
         except NotFound as exc:
             yield {"type": "error", "message": str(exc)}
             return
         text = (text or "").strip()
-        if not text:
+        if not text and prepare is None:
             yield {"type": "error", "message": "Empty message."}
             return
         lock = self._lock(conv_id)
@@ -121,7 +123,19 @@ class ChatEngine:
                 note = ""
                 yield {"type": "dice", "roll": rolled.to_dict()}
                 text = rolled.text + note
-            user_msg = self.repo.add_message(conv_id, "user", text)
+            meta = None
+            if prepare is not None:
+                before = self.repo.capture_snapshot(conv_id)  # undo/rewind of this turn also undoes the dice results
+                try:
+                    new_state, line = prepare(self.repo.get_state(conv_id))
+                except ValueError as exc:
+                    yield {"type": "error", "message": str(exc)}
+                    return
+                self.repo.save_state(conv_id, new_state)
+                text = f"{text}\n\n{line}".strip() if text else line
+                meta = {"snapshot": before, "combat": True}
+                yield {"type": "state", "state": new_state, "npcs": self.repo.list_npcs(conv_id), "changes": []}
+            user_msg = self.repo.add_message(conv_id, "user", text, meta)
             self._auto_title(conv_id, text)
             yield {"type": "user_message", "message": user_msg}
             async with aclosing(self._reply(conv_id, user_msg)) as turn:
@@ -241,7 +255,8 @@ class ChatEngine:
         rows = self.repo.list_messages(conv_id, after_id=message_id - 1 if inclusive else message_id, with_snapshot=True)
         if not rows:
             return 0
-        snap_msg = next((m for m in rows if m["role"] == "assistant" and m.get("snapshot")), None)
+        # The first saved state among the removed messages (a combat turn saves one on the player's message).
+        snap_msg = next((m for m in rows if m.get("snapshot")), None)
         if snap_msg:
             self.repo.restore_snapshot(conv_id, snap_msg["snapshot"])
         for m in rows:
@@ -329,7 +344,7 @@ class ChatEngine:
         scenario_name = conv["scenario"].get("name", "")
         if conv["title"] in DEFAULT_TITLES or conv["title"] == scenario_name:
             said = strip_thoughts(text)  # thoughts and GM messages never end up in the title
-            if said and not said.startswith("\U0001F3B2"):
+            if said and not said.startswith(("\U0001F3B2", "\u2694")):
                 self.repo.rename(conv_id, truncate(f"{scenario_name}: {said}" if scenario_name else said, 60))
 
     async def _reply(self, conv_id: int, user_msg: dict) -> AsyncIterator[dict]:
@@ -514,6 +529,8 @@ class ChatEngine:
             updates["new_locations"] = []
         if mode == "character":
             updates["new_npcs"] = []
+        if (state.get("combat") or {}).get("active") or any("\u2694" in u for u, _ in exchanges):
+            updates["hp_change"] = 0  # in a fight the app already applied the damage
 
         new_state, changes = apply_state_updates(state, updates)
         self.repo.save_state(conv_id, new_state)

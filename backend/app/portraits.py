@@ -145,17 +145,24 @@ def portrait_instructions(npcs: list[dict], mode: str = "gm_world") -> str:
              (n["portraits"].get("default") or n["portraits"].get("moods"))]
     if not names:
         return ""
+    standard = {"standard", "happy", "sad", "angry", "disgusted", "disgusted/very angry", "very angry", "blushing"}
+    extra = []
+    for n in npcs:
+        own = [m["label"] for m in (n.get("portraits") or {}).get("moods", []) if m.get("label", "").lower() not in standard]
+        if own and n["name"] in names:
+            extra.append(f"{n['name']}: {', '.join(own)}")
+    extra_line = (" Extra moods some characters have: " + "; ".join(extra) + ".") if extra else ""
     main = next((n for n in npcs if n.get("is_main")), None)
     if mode == "character" and main and main["name"] in names:
         return (
             "## Portrait and emotion\n"
             f"Start EVERY reply with a line  [[show: {main['name']} | Mood]]  that matches {main['name']}'s emotion at that moment. "
-            "Moods: Standard, Happy, Sad, Angry, Disgusted, Blushing. Change it whenever the feeling changes. Never write image links."
+            "Moods: Standard, Happy, Sad, Angry, Disgusted, Blushing." + extra_line + " Change it whenever the feeling changes. Never write image links."
         )
     return (
         "## Portraits\n"
         "To show a character's portrait, write a line  [[show: Name | Mood]]  right before the paragraph where that "
-        "character speaks or acts. Moods: Standard, Happy, Sad, Angry, Disgusted, Blushing. Show at most 2 portraits per "
+        "character speaks or acts. Moods: Standard, Happy, Sad, Angry, Disgusted, Blushing." + extra_line + " Show at most 2 portraits per "
         "reply: the 2 most important characters of the scene, the second one only when its part starts. Never write "
         "image links or URLs; the app inserts the pictures.\n"
         "Characters with portraits: " + ", ".join(names)

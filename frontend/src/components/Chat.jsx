@@ -79,13 +79,14 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
 
   if (isUser) {
     const isDice = m.content.startsWith("\u{1F3B2}");
+    const isCombat = !!m.meta?.combat || m.content.includes("\u2694\uFE0F");
     return (
       <div className={`msg user ${hit || ""}`} data-mid={m.id}>
         {playerPic && portraitStyle !== "off" && <Avatar url={playerPic} title="You" size="small" />}
         <div className="user-col">
           {editing ? editor : (
             <>
-              <div className={`bubble ${isDice ? "dice" : ""}`}><Markdown text={showThoughts(m.content)} /></div>
+              <div className={`bubble ${isDice ? "dice" : ""} ${isCombat ? "combat-card" : ""}`}><Markdown text={showThoughts(m.content)} /></div>
               {m.meta?.edited && <div className="muted tiny edited">edited</div>}
               {actions}
             </>
