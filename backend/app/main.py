@@ -26,7 +26,8 @@ from .maps import MapError, generate as generate_map
 from .jukebox import MOODS as MUSIC_MOODS
 from .jukebox import MusicError
 from .rulebooks import RulebookError, ocr_available
-from .images import UPLOAD_NAME, ImageError, get_image, save_upload
+from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
+from .scenes import is_pollinations, polite_fetch
 from .dice import DiceError
 from .engine import BusyError
 from .llm import LLMError
@@ -440,7 +441,11 @@ async def uploaded_picture(name: str):
 async def portrait(url: str = Query(...)):
     """A character picture, downloaded once from its link and then served from this PC."""
     try:
-        path = await get_image(url, PORTRAIT_DIR)
+        if is_pollinations(url):  # a scene picture: painted on demand, one at a time, can take up to a minute
+            fetch = lambda u: polite_fetch(u, lambda x: http_fetch(x, timeout=120.0))  # noqa: E731
+            path = await get_image(url, PORTRAIT_DIR, fetch=fetch)
+        else:
+            path = await get_image(url, PORTRAIT_DIR)
     except ImageError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:  # network problems: the picture just doesn't show
@@ -513,6 +518,12 @@ async def chat(conv_id: int, body: dict[str, Any] = Body(...)):
 async def regenerate(conv_id: int):
     svc().conversations.get(conv_id)
     return stream_response(svc().engine.regenerate(conv_id))
+
+
+@app.post("/api/conversations/{conv_id}/messages/{message_id}/scene-picture")
+async def scene_picture(conv_id: int, message_id: int, body: dict[str, Any] = Body(default={})):
+    """Paint the scene of a GM reply (reroll=true: same description, another version)."""
+    return await svc().engine.paint_scene(conv_id, message_id, bool(body.get("reroll")))
 
 
 @app.post("/api/conversations/{conv_id}/fork")

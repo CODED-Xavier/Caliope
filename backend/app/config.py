@@ -47,6 +47,9 @@ DEFAULT_SETTINGS: dict = {
     "skills_char_budget": 3500,       # max characters of attached skill text shared by one card's skills
     # --- Rulebooks ---
     "rules_char_budget": 1400,        # characters of rulebook passages added to a turn (about 350 tokens)
+    # --- Scene pictures (optional, uses the free Pollinations.ai service over the internet) ---
+    "scene_pictures": False,
+    "scene_picture_style": "atmospheric fantasy painting, detailed, cinematic lighting",
 }
 
 

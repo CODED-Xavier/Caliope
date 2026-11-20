@@ -22,6 +22,7 @@ from .conversations import ConversationRepository, NotFound
 from .dice import DiceError, DiceRoller
 from .llm import LLMError
 from .jukebox import guess_mood
+from .scenes import new_seed, picture_url, write_prompt
 from .lorebook import select_entries
 from .memory import MemoryManager
 from .portraits import process_reply
@@ -436,6 +437,7 @@ class ChatEngine:
         yield {"type": "assistant_message", "message": self.repo.get_message(assistant_msg["id"])}
 
         tracker = features["tracker"]
+        place_before = self.repo.get_state(conv_id).get("location", "")
         if is_gm_message(user_msg["content"]):
             pass  # a message to the GM, outside the story: nothing to track or remember
         elif tracker == "off":
@@ -458,6 +460,15 @@ class ChatEngine:
                 else:
                     yield {"type": "state", **result}
 
+        if settings.get("scene_pictures") and not is_gm_message(user_msg["content"]):
+            place_now = self.repo.get_state(conv_id).get("location", "")
+            first = not any(m["meta"].get("scene_picture") for m in self.repo.list_messages(conv_id))
+            new_scene = first or (place_now and place_now != place_before) or "\u2694\ufe0f Combat starts" in user_msg["content"]
+            if new_scene:
+                pic = await self._scene_picture(conv_id, assistant_msg["id"], reply, settings)
+                if pic:
+                    yield {"type": "scene_picture", "message_id": assistant_msg["id"], "picture": pic}
+
         if settings["auto_summary"]:
             t0 = time.perf_counter()
             summary = await self._maybe_summarize(conv_id, settings)
@@ -469,6 +480,39 @@ class ChatEngine:
             self.repo.update_message_meta(assistant_msg["id"], {"timing": timing})
             yield {"type": "timing", "timing": timing}
         yield {"type": "done"}
+
+    async def _scene_picture(self, conv_id: int, message_id: int, text: str, settings: dict,
+                             reroll_of: dict | None = None) -> dict | None:
+        """Write a picture prompt for this scene and attach the picture link to the message (Pollinations paints it
+        when the interface first shows it). A reroll keeps the prompt and changes only the seed."""
+        try:
+            if reroll_of and reroll_of.get("prompt"):
+                prompt = reroll_of["prompt"]
+            else:
+                names = [n["name"] for n in self.repo.list_npcs(conv_id)]
+                state = self.repo.get_state(conv_id)
+                names.append(state["player"].get("name") or "")
+                prompt = await write_prompt(self.llm, text, state, settings.get("scene_picture_style", ""), names)
+        except (LLMError, ValueError) as exc:
+            log.warning("Scene picture prompt failed: %s", exc)
+            return None
+        seed = new_seed()
+        pic = {"prompt": prompt, "seed": seed, "url": picture_url(prompt, seed)}
+        self.repo.update_message_meta(message_id, {"scene_picture": pic})
+        return pic
+
+    async def paint_scene(self, conv_id: int, message_id: int, reroll: bool = False) -> dict:
+        """The 🖼 button: paint the scene of a reply (or another version of its picture)."""
+        msg = self.repo.get_message(message_id)
+        if msg["conversation_id"] != conv_id or msg["role"] != "assistant":
+            raise NotFound("Only the GM's replies can be painted.")
+        if self.is_busy(conv_id):
+            raise BusyError("Wait for the current reply to finish.")
+        pic = await self._scene_picture(conv_id, message_id, msg["content"], self.settings.all(),
+                                        msg["meta"].get("scene_picture") if reroll else None)
+        if not pic:
+            raise LLMError("The model could not describe this scene. Is LM Studio running?")
+        return self.repo.get_message(message_id)
 
     async def _rules_for(self, scenario: dict, query: str, settings: dict) -> tuple[list[dict], list[tuple[str, str]]]:
         """Rulebook passages that fit this turn, and the house rules of the card's books."""

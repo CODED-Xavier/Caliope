@@ -75,6 +75,7 @@ export const api = {
   combatDefaults: (id, system) => request("GET", `/api/conversations/${id}/combat/defaults?system=${system}`),
   combatSuggest: (id, system) => request("POST", `/api/conversations/${id}/combat/suggest`, { system }),
   combatEdit: (id, cid, patch) => request("PATCH", `/api/conversations/${id}/combat/${cid}`, patch),
+  paintScene: (convId, messageId, reroll = false) => request("POST", `/api/conversations/${convId}/messages/${messageId}/scene-picture`, { reroll }),
   music: () => request("GET", "/api/music"),
   async uploadMusic(file, name, tags = []) {
     const qs = new URLSearchParams({ name, tags: tags.join(",") });

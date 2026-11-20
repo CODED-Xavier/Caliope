@@ -1,4 +1,4 @@
-# Local RPG Chat (v0.12: jukebox)
+# Local RPG Chat (v0.13: scene pictures)
 
 A chatbot for RPG and roleplay that runs 100% on your PC: no token limits, no subscription.
 It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
@@ -188,6 +188,18 @@ With **Auto** on, the tracker names the mood of each scene and the player fades 
 **combat** music (**boss** music when the enemy sounds like a boss), and a won fight plays a **victory** song once.
 When no song has a mood, a close one is used (tavern → town → calm…). Browsers only start sound after your first
 click, so press ▶ once per session. Songs from your PC are copied into `backend/data/music`.
+
+## 4h. Scene pictures (v0.13, optional, needs internet)
+
+Settings → **Scene pictures (internet)**. When a new scene starts (the first reply of a game, a new place, a fight),
+the AI writes a short description of the place and the free **Pollinations.ai** service paints it above the reply.
+**🖼** under any GM reply paints that scene; **🎲** on a picture makes another version; **✕** hides it.
+
+- Only the description of the place leaves your PC: names are removed and your messages are never sent.
+- The free service paints one picture at a time, about one a minute (the app waits its turn), up to 768×432 here,
+  with a small logo in the corner. It may refuse some dark scenes.
+- **Picture style** (in Settings) is added to every description: e.g. *oil painting*, *anime style*, *dark gothic illustration*.
+- Pictures are kept on your PC after the first time; the **Aa → Character pictures: Hidden** option hides them too.
 
 ## 5. Tests
 

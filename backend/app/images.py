@@ -51,10 +51,10 @@ def find_cached(cache_dir: Path, url: str) -> Path | None:
 Fetcher = Callable[[str], Awaitable[tuple[bytes, str]]]
 
 
-async def http_fetch(url: str) -> tuple[bytes, str]:
+async def http_fetch(url: str, timeout: float = 20.0) -> tuple[bytes, str]:
     import httpx
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as client:
+    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
         resp = await client.get(url, headers={"User-Agent": "LocalRPGChat/0.6"})
         if resp.status_code != 200:
             raise ImageError(f"The image server answered {resp.status_code}.")

@@ -4,6 +4,34 @@ import { firstMood, hideStatus, moodUrl, portraitSrc, stripTags } from "../portr
 import Story from "./Story.jsx";
 import HelpTip from "./HelpTip.jsx";
 
+/** A picture of the scene, painted by Pollinations.ai the first time it is shown (can take up to a minute). */
+function ScenePicture({ pic, onReroll, canAct }) {
+  const [state, setState] = useState("loading");
+  const [tries, setTries] = useState(0);
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => { setState("loading"); setTries(0); }, [pic.url]);
+  useEffect(() => { // the free service paints one picture at a time: try again a little later
+    if (state !== "error" || tries >= 2) return undefined;
+    const t = setTimeout(() => { setTries((n) => n + 1); setState("loading"); }, 30000);
+    return () => clearTimeout(t);
+  }, [state, tries]);
+  if (hidden) return <button className="link-btn tiny muted" onClick={() => setHidden(false)}>🖼 show scene picture</button>;
+  return (
+    <figure className={`scene-pic ${state}`}>
+      {state !== "error" && (
+        <img key={tries} src={`${portraitSrc(pic.url)}${tries ? `&try=${tries}` : ""}`} alt={pic.prompt} title={pic.prompt}
+          onLoad={() => setState("ok")} onError={() => setState("error")} />
+      )}
+      {state === "loading" && <div className="scene-wait"><span className="spinner" /> Painting the scene… (up to a minute)</div>}
+      {state === "error" && <div className="scene-wait">{tries >= 2 ? "The picture service did not answer. Try 🎲 later." : "The picture service is busy; trying again in 30 s…"}</div>}
+      <figcaption>
+        {canAct && <button className="icon-btn" title="Another version of this picture" onClick={onReroll}>🎲</button>}
+        <button className="icon-btn" title="Hide" onClick={() => setHidden(true)}>✕</button>
+      </figcaption>
+    </figure>
+  );
+}
+
 /** A small round picture beside a message. Hidden when the picture cannot be loaded. */
 function Avatar({ url, title, size }) {
   const [failed, setFailed] = useState(false);
@@ -18,7 +46,7 @@ function speakerAvatar(text, speaker) {
   return { url: moodUrl(speaker.portraits, mood || ""), mood: mood || "", text: stripTags(text) };
 }
 
-const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, hit }) {
+const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, scenePictures, onPaint, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, hit }) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -74,6 +102,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
       {canAct && !isLast && <button className="icon-btn" title="Rewind: delete everything after this message" onClick={() => onRewind(m.id, false)}>⏪</button>}
       {canAct && !isOpening && <button className="icon-btn" title="Delete this message and everything after it" onClick={() => onRewind(m.id, true)}>🗑</button>}
       {canAct && <button className="icon-btn" title="Save point: start a new game from this moment (this game stays as it is)" onClick={() => onFork(m.id)}>⑂</button>}
+      {canAct && scenePictures && !isUser && !m.meta?.scene_picture && <button className="icon-btn" title="Paint this scene (Pollinations.ai)" onClick={() => onPaint(m.id)}>🖼</button>}
     </div>
   );
 
@@ -105,6 +134,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
       {isOpening && <div className="tag">Opening scene</div>}
       {editing ? editor : (
         <>
+          {m.meta?.scene_picture && portraitStyle !== "off" && <ScenePicture pic={m.meta.scene_picture} canAct={canAct} onReroll={() => onPaint(m.id, true)} />}
           <Story text={av ? av.text : m.content} npcs={npcs} known={m.meta?.portraits} portraitStyle={portraitStyle} />
           {m.meta?.edited && <span className="muted tiny edited"> (edited)</span>}
           {m.meta?.interrupted && <div className="muted small">⏹ Stopped early</div>}
@@ -147,7 +177,7 @@ const showThoughts = (t) => (t.trimStart().startsWith("/") && !/^\s*\/roll/i.tes
 // While a reply is being written: hide the status block and any half-written portrait tag at the end.
 const liveText = (t) => hideStatus(t).replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, "");
 
-export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch, portraitStyle = "big" }) {
+export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint }) {
   const [text, setText] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [query, setQuery] = useState("");
@@ -259,7 +289,8 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
       }}>
         <div className="chat-inner">
           {messages.map((m, i) => (
-            <Message key={m.id} m={m} npcs={game.npcs} speaker={speaker} playerPic={playerPic} portraitStyle={portraitStyle} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
+            <Message key={m.id} m={m} npcs={game.npcs} speaker={speaker} playerPic={playerPic} portraitStyle={portraitStyle}
+              scenePictures={scenePictures} onPaint={onPaint} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
               onRegenerate={regenerate} onContinue={onContinue} onFork={onFork}
               hit={m.id === current ? "search-hit current" : hits.includes(m.id) ? "search-hit" : ""} canAct={!busy} lastContext={busy ? null : lastContext}
               onEdit={onEdit} onResend={onResend} onRewind={onRewind} />

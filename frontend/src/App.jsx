@@ -72,6 +72,9 @@ export default function App() {
   const [viewOpen, setViewOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [tracks, setTracks] = useState([]);
+  const [scenePictures, setScenePictures] = useState(false);
+  const loadSettingsFlags = () => api.settings().then((s) => setScenePictures(!!s.scene_pictures)).catch(() => {});
+  useEffect(() => { loadSettingsFlags(); }, []);
   useEffect(() => { api.music().then((r) => setTracks(r.tracks)).catch(() => {}); }, []);
   const setView = (v) => { setViewState(v); try { localStorage.setItem("view", JSON.stringify(v)); } catch { /* private mode */ } };
 
@@ -165,6 +168,9 @@ export default function App() {
       case "continue_start":
         setStream((s) => (s ? { ...s, continuing: true } : s));
         break;
+      case "scene_picture":
+        setGame((g) => (g ? { ...g, messages: g.messages.map((m) => (m.id === ev.message_id ? { ...m, meta: { ...m.meta, scene_picture: ev.picture } } : m)) } : g));
+        break;
       case "message_updated":
         if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
         bufferRef.current = "";
@@ -250,6 +256,13 @@ export default function App() {
       : "Delete everything after this message? The sheet, characters and memories go back to how they were at this point.";
     if (!window.confirm(text)) return;
     try { setGame(await api.rewind(activeId, messageId, inclusive)); setLastContext(null); setMemoryKey((k) => k + 1); refreshConvs(); } catch (e) { setError(e.message); }
+  };
+
+  const paintScene = async (messageId, reroll = false) => {
+    try {
+      const msg = await api.paintScene(activeId, messageId, reroll);
+      setGame((g) => (g ? { ...g, messages: g.messages.map((m) => (m.id === msg.id ? msg : m)) } : g));
+    } catch (e) { setError(e.message); }
   };
 
   const forkAt = async (messageId) => {
@@ -360,7 +373,8 @@ export default function App() {
             <Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
               onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt}
-              follow={view.follow} portraitStyle={view.portraits} searchOpen={searchOpen} onCloseSearch={() => setSearchOpen(false)} />
+              follow={view.follow} portraitStyle={view.portraits} searchOpen={searchOpen}
+              scenePictures={scenePictures} onPaint={paintScene} onCloseSearch={() => setSearchOpen(false)} />
           </>
         ) : (
           <div className="welcome">
@@ -380,7 +394,7 @@ export default function App() {
           onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit} />
       )}
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
-      {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={refreshHealth} />}
+      {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} />}
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}
       {modal === "rulebooks" && <RulebooksModal onClose={() => setModal(null)} />}
       {modal === "jukebox" && <JukeboxModal onClose={() => setModal(null)} onChanged={setTracks} />}

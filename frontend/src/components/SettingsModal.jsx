@@ -98,6 +98,14 @@ export default function SettingsModal({ onClose, onSaved }) {
       <Row label="Summarize old messages" help="auto_summary">
         <input type="checkbox" checked={s.auto_summary} onChange={(e) => set("auto_summary", e.target.checked)} />
       </Row>
+      <Row label="Scene pictures (internet)" help="scene_pictures">
+        <input type="checkbox" checked={!!s.scene_pictures} onChange={(e) => set("scene_pictures", e.target.checked)} />
+      </Row>
+      {s.scene_pictures && (
+        <Row label="Picture style" help="scene_picture_style">
+          <input className="field" value={s.scene_picture_style || ""} onChange={(e) => set("scene_picture_style", e.target.value)} />
+        </Row>
+      )}
       <Row label="Show timing under replies" help="show_timing">
         <input type="checkbox" checked={s.show_timing} onChange={(e) => set("show_timing", e.target.checked)} />
       </Row>
