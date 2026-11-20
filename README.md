@@ -223,6 +223,14 @@ the AI writes a short description of the place and the free **Pollinations.ai** 
 - *Find more*: searches Hugging Face for GGUF models; open a result to see each size (Q4_K_M, Q4_K_S…) with a short note on quality and whether it fits an 8 GB card.
 - *Downloads*: progress and speed; Cancel pauses (Download again resumes), and every file is checked against Hugging Face's published checksum. New models go to LM Studio's folder, so both programs share them.
 
+## 4j. Your world additions (player lorebook)
+
+On the start screen (and later in Journal > *Your world additions*) you can add lore of your own for this game: a great house your character belongs to, a home village, a secret order.
+- They are **canon**: the GM is told they are true and win where the card's lore disagrees (a card with five great houses now has six), and to weave them into the world's politics and history.
+- One line of each entry is always in the prompt; the full text is added when the entry's name or one of its keywords comes up (like the card's lorebook).
+- **✨ New facts from the story** reads the recent story and suggests facts it established about the entry (new members, events); click *Add* on the ones you want, then Save.
+- Your character's Background now keeps up to 900 characters in the prompt (was 400); put long details in a lore entry instead.
+
 ## 5. Tests
 
 ```

@@ -384,3 +384,12 @@ body.resizing { user-select: none; cursor: col-resize; }
 .status-line progress { width: 120px; }
 .side-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .side-tools .btn { justify-content: flex-start; }
+
+/* ---- player lorebook ---- */
+.player-lore { margin: 10px 0; display: flex; flex-direction: column; gap: 6px; }
+.lore-entry { margin: 0; }
+.lore-entry.off { opacity: .6; }
+.lore-head { background: none; border: none; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.lore-body { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.lore-idea { padding: 4px 6px; background: var(--bg2); border-radius: 6px; }
+.lore-body .grow.tiny { white-space: nowrap; }

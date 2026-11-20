@@ -127,6 +127,8 @@ export const api = {
 
   conversations: () => request("GET", "/api/conversations"),
   conversation: (id) => request("GET", `/api/conversations/${id}`),
+  setPlayerLore: (convId, entries) => request("PUT", `/api/conversations/${convId}/player-lore`, { entries }),
+  suggestPlayerLore: (convId, id) => request("POST", `/api/conversations/${convId}/player-lore/suggest`, { id }),
   createConversation: (body) => request("POST", "/api/conversations", body),
   renameConversation: (id, title) => request("PATCH", `/api/conversations/${id}`, { title }),
   deleteConversation: (id) => request("DELETE", `/api/conversations/${id}`),

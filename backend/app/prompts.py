@@ -9,6 +9,7 @@ from .status import split_template
 from .util import estimate_tokens, render_macros, truncate
 from .writing import RULES as WRITING_RULES
 from .writing import for_model
+from .playerlore import always_section, triggered
 
 LANGUAGE_DIRECTIVES = {
     "en": "Write everything in English.",
@@ -129,7 +130,7 @@ def describe_player(state: dict, numbers: bool) -> str:
         lines.append("Skills: " + ", ".join(str(s) for s in p["skills"][:12]))
     for key, label in (("background", "Background"), ("description", "Appearance"), ("traits", "Personality")):
         if p.get(key):
-            lines.append(f"{label}: {truncate(p[key], 400)}")
+            lines.append(f"{label}: {truncate(p[key], 900 if key == 'background' else 400)}")
     rule = ("Always call the player's character by this name and keep these details exactly. Their "
             + ("class, skills and abilities matter: let strengths shine and weaknesses show (a low STR character struggles to lift "
                "heavy things, a wizard understands magic, a fighter reads a fight)." if numbers else
@@ -185,7 +186,7 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
 
 SECTION_ORDER = [
     "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario",
-    "lore_always", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
+    "lore_always", "player_lore", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
     "player", "pinned", "opening", "summary",
 ]
 
@@ -201,7 +202,7 @@ class PromptBuilder:
               skills: list[dict], history: list[dict], settings: dict, pinned: str = "",
               appearance_hint: str = "", lore: tuple[list[dict], list[dict]] = ([], []),
               status_due: bool | None = None, player_name: str = "", rules: list[dict] | None = None,
-              house_rules: list[tuple[str, str]] | None = None) -> tuple[list[dict], dict]:
+              house_rules: list[tuple[str, str]] | None = None, player_lore: list[dict] | None = None) -> tuple[list[dict], dict]:
         """Return (messages, debug_info). History items need id, role, content and meta."""
         ctx = int(settings["context_window"])
         reserve = reply_token_limit(settings) + 150
@@ -222,6 +223,8 @@ class PromptBuilder:
         sections = self._stable_sections(scenario, prompt_npcs, summary, pinned, language, settings, mode, opening, skills)
         sections.update(self._card_sections(scenario, npcs, lore[0], macro))
         sections["writing"] = WRITING_RULES
+        if player_lore:
+            sections["player_lore"] = always_section(player_lore)
         if house_rules:
             sections["house_rules"] = "## House rules (they win over the rulebook)\n" + "\n\n".join(
                 (f"{name}:\n" if len(house_rules) > 1 else "") + text for name, text in house_rules)
@@ -242,6 +245,11 @@ class PromptBuilder:
         used_memories = fit_memories(memories, mem_budget)
         met = [n for n in npcs if n.get("met", True)]
         extra = self._card_volatile(scenario, lore[1], status_due, macro)
+        lore_hits = triggered(player_lore or [], [h["content"] for h in reversed(history)], int(ctx * 0.06))
+        if lore_hits:
+            mine = "## The player's world additions (relevant right now, canon)\n" + "\n\n".join(
+                f"{e['name']}: {e['content']}" for e in lore_hits)
+            extra = mine + ("\n\n" + extra if extra else "")
         if rules:
             ref = "## Rules reference (from the rulebook; apply it, do not quote it at length)\n" + "\n\n".join(
                 f"[{r['book']}, p. {r['page']}{' - ' + r['heading'] if r['heading'] else ''}]\n{r['text']}" for r in rules)
@@ -302,7 +310,7 @@ class PromptBuilder:
             "dropped_sections": dropped,
             "skills": [s["name"] for s in skills],
             "memories": len(used_memories),
-            "lore_entries": [e["name"] or (e["keys"][:1] or ["?"])[0] for e in lore[0] + lore[1]],
+            "lore_entries": [e["name"] or (e["keys"][:1] or ["?"])[0] for e in lore[0] + lore[1]] + [e["name"] for e in lore_hits],
             "status_due": bool(status_due),
             "rules": [f"{r['book']} p.{r['page']} {r['heading']}".strip() for r in (rules or [])],
         }

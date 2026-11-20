@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from "react";
+import PlayerLore from "./PlayerLore.jsx";
+
+const NO_LORE = [];
 import { api } from "../api.js";
 import HelpTip from "./HelpTip.jsx";
 import { abilityMod, fmtMod } from "../utils.js";
@@ -26,6 +29,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   const [busy, setBusy] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState("");
+  const [lore, setLore] = useState([]);
 
   useEffect(() => {
     api.scenario(scenarioId).then((s) => {
@@ -72,13 +76,13 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
     setBusy(true); setError("");
     try {
       if (way === "card") {
-        await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined });
+        await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined, player_lore: lore });
       } else {
         if (!p.name.trim()) { setError("Give your character a name."); setBusy(false); return; }
         const player = { ...p, name: p.name.trim() };
         if (adventure) { player.hp = { current: hp, max: hp }; player.ac = ac; }
         else delete player.stats;
-        await onStart(scenarioId, { setup: "app", player });
+        await onStart(scenarioId, { setup: "app", player, player_lore: lore });
       }
     } catch (e) { setError(e.message); setBusy(false); }
   };
@@ -148,6 +152,8 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
           <input className="field" value={p.traits} onChange={(e) => set("traits", e.target.value)} placeholder="Two or three words are enough" />
         </>
       )}
+
+      <PlayerLore entries={NO_LORE} onChange={setLore} />
 
       {error && <div className="error-text small">{error}</div>}
       <div className="row gap end">

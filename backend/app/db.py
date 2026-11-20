@@ -198,6 +198,7 @@ class Database:
     def _migrate(self) -> None:
         """Bring databases created by older versions up to date (adds missing columns)."""
         self._ensure_column("conversations", "pinned_memory", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column("conversations", "player_lore", "TEXT NOT NULL DEFAULT '[]'")
         self._ensure_column("memories", "participants", "TEXT NOT NULL DEFAULT ''")
         self._ensure_column("npcs", "appearance", "TEXT NOT NULL DEFAULT ''")
         self._ensure_column("npcs", "portraits", "TEXT NOT NULL DEFAULT ''")

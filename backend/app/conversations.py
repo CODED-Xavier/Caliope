@@ -9,6 +9,7 @@ from .scenarios import normalize_portraits, normalize_scenario
 from .state import new_state
 from .portraits import process_reply
 from .util import clamp, now, render_macros
+from .playerlore import clean_entries
 
 NPC_COLUMNS = ("name", "description", "personality", "speech_style", "appearance", "portraits", "in_prompt", "met", "relationship", "notes", "active", "is_main")
 
@@ -20,13 +21,22 @@ class NotFound(Exception):
 PLAYER_FIELDS = ("name", "race", "class", "level", "background", "description", "traits", "stats", "hp", "ac", "skills")
 
 
+
+def _json_list(raw) -> list:
+    try:
+        value = json.loads(raw or "[]")
+    except ValueError:
+        return []
+    return value if isinstance(value, list) else []
+
+
 class ConversationRepository:
     def __init__(self, db: Database):
         self.db = db
 
     # ------------------------------------------------------------ conversations
     def create(self, scenario: dict | None = None, title: str = "", player_name: str | None = None,
-               player: dict | None = None, setup: str = "") -> dict:
+               player: dict | None = None, setup: str = "", player_lore: list | None = None) -> dict:
         """`player` comes from the start screen and is laid over the card's starting sheet.
         `setup` is "app" (made on the start screen), "card" (the card asks in the story) or ""."""
         """Start a new playthrough. `scenario` is a full scenario row (with `data`) or None for freeform."""
@@ -35,8 +45,9 @@ class ConversationRepository:
         ts = now()
         with self.db.transaction():
             cur = self.db.execute(
-                "INSERT INTO conversations(title, scenario_id, scenario_snapshot, created_at, updated_at) VALUES(?,?,?,?,?)",
-                (title or snapshot["name"], scenario["id"] if scenario else None, json.dumps(snapshot, ensure_ascii=False), ts, ts),
+                "INSERT INTO conversations(title, scenario_id, scenario_snapshot, player_lore, created_at, updated_at) VALUES(?,?,?,?,?,?)",
+                (title or snapshot["name"], scenario["id"] if scenario else None, json.dumps(snapshot, ensure_ascii=False),
+                 json.dumps(clean_entries(player_lore or []), ensure_ascii=False), ts, ts),
             )
             conv_id = cur.lastrowid
             template = dict(data.get("player") or {})
@@ -85,6 +96,7 @@ class ConversationRepository:
             "summary": row["summary"],
             "summary_upto": row["summary_upto"],
             "pinned_memory": row.get("pinned_memory", "") or "",
+            "player_lore": _json_list(row.get("player_lore")),
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }
@@ -131,6 +143,12 @@ class ConversationRepository:
         if len(text) > limit:
             raise ValueError(f"The memory box holds at most {limit} characters (you wrote {len(text)}).")
         self.db.execute("UPDATE conversations SET pinned_memory = ? WHERE id = ?", (text, conv_id))
+        return self.get(conv_id)
+
+    def set_player_lore(self, conv_id: int, entries) -> dict:
+        self.get(conv_id)
+        self.db.execute("UPDATE conversations SET player_lore = ? WHERE id = ?",
+                        (json.dumps(clean_entries(entries), ensure_ascii=False), conv_id))
         return self.get(conv_id)
 
     def set_summary(self, conv_id: int, summary: str, upto: int) -> None:
@@ -317,9 +335,10 @@ class ConversationRepository:
         ts = now()
         with self.db.transaction():
             cur = self.db.execute(
-                "INSERT INTO conversations(title, scenario_id, scenario_snapshot, pinned_memory, created_at, updated_at) VALUES(?,?,?,?,?,?)",
+                "INSERT INTO conversations(title, scenario_id, scenario_snapshot, pinned_memory, player_lore, created_at, updated_at) "
+                "VALUES(?,?,?,?,?,?,?)",
                 (title or f"⑂ {conv['title']}", conv["scenario_id"], json.dumps(conv["scenario"], ensure_ascii=False),
-                 conv.get("pinned_memory", ""), ts, ts),
+                 conv.get("pinned_memory", ""), json.dumps(conv.get("player_lore", []), ensure_ascii=False), ts, ts),
             )
             new_id = cur.lastrowid
             self.db.execute("INSERT INTO game_state(conversation_id, data) VALUES(?,?)", (new_id, json.dumps(state, ensure_ascii=False)))

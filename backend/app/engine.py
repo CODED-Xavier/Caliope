@@ -198,7 +198,7 @@ class ChatEngine:
             messages, _debug = self.prompts.build(
                 scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=[],
                 skills=self.skills.attached((scenario.get("skills") or {}).get("attached", [])),
-                history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""),
+                history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""), player_lore=conv.get("player_lore"),
                 lore=lore, player_name=state["player"].get("name") or "", house_rules=house,
             )
             messages.append({"role": "user", "content": CONTINUE_PROMPT})
@@ -375,7 +375,7 @@ class ChatEngine:
         rules, house = await self._rules_for(scenario, said + " " + previous_text[-250:], settings)
         messages, debug = self.prompts.build(
             scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=memories,
-            skills=skills, history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""),
+            skills=skills, history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""), player_lore=conv.get("player_lore"),
             appearance_hint=hint, lore=lore, status_due=self._status_due(conv_id, scenario),
             player_name=state["player"].get("name") or "", rules=rules, house_rules=house,
         )

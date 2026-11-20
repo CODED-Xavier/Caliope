@@ -30,6 +30,7 @@ from .runtime import ENGINE_KEYS, EngineError
 from .modelhub import download_root
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import is_pollinations, polite_fetch
+from .playerlore import parse_suggestions, suggest_prompt
 from .dice import DiceError
 from .engine import BusyError
 from .llm import LLMError
@@ -493,7 +494,8 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
             raise NotFound("Scenario not found")
     player = body.get("player") if isinstance(body.get("player"), dict) else None
     conv = svc().conversations.create(scenario, title=str(body.get("title", "")), player_name=body.get("player_name"),
-                                      player=player, setup=str(body.get("setup") or ""))
+                                      player=player, setup=str(body.get("setup") or ""),
+                                      player_lore=body.get("player_lore") if isinstance(body.get("player_lore"), list) else None)
     return full_conversation(conv["id"])
 
 
@@ -525,6 +527,25 @@ async def set_pinned(conv_id: int, body: dict[str, Any] = Body(...)):
     """The "remember this" box: text the AI always sees and never forgets (limited in size)."""
     limit = int(svc().settings.get("pinned_memory_limit"))
     return svc().conversations.set_pinned(conv_id, str(body.get("text", "")), limit)
+
+
+@app.put("/api/conversations/{conv_id}/player-lore")
+async def set_player_lore(conv_id: int, body: dict[str, Any] = Body(...)):
+    """The player's own lore entries for this game (canon, they win over the card's lore)."""
+    return svc().conversations.set_player_lore(conv_id, body.get("entries"))
+
+
+@app.post("/api/conversations/{conv_id}/player-lore/suggest")
+async def suggest_player_lore(conv_id: int, body: dict[str, Any] = Body(...)):
+    """New facts the story established about one entry (the player chooses which to add)."""
+    conv = svc().conversations.get(conv_id)
+    entry = next((e for e in conv["player_lore"] if e["id"] == body.get("id")), None)
+    if not entry:
+        raise NotFound("Lore entry not found")
+    recent = [m["content"] for m in reversed(svc().conversations.list_messages(conv_id, after_id=conv["summary_upto"]))]
+    text = await svc().llm.chat([{"role": "user", "content": suggest_prompt(entry, conv["summary"], recent)}],
+                                max_tokens=250, temperature=0.3)
+    return {"suggestions": parse_suggestions(text)}
 
 
 @app.delete("/api/conversations/{conv_id}")
