@@ -24,12 +24,12 @@ function Portrait({ name, mood, url, small }) {
 /** A reply with big character portraits above the part where each character speaks or acts. */
 const Story = memo(function Story({ text, npcs, known, portraitStyle = "big" }) {
   const parts = splitStory(String(text || ""), npcs || [], known || {}).filter((p) => portraitStyle !== "off" || p.type === "text");
-  if (parts.length === 1 && parts[0].type === "text") return <Markdown text={parts[0].text} />;
+  if (parts.length === 1 && parts[0].type === "text") return <Markdown text={parts[0].text} story />;
   return (
     <>
       {parts.map((p, i) => (p.type === "portrait"
         ? <Portrait key={i} name={p.name} mood={p.mood} url={p.url} small={portraitStyle === "small"} />
-        : p.text.trim() ? <Markdown key={i} text={p.text} /> : null))}
+        : p.text.trim() ? <Markdown key={i} text={p.text} story /> : null))}
     </>
   );
 });

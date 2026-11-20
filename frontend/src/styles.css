@@ -1,5 +1,6 @@
 :root {
   --bg: #faf9f5; --bg2: #f0eee6; --panel: #ffffff; --text: #1f1e1d; --muted: #6f6e69; --border: #e1ddd0;
+  --narr: #6b6962; --say: #1f1e1d; --think: #7650b0;
   --accent: #c96442; --accent-text: #ffffff; --accent-soft: #f4e4db; --user: #ece8dc;
   --good: #2f855a; --bad: #c0392b; --warn: #b7791f; --shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   --serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
@@ -7,6 +8,7 @@
 }
 [data-theme="dark"] {
   --bg: #262624; --bg2: #1f1e1d; --panel: #30302e; --text: #f3f2ec; --muted: #a2a09a; --border: #3e3d3a;
+  --narr: #a8a59d; --say: #f7f6f2; --think: #b9a3e8;
   --accent: #d97757; --accent-text: #1f1e1d; --accent-soft: #3d2f29; --user: #3a3936;
   --good: #5fbf8a; --bad: #e56b5d; --warn: #e0b04a; --shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
@@ -430,3 +432,15 @@ body.resizing { user-select: none; cursor: col-resize; }
 .powers-editor { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
 .powers-editor .card { display: flex; flex-direction: column; gap: 6px; margin: 0; }
 .powers-editor input[type=color] { width: 30px; height: 28px; padding: 0; border: none; background: none; }
+
+/* ---- story colours: narration and *actions* grey, "speech" bright, 'thoughts' their own colour ---- */
+.app[data-story-colors="on"] .md.story { color: var(--narr); }
+.app[data-story-colors="on"] .md.story em { color: var(--narr); }
+.app[data-story-colors="on"] .md.story .say { color: var(--say); }
+.app[data-story-colors="on"] .md.story .say em { color: var(--say); }
+.app[data-story-colors="on"] .md.story .think { color: var(--think); font-style: italic; }
+.app[data-story-colors="on"] .md.story strong { color: var(--say); }
+.story-colors { flex-wrap: wrap; }
+.color-pick { display: inline-flex; align-items: center; gap: 4px; }
+.color-pick input[type=color] { width: 26px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 4px; background: none; }
+.view-menu select.field { width: auto; flex: 0 0 auto; }

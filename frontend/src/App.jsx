@@ -11,10 +11,16 @@ import { JukeboxModal, JukeboxPlayer } from "./components/Jukebox.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
 import { KIND_LABELS, MODE_LABELS } from "./utils.js";
 
-const VIEW_DEFAULTS = { fontSize: 16, wide: false, compact: false, follow: false, panelWidth: 372, portraits: "big" };
+const VIEW_DEFAULTS = { fontSize: 16, wide: false, compact: false, follow: false, panelWidth: 372, portraits: "big",
+  storyColors: true, narr: "", say: "", think: "" };  // "" = the theme's colour
 function loadView() {
   try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem("view") || "{}") }; } catch { return { ...VIEW_DEFAULTS }; }
 }
+
+const DEFAULT_COLORS = {
+  dark: { narr: "#a8a59d", say: "#f7f6f2", think: "#b9a3e8" },
+  light: { narr: "#6b6962", say: "#1f1e1d", think: "#7650b0" },
+};
 
 /** "Aa" menu: how the story looks and behaves. Saved in this browser. */
 function ViewMenu({ view, setView, onClose }) {
@@ -40,6 +46,18 @@ function ViewMenu({ view, setView, onClose }) {
           <option value="off">Hidden</option>
         </select>
       </div>
+      <label className="check small"><input type="checkbox" checked={view.storyColors !== false} onChange={(e) => set("storyColors", e.target.checked)} />Colour the story: narration, “speech”, ‘thoughts’</label>
+      {view.storyColors !== false && (
+        <div className="row gap center story-colors">
+          {[["narr", "Narration"], ["say", "Speech"], ["think", "Thoughts"]].map(([k, label]) => (
+            <label key={k} className="tiny muted color-pick">
+              <input type="color" value={view[k] || DEFAULT_COLORS[document.documentElement.dataset.theme === "light" ? "light" : "dark"][k]}
+                onChange={(e) => set(k, e.target.value)} />{label}
+            </label>
+          ))}
+          {(view.narr || view.say || view.think) && <button className="link-btn tiny" onClick={() => setView({ ...view, narr: "", say: "", think: "" })}>default</button>}
+        </div>
+      )}
       <label className="check small"><input type="checkbox" checked={view.wide} onChange={(e) => set("wide", e.target.checked)} />Wider story column</label>
       <label className="check small"><input type="checkbox" checked={view.compact} onChange={(e) => set("compact", e.target.checked)} />Compact (less spacing)</label>
       <label className="check small"><input type="checkbox" checked={view.follow} onChange={(e) => set("follow", e.target.checked)} />Follow the text while it is written</label>
@@ -349,7 +367,9 @@ export default function App() {
 
   return (
     <div className={`app ${view.wide ? "wide" : ""} ${view.compact ? "compact" : ""}`}
-      style={{ "--story-font": `${view.fontSize}px`, "--panel-w": `${view.panelWidth}px` }}>
+      style={{ "--story-font": `${view.fontSize}px`, "--panel-w": `${view.panelWidth}px`,
+        ...(view.narr ? { "--narr": view.narr } : {}), ...(view.say ? { "--say": view.say } : {}), ...(view.think ? { "--think": view.think } : {}) }}
+      data-story-colors={view.storyColors === false ? "off" : "on"}>
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => setModal("new")}
         onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onModels={() => setModal("models")} onSettings={() => setModal("settings")}
