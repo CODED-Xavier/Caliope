@@ -120,6 +120,9 @@ export default function SettingsModal({ onClose, onSaved }) {
           <input className="field" value={s.scene_picture_style || ""} onChange={(e) => set("scene_picture_style", e.target.value)} />
         </Row>
       )}
+      <Row label="Open in its own window" help="app_window">
+        <input type="checkbox" checked={s.app_window !== false} onChange={(e) => set("app_window", e.target.checked)} />
+      </Row>
       <Row label="Show timing under replies" help="show_timing">
         <input type="checkbox" checked={s.show_timing} onChange={(e) => set("show_timing", e.target.checked)} />
       </Row>

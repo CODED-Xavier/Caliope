@@ -256,6 +256,10 @@ Card editor > **Resources and powers**: the card's pools (name, maximum, colour,
 - **In fights** the powers are buttons in the Combat tab: the app pays the cost, rolls the hit and damage or the healing, and pools that refill per round do so. Enemy casters (*＋ casts spells* in the fight form, or suggested by the AI) spend from their own pool and fall back to weapons when it runs dry.
 - When the story spends a resource without a button ("you pour your aura into the barrier"), the tracker subtracts it. The GM always sees your pools and is told to show a drained character as drained.
 
+## 4n. Its own window
+
+Play.bat and LocalRPG.exe open the game in a window of its own (Microsoft Edge's app mode, which comes with Windows: no tabs, no address bar), not in a browser tab. The black window is minimized; it still holds the messages and errors. **Closing the game window stops everything.** Settings > *Open in its own window* turns it off (back to a browser tab). If Edge is missing, Chrome or Brave is used, else your normal browser.
+
 ## 5. Tests
 
 ```
