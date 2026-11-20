@@ -48,6 +48,7 @@ def main() -> int:
     say("  Packing the program (a few minutes)...")
     import PyInstaller.__main__
 
+    icon = ROOT / "assets" / "icon.ico"
     PyInstaller.__main__.run([
         str(BACKEND / "desktop.py"), "--name", "LocalRPG", "--onedir", "--console", "--noconfirm", "--clean",
         "--distpath", str(WORK / "dist"), "--workpath", str(WORK / "work"), "--specpath", str(WORK),
@@ -56,6 +57,7 @@ def main() -> int:
         "--add-data", f"{BACKEND / 'app' / 'seed'}{SEP}app/seed",
         "--collect-submodules", "app", "--collect-submodules", "uvicorn",
         "--collect-all", "pypdfium2", "--hidden-import", "pytesseract",
+        *(["--icon", str(icon)] if icon.is_file() else []),
     ])
     built = WORK / "dist" / "LocalRPG"
     if not (built / ("LocalRPG.exe" if sys.platform == "win32" else "LocalRPG")).exists():

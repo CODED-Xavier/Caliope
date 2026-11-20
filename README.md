@@ -239,7 +239,7 @@ Each card can have its own calendar: week days, months and their lengths, what a
 - **Appointments:** "the festival is on Sunday" becomes an appointment on the exact day (counted by the app from the calendar, not by the AI). The GM sees today, the coming week day by day and the appointments, so "in two days" is always right; skipping past an appointment tells you about it. You can add or remove appointments in Journal.
 - Needs the tracker (on by default) to move the clock between skips.
 
-## 4l. Done by the app, not the AI (v1.1)
+## 4l. Done by the app, not the AI (v1.5)
 
 - **Roll buttons:** when the GM asks for a check ("Make a DEX (Stealth) check, DC 13"), a 🎲 button appears under the reply (▲ advantage, ▼ disadvantage). The app adds your sheet's bonus (ability modifier, plus proficiency when the skill or save is on your sheet), rolls, and tells the GM "17 vs DC 13 → ✅ Success".
 - **Quiet turns are faster:** on turns of pure talk the tracker (the second AI call after each reply) is skipped and reads those turns together a little later. Money, items, wounds, travel, quests or a new name make it run at once. Settings > *Skip tracking on quiet turns*.

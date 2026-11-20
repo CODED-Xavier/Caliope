@@ -52,7 +52,7 @@ def needs_build(frontend: Path) -> bool:
     index = frontend / "dist" / "index.html"
     if not index.is_file():
         return True
-    sources = [frontend / "src", frontend / "index.html", frontend / "package.json", frontend / "vite.config.js"]
+    sources = [frontend / "src", frontend / "public", frontend / "index.html", frontend / "package.json", frontend / "vite.config.js"]
     return newest_mtime(sources) > index.stat().st_mtime
 
 
