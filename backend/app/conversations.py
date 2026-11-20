@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 
 from .appearance import normalize_appearance
@@ -11,7 +12,9 @@ from .state import new_state
 from .portraits import process_reply
 from .util import clamp, now, render_macros
 from .playerlore import clean_entries
-from .worldtime import format_now, time_label
+from . import statusbook
+from .cards import resolve_features
+from .worldtime import format_now, time_label, weather_on
 
 NPC_COLUMNS = ("name", "description", "personality", "speech_style", "appearance", "portraits", "in_prompt", "met", "relationship", "notes", "active", "is_main")
 
@@ -59,8 +62,10 @@ class ConversationRepository:
             state = new_state(template, player_name or (player or {}).get("name"))
             cal = data.get("calendar") or {}
             if cal.get("enabled") and cal.get("months"):
-                state["clock"] = {"minutes": 0}
+                state["clock"] = {"minutes": 0, "seed": random.randrange(1, 1_000_000)}
                 state["time"] = time_label(cal, 0)
+                if cal.get("climate", "temperate") != "none":
+                    state["weather"] = weather_on(cal, 0, state["clock"]["seed"])
                 state["date_label"] = format_now(cal, 0)
             if setup in ("app", "card"):
                 state["setup"] = setup
@@ -82,6 +87,10 @@ class ConversationRepository:
             if data.get("opening_message"):
                 opening = render_macros(data["opening_message"], player_name or state["player"].get("name") or "the player", snapshot["name"])
                 opening, extra, met = process_reply(opening, self.list_npcs(conv_id))
+                tpl = statusbook.template_of(data)
+                if tpl and extra.get("status") and resolve_features(data).get("status_by", "app") == "app":
+                    statusbook.harvest(state, tpl, extra["status"])  # the opening's block gives the card's starting values
+                    self.save_state(conv_id, state)
                 for npc_id in met:
                     self.update_npc(npc_id, met=True)
                 self.add_message(conv_id, "assistant", opening, {"opening": True, **extra})

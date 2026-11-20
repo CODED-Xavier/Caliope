@@ -31,6 +31,7 @@ FANTASY = {
 }
 PRESETS = {"earth": EARTH, "fantasy": FANTASY}
 DEFAULT_START = {"year": 1, "month": 1, "day": 1, "hour": 8, "minute": 0, "weekday": 0}
+CLIMATES = ("temperate", "cold", "warm", "dry", "tropical", "none")
 MAX_TURN_MINUTES = 12 * 60
 MAX_SKIP_DAYS = 366
 MAX_EVENTS = 40
@@ -84,6 +85,7 @@ def normalize_calendar(raw) -> dict:
     start["weekday"] = start["weekday"] % len(weekdays)
     return {
         "enabled": bool(raw.get("enabled", False)),
+        "climate": raw.get("climate") if raw.get("climate") in CLIMATES else "temperate",
         "preset": str(raw.get("preset") or ""),
         "weekdays": weekdays,
         "months": months,
@@ -361,18 +363,55 @@ def clock_of(state: dict) -> int:
 
 def advance(state: dict, cal: dict, minutes: int) -> dict:
     minutes = max(0, int(minutes))
-    state["clock"] = {"minutes": clock_of(state) + minutes}
+    state["clock"] = {**(state.get("clock") or {}), "minutes": clock_of(state) + minutes}
     state["time"] = time_label(cal, state["clock"]["minutes"])
+    if cal.get("climate", "temperate") != "none":
+        state["weather"] = weather_on(cal, day_index(cal, state["clock"]["minutes"]), state["clock"].get("seed", 0))
     return state
 
 
-def skip_note(cal: dict, before: int, after: int, passed: list[dict], spec: str) -> str:
+# ------------------------------------------------------------------ weather (rolled by the app, by season)
+WEATHER = {  # season: [(weather, weight)]
+    "winter": [("clear and cold", 3), ("grey and overcast", 3), ("light snow", 3), ("heavy snow", 1), ("freezing fog", 1), ("icy rain", 1)],
+    "spring": [("clear and mild", 3), ("cloudy", 2), ("light rain", 3), ("heavy rain", 1), ("morning fog", 1), ("windy", 1)],
+    "summer": [("clear and hot", 4), ("sunny with a light breeze", 3), ("humid and hazy", 1), ("a thunderstorm", 1), ("cloudy", 1)],
+    "autumn": [("cool and clear", 2), ("overcast", 3), ("drizzle", 2), ("heavy rain", 1), ("windy, leaves blowing", 2), ("fog", 1)],
+}
+CLIMATE_SHIFT = {"cold": {"summer": "spring", "spring": "winter", "autumn": "winter"},
+                 "warm": {"winter": "autumn", "spring": "summer", "autumn": "summer"},
+                 "tropical": {"winter": "summer", "spring": "summer", "autumn": "summer"},
+                 "dry": {}}
+
+
+def season_of(cal: dict, month: int) -> str:
+    f = (month - 0.5) / len(cal["months"])  # where the month falls in the year (northern seasons)
+    return "winter" if f < 2 / 12 or f >= 11 / 12 else "spring" if f < 5 / 12 else "summer" if f < 8 / 12 else "autumn"
+
+
+def weather_on(cal: dict, day: int, seed: int = 0) -> str:
+    """The weather of a day: rolled from the season, and it tends to last a day or two (same seed, same weather)."""
+    import random
+    climate = cal.get("climate", "temperate")
+    season = season_of(cal, date_of_day(cal, day)["month"])
+    season = CLIMATE_SHIFT.get(climate, {}).get(season, season)
+    rng = random.Random(f"{seed}:{day // 2}:{day % 2 if (day * 7 + seed) % 3 == 0 else 0}")
+    options = WEATHER[season]
+    if climate == "dry":
+        options = [(w, n) for w, n in options if not any(x in w for x in ("rain", "snow", "drizzle", "storm", "fog"))] or options
+    if climate == "tropical":
+        options = options + [("a warm downpour", 3)]
+    return rng.choices([w for w, _ in options], weights=[n for _, n in options])[0]
+
+
+def skip_note(cal: dict, before: int, after: int, passed: list[dict], spec: str, seed: int = 0) -> str:
     span = after - before
     dm = day_minutes(cal)
     days, rest = divmod(span, dm)
     hours = round(rest / 60)
     length = ", ".join(x for x in (f"{days} day{'s' * (days != 1)}" if days else "", f"{hours} hour{'s' * (hours != 1)}" if hours else "") if x) or "a few minutes"
     note = f"⏳ Time passes ({length}). It is now {format_now(cal, after)}."
+    if cal.get("climate", "temperate") != "none":
+        note += f" Weather: {weather_on(cal, day_index(cal, after), seed)}."
     if passed:
         note += " On the way: " + "; ".join(f"{cal['weekdays'][date_of_day(cal, e['day'])['weekday']]}: {e['text']}" for e in passed) + "."
     return note
@@ -382,7 +421,7 @@ def gm_notes(state: dict, cal: dict) -> str:
     """The calendar part of the GM notes: now, the coming week, appointments."""
     clock = clock_of(state)
     today = day_index(cal, clock)
-    lines = [f"Now: {format_now(cal, clock)}. {week_ahead(cal, clock)}"]
+    lines = [f"Now: {format_now(cal, clock)}" + (f", weather: {state['weather']}" if state.get("weather") else "") + f". {week_ahead(cal, clock)}"]
     soon = [e for e in state.get("events", []) if today <= e["day"] <= today + len(cal["weekdays"])]
     if soon:
         lines.append("Appointments: " + " | ".join(describe_event(cal, e, today) for e in soon))

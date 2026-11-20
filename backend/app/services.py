@@ -6,6 +6,7 @@ from pathlib import Path
 from .config import DB_PATH, SEED_DIR, SKILLS_DIR, SettingsStore
 from .conversations import ConversationRepository
 from .db import Database
+from .util import set_chars_per_token
 from .dice import DiceRoller
 from .engine import ChatEngine
 from .llm import LLMClient
@@ -25,6 +26,7 @@ class Services:
                  seed_dir: str | Path = SEED_DIR, llm=None):
         self.db = Database(db_path)
         self.settings = SettingsStore(self.db)
+        set_chars_per_token(self.settings.get("chars_per_token"))
         self.llm = llm or LLMClient(self.settings.all)
         self.scenarios = ScenarioRepository(self.db)
         self.scenarios.seed_defaults(Path(seed_dir))

@@ -50,6 +50,7 @@ DEFAULT_SETTINGS: dict = {
     "response_language": "en",     # "en", "pt-BR" or "auto"
     "extra_instructions": "",      # appended to every system prompt
     "state_tracking": True,        # extra model call after each turn to update HP/gold/relationships/memories
+    "tracker_skip": True,          # skip that call on quiet turns (pure talk); it reads them later
     "relationship_max_step": 20,   # max relationship change per turn
     # --- Memory ---
     "auto_summary": True,
@@ -61,6 +62,7 @@ DEFAULT_SETTINGS: dict = {
     "memory_char_budget": 900,    # characters of recalled facts added to each turn
     "memory_min_similarity": 0.40,
     "show_timing": True,
+    "chars_per_token": 3.4,       # measured automatically from the model server's real token counts
     # --- Cards and skills ---
     "default_card_kind": "roleplay",  # type used for new cards: roleplay | adventure
     "skills_char_budget": 3500,       # max characters of attached skill text shared by one card's skills

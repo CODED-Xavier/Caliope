@@ -16,6 +16,10 @@ from contextlib import aclosing
 from typing import AsyncIterator
 
 from .appearance import appearance_seed
+from .checks import find_checks
+from .shop import find_offers, is_trade
+from . import statusbook
+from .signals import needs_tracking, quiet_minutes
 from .cards import resolve_features
 from .config import SettingsStore
 from .conversations import ConversationRepository, NotFound
@@ -31,7 +35,7 @@ from .skills import SkillManager
 from .state import apply_state_updates, normalize_updates
 from .status import split_template
 from .writing import is_gm_message, strip_thoughts
-from .util import clamp, estimate_tokens, extract_json, truncate
+from .util import clamp, estimate_tokens, extract_json, set_chars_per_token, truncate
 from . import worldtime
 
 log = logging.getLogger("rpg.engine")
@@ -100,7 +104,7 @@ class ChatEngine:
         return self._locks.setdefault(conv_id, asyncio.Lock())
 
     # ------------------------------------------------------------------ public
-    async def send(self, conv_id: int, text: str, prepare=None) -> AsyncIterator[dict]:
+    async def send(self, conv_id: int, text: str, prepare=None, kind: str = "combat") -> AsyncIterator[dict]:
         """`prepare(state) -> (state, text)` runs inside the turn lock before the message is saved (used by
         combat: the app rolls and changes the state, then the result is sent to the GM as this message)."""
         try:
@@ -127,7 +131,6 @@ class ChatEngine:
                 yield {"type": "dice", "roll": rolled.to_dict()}
                 text = rolled.text + note
             meta = None
-            kind = "combat"
             if prepare is None:
                 try:
                     prepare, text = self._time_skip(conv_id, text)
@@ -171,7 +174,7 @@ class ChatEngine:
             worldtime.advance(st, cal, minutes)
             st["date_label"] = worldtime.format_now(cal, worldtime.clock_of(st))
             passed = worldtime.events_between(st, cal, before, worldtime.clock_of(st))
-            return st, worldtime.skip_note(cal, before, worldtime.clock_of(st), passed, spec)
+            return st, worldtime.skip_note(cal, before, worldtime.clock_of(st), passed, spec, (st.get("clock") or {}).get("seed", 0))
 
         return prepare, ("" if text.lower().startswith("/wait") else text)
 
@@ -226,10 +229,12 @@ class ChatEngine:
             recent = [m["content"] for m in reversed(history)]
             lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
             _, house = await self._rules_for(scenario, "", settings)
+            tpl = self._status_template(scenario, settings)
             messages, _debug = self.prompts.build(
                 scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=[],
                 skills=self.skills.attached((scenario.get("skills") or {}).get("attached", [])),
-                history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""), player_lore=conv.get("player_lore"),
+                history=history if tpl else with_latest_status(history), settings=settings,
+                app_status=statusbook.render(tpl, state, npcs) if tpl else None, pinned=conv.get("pinned_memory", ""), player_lore=conv.get("player_lore"),
                 lore=lore, player_name=state["player"].get("name") or "", house_rules=house,
             )
             messages.append({"role": "user", "content": CONTINUE_PROMPT})
@@ -406,10 +411,12 @@ class ChatEngine:
         recent = [m["content"] for m in reversed(history)]  # newest first, for the lorebook keyword scan
         lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
         rules, house = await self._rules_for(scenario, query, settings)  # same text as the memory search: embedded once
+        tpl = self._status_template(scenario, settings)  # the card's INFO block, kept by the app
         messages, debug = self.prompts.build(
             scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=memories,
-            skills=skills, history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""), player_lore=conv.get("player_lore"),
-            appearance_hint=hint, lore=lore, status_due=self._status_due(conv_id, scenario),
+            skills=skills, history=history if tpl else with_latest_status(history), settings=settings,
+            app_status=statusbook.render(tpl, state, npcs) if tpl else None, pinned=conv.get("pinned_memory", ""), player_lore=conv.get("player_lore"),
+            appearance_hint=hint, lore=lore, status_due=None if tpl else self._status_due(conv_id, scenario),
             player_name=state["player"].get("name") or "", rules=rules, house_rules=house,
         )
         yield {"type": "context", "debug": debug, "skills": [s["name"] for s in skills],
@@ -447,6 +454,7 @@ class ChatEngine:
             yield {"type": "error", "message": "The model returned an empty reply. Try again or check the model in LM Studio."}
             return
 
+        real_prompt = self._calibrate(messages)
         timing: dict = {}
         if settings.get("show_timing", True):
             written = estimate_tokens(reply)
@@ -455,15 +463,25 @@ class ChatEngine:
                 "first_word_s": round((t_first or t_end) - t_start, 1),
                 "write_s": round(write_s, 1),
                 "tokens_per_s": round(written / write_s, 1),
-                "prompt_tokens": debug["prompt_tokens"],
+                "prompt_tokens": real_prompt or debug["prompt_tokens"],
                 "stable_tokens": debug["stable_tokens"],
                 "volatile_tokens": debug["volatile_tokens"],
             }
         reply, extra, met = process_reply(reply, npcs)
         for npc_id in met:
             self.repo.update_npc(npc_id, met=True)
+        if tpl and extra.get("status"):  # the model wrote the block anyway: keep the card's values it reports
+            st = self.repo.get_state(conv_id)
+            statusbook.harvest(st, tpl, extra.pop("status"))
+            self.repo.save_state(conv_id, st)
         snapshot = self.repo.capture_snapshot(conv_id)
         meta = {"snapshot": snapshot, **extra}
+        asked = find_checks(reply)  # "Make a DEX (Stealth) check, DC 13" becomes a roll button
+        if asked:
+            meta["checks"] = asked
+        offers = find_offers(reply, scenario.get("currency") or "gold")  # "a lantern (5 gold)" becomes a buy button
+        if offers:
+            meta["offers"] = offers
         if timing:
             meta["timing"] = timing
         assistant_msg = self.repo.add_message(conv_id, "assistant", reply, meta)
@@ -482,8 +500,19 @@ class ChatEngine:
                 self.repo.save_state(conv_id, st)
                 yield {"type": "state", "state": st, "npcs": self.repo.list_npcs(conv_id), "changes": []}
         else:
-            count, exchanges = self._tracking_context(conv_id, features["tracker_interval"])
-            if exchanges and count % features["tracker_interval"] == 0:  # the tracker runs every N replies and reads all N exchanges
+            interval = features["tracker_interval"]
+            skip_ok = bool(settings.get("tracker_skip", True))
+            st = self.repo.get_state(conv_id)
+            pending = int(st.get("untracked", 0)) + 1  # exchanges the tracker has not read yet, this one included
+            if skip_ok:
+                known = [n["name"] for n in npcs] + [state["player"].get("name") or ""] + [l["name"] for l in st.get("locations", [])]
+                run = needs_tracking(user_msg["content"], reply, known) or pending >= interval + 1
+            else:
+                run = self.repo.count_replies(conv_id) % interval == 0
+            count, exchanges = self._tracking_context(conv_id, min(pending, 4) if skip_ok else interval)
+            if not run or not exchanges:
+                yield {"type": "state", **self._quiet_turn(conv_id, scenario, user_msg["content"], reply, pending)}
+            else:  # the tracker reads every exchange it has not seen yet
                 yield {"type": "analysis_start"}
                 t0 = time.perf_counter()
                 result = await self._analyze(conv_id, scenario, exchanges, assistant_msg["id"], settings, tracker)
@@ -501,6 +530,11 @@ class ChatEngine:
                 pic = await self._scene_picture(conv_id, assistant_msg["id"], reply, settings)
                 if pic:
                     yield {"type": "scene_picture", "message_id": assistant_msg["id"], "picture": pic}
+
+        if tpl:  # the status block for this reply, filled by the app after the tracker ran
+            block = statusbook.render(tpl, self.repo.get_state(conv_id), self.repo.list_npcs(conv_id))
+            self.repo.update_message_meta(assistant_msg["id"], {"status": block})
+            yield {"type": "message_updated", "message": self.repo.get_message(assistant_msg["id"])}
 
         if settings["auto_summary"]:
             t0 = time.perf_counter()
@@ -557,6 +591,29 @@ class ChatEngine:
         passages = await self.rulebooks.passages_for_turn(ids, query, int(settings.get("rules_char_budget", 1400)))
         return passages, self.rulebooks.house_rules(ids)
 
+    def _calibrate(self, messages: list[dict]) -> int | None:
+        """Learn how many characters make one token for the model in use, from the real count the server reports,
+        so the history is trimmed exactly instead of with a rough guess. Returns the real prompt size."""
+        usage = getattr(self.llm, "last_usage", None) or {}
+        real = int(usage.get("prompt_tokens") or 0)
+        if real <= 50:
+            return None
+        chars = sum(len(m.get("content") or "") for m in messages)
+        measured = chars / max(1, real - 6 * len(messages))  # ~6 tokens of chat template per message
+        old = float(self.settings.get("chars_per_token"))
+        new = round(max(2.5, min(5.0, old * 0.6 + measured * 0.4)), 3)
+        if abs(new - old) >= 0.01:
+            self.settings.update({"chars_per_token": new})
+            set_chars_per_token(new)
+        return real
+
+    @staticmethod
+    def _status_template(scenario: dict, settings: dict) -> str | None:
+        """The card's INFO template when the app writes the block (the default), else None."""
+        if resolve_features(scenario, settings).get("status_by", "app") != "app":
+            return None
+        return statusbook.template_of(scenario)
+
     def _status_due(self, conv_id: int, scenario: dict) -> bool | None:
         """None when the card has no status block; otherwise whether this reply should write one."""
         info = scenario.get("information") or {}
@@ -582,6 +639,20 @@ class ChatEngine:
         pairs.reverse()
         return count, pairs
 
+    def _quiet_turn(self, conv_id: int, scenario: dict, user_text: str, reply: str, pending: int) -> dict:
+        """No tracker this turn: code moves the clock a little and names the music mood; the tracker reads it later."""
+        st = self.repo.get_state(conv_id)
+        st["untracked"] = pending
+        changes: list[str] = []
+        cal = scenario.get("calendar") or {}
+        if cal.get("enabled") and cal.get("months"):
+            changes = self._move_clock(st, cal, {"minutes_passed": quiet_minutes(user_text, reply), "appointments": []})
+        mood = guess_mood(reply)
+        if mood:
+            st["scene_mood"] = mood
+        self.repo.save_state(conv_id, st)
+        return {"state": st, "npcs": self.repo.list_npcs(conv_id), "changes": changes}
+
     @staticmethod
     def _move_clock(state: dict, cal: dict, updates: dict) -> list[str]:
         """The tracker's estimate moves the clock (at most 12 hours a turn); appointments get their exact day."""
@@ -591,11 +662,14 @@ class ChatEngine:
             ev = worldtime.add_event(state, cal, ap["text"], ap.get("when", ""), ap.get("days_from_now"))
             if ev:
                 changes.append("Appointment: " + worldtime.describe_event(cal, ev, worldtime.day_index(cal, before)))
+        weather = state.get("weather")
         worldtime.advance(state, cal, min(updates.get("minutes_passed", 0), worldtime.MAX_TURN_MINUTES))
         after = worldtime.clock_of(state)
         state["date_label"] = worldtime.format_now(cal, after)
         if worldtime.day_index(cal, after) != worldtime.day_index(cal, before):
             changes.append("New day: " + worldtime.format_date(cal, worldtime.now(cal, after)))
+        if state.get("weather") and state.get("weather") != weather:
+            changes.append(f"Weather: {state['weather']}")
         return changes
 
     async def _remember_exchange(self, conv_id: int, user_text: str, reply: str, message_id: int) -> None:
@@ -609,10 +683,12 @@ class ChatEngine:
         npcs = self.repo.list_npcs(conv_id)
         cal = scenario.get("calendar") or {}
         cal_on = bool(cal.get("enabled") and cal.get("months"))
+        tpl = self._status_template(scenario, settings)
+        status_lines = statusbook.tracker_lines(state, tpl) if tpl else ""
         prompt = self.prompts.analysis_messages(scenario=scenario, state=state, npcs=npcs, exchanges=exchanges, tracker=tracker,
-                                                calendar=cal if cal_on else None)
+                                                calendar=cal if cal_on else None, status_fields=status_lines)
         try:
-            raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker, cal_on), temperature=0.2,
+            raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker, cal_on, bool(status_lines)), temperature=0.2,
                                       max_tokens=700 if tracker == "full" else 450)
         except LLMError as exc:
             log.warning("State analysis failed: %s", exc)
@@ -633,10 +709,18 @@ class ChatEngine:
             updates["new_npcs"] = []
         if (state.get("combat") or {}).get("active") or any("\u2694" in u for u, _ in exchanges):
             updates["hp_change"] = 0  # in a fight the app already applied the damage
+        if any(is_trade(u) for u, _ in exchanges):  # the app already moved the money and the items
+            updates["gold_change"] = 0
+            updates["inventory_add"] = updates["inventory_remove"] = []
 
         if cal_on:
             updates["time"] = ""  # the app's clock decides the time of day
+            if cal.get("climate", "temperate") != "none":
+                updates["weather"] = ""  # and the weather
         new_state, changes = apply_state_updates(state, updates)
+        new_state["untracked"] = 0
+        if status_lines:
+            changes += statusbook.apply_changes(new_state, tpl, updates.get("status_changes", []))
         if cal_on:
             changes += self._move_clock(new_state, cal, updates)
         self.repo.save_state(conv_id, new_state)

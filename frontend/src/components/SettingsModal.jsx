@@ -104,6 +104,11 @@ export default function SettingsModal({ onClose, onSaved }) {
       <Row label="Track the sheet automatically" help="state_tracking">
         <input type="checkbox" checked={s.state_tracking} onChange={(e) => set("state_tracking", e.target.checked)} />
       </Row>
+      {s.state_tracking && (
+        <Row label="Skip tracking on quiet turns" help="tracker_skip">
+          <input type="checkbox" checked={s.tracker_skip !== false} onChange={(e) => set("tracker_skip", e.target.checked)} />
+        </Row>
+      )}
       <Row label="Summarize old messages" help="auto_summary">
         <input type="checkbox" checked={s.auto_summary} onChange={(e) => set("auto_summary", e.target.checked)} />
       </Row>

@@ -239,6 +239,16 @@ Each card can have its own calendar: week days, months and their lengths, what a
 - **Appointments:** "the festival is on Sunday" becomes an appointment on the exact day (counted by the app from the calendar, not by the AI). The GM sees today, the coming week day by day and the appointments, so "in two days" is always right; skipping past an appointment tells you about it. You can add or remove appointments in Journal.
 - Needs the tracker (on by default) to move the clock between skips.
 
+## 4l. Done by the app, not the AI (v1.1)
+
+- **Roll buttons:** when the GM asks for a check ("Make a DEX (Stealth) check, DC 13"), a 🎲 button appears under the reply (▲ advantage, ▼ disadvantage). The app adds your sheet's bonus (ability modifier, plus proficiency when the skill or save is on your sheet), rolls, and tells the GM "17 vs DC 13 → ✅ Success".
+- **Quiet turns are faster:** on turns of pure talk the tracker (the second AI call after each reply) is skipped and reads those turns together a little later. Money, items, wounds, travel, quests or a new name make it run at once. Settings > *Skip tracking on quiet turns*.
+- **INFO status block kept by the app** (cards like Lumencia): place, time, items, money, HP, quests and relationships come from the game; the card's own values (Tier, EXP, Crowns...) start from the opening scene and the tracker reports only what changed. The AI no longer writes the block (faster replies, right numbers). Status tab > *Edit the card's values* to correct them. Card editor > Advanced lets a card go back to "Written by the AI".
+- **Weather from the calendar:** with a calendar, the app rolls the day's weather from the season and the card's climate (temperate, cold, warm, tropical, dry, or off). It lasts a day or two and the GM describes it.
+- **Shops and money:** prices in a reply ("a lantern (5 gold)") become 🛒 buttons; buying checks your money, takes it and puts the item in your bag. The Bag tab has a **Pay** box. The tracker never counts those twice. Card editor: *Money is called* (gold, crowns...).
+- **Quests:** the AI can add quests, but only suggests when one is completed or failed; you confirm it in the Bag tab.
+- **Exact prompt size:** the app learns how many characters make one token for your model from the server's real counts, so it keeps as much history as really fits.
+
 ## 5. Tests
 
 ```

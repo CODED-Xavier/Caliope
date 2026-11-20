@@ -210,7 +210,8 @@ class PromptBuilder:
               skills: list[dict], history: list[dict], settings: dict, pinned: str = "",
               appearance_hint: str = "", lore: tuple[list[dict], list[dict]] = ([], []),
               status_due: bool | None = None, player_name: str = "", rules: list[dict] | None = None,
-              house_rules: list[tuple[str, str]] | None = None, player_lore: list[dict] | None = None) -> tuple[list[dict], dict]:
+              house_rules: list[tuple[str, str]] | None = None, player_lore: list[dict] | None = None,
+              app_status: str | None = None) -> tuple[list[dict], dict]:
         """Return (messages, debug_info). History items need id, role, content and meta."""
         ctx = int(settings["context_window"])
         reserve = reply_token_limit(settings) + 150
@@ -229,7 +230,7 @@ class PromptBuilder:
         macro = lambda t: render_macros(t or "", player_name or "the player", main["name"] if main else card_name)
         prompt_npcs = [n for n in npcs if n.get("in_prompt", True)]
         sections = self._stable_sections(scenario, prompt_npcs, summary, pinned, language, settings, mode, opening, skills)
-        sections.update(self._card_sections(scenario, npcs, lore[0], macro))
+        sections.update(self._card_sections(scenario, npcs, lore[0], macro, app_status is not None))
         replies = sum(1 for h in history if h["role"] == "assistant" and not h.get("meta", {}).get("opening"))
         if "card_examples" in sections and (summary or replies >= EXAMPLES_UNTIL):
             sections.pop("card_examples")  # the story itself now shows the style; frees ~300-800 tokens for history
@@ -260,7 +261,7 @@ class PromptBuilder:
 
         used_memories = fit_memories(memories, mem_budget)
         met = [n for n in npcs if n.get("met", True)]
-        extra = self._card_volatile(scenario, lore[1], status_due, macro)
+        extra = self._card_volatile(scenario, lore[1], status_due, macro, app_status)
         if cal_on:
             extra = "## Date and time (kept by the app)\n" + gm_notes(state, cal) + ("\n\n" + extra if extra else "")
         lore_hits = triggered(player_lore or [], [h["content"] for h in reversed(history)], int(ctx * 0.06))
@@ -376,7 +377,7 @@ class PromptBuilder:
         return sec
 
     @staticmethod
-    def _card_sections(scenario: dict, npcs: list[dict], always_lore: list[dict], macro) -> dict[str, str]:
+    def _card_sections(scenario: dict, npcs: list[dict], always_lore: list[dict], macro, app_status: bool = False) -> dict[str, str]:
         """Stable parts that come from an imported card: its long texts, always-on lore, portrait rules."""
         info = scenario.get("information") or {}
         sec: dict[str, str] = {}
@@ -398,7 +399,10 @@ class PromptBuilder:
         if info and features.get("relationships", "app") == "app":
             rules.append("Relationships use the app's scale from -100 to +100 shown in the GM notes. Ignore any other "
                          "affinity scale the card mentions (for example -3 to +3) and never write affinity scores yourself.")
-        if info.get("status_every"):
+        if app_status:
+            rules.append("Never write the INFO status block, even if the card asks for it: the app keeps it and shows it to the "
+                         "player. Its current values are in the GM notes; follow the card's rules for them in the story.")
+        elif info.get("status_every"):
             rules.append("Only write the INFO status block when the GM notes ask for it.")
         pics = portrait_instructions(npcs, scenario.get("mode", "gm_world"))
         if pics:
@@ -409,7 +413,7 @@ class PromptBuilder:
         return sec
 
     @staticmethod
-    def _card_volatile(scenario: dict, triggered: list[dict], status_due: bool | None, macro) -> str:
+    def _card_volatile(scenario: dict, triggered: list[dict], status_due: bool | None, macro, app_status: str | None = None) -> str:
         """Per-turn parts from a card: lorebook entries whose keywords came up, the card's reminders, the status block."""
         info = scenario.get("information") or {}
         parts: list[str] = []
@@ -418,7 +422,9 @@ class PromptBuilder:
         rules, template = split_template(info.get("post_history") or "")
         if rules.strip():
             parts.append("## Card reminders\n" + macro(rules).strip())
-        if template and status_due is not None:
+        if app_status:
+            parts.append("## Status (kept by the app; do not write it)\n" + app_status)
+        elif template and status_due is not None:
             if status_due:
                 parts.append("## Status block\nEnd THIS reply with the status block, exactly in this format:\n" + macro(template))
             else:
@@ -451,7 +457,7 @@ class PromptBuilder:
 
     # ----------------------------------------------------- analysis / summarizing
     def analysis_messages(self, *, scenario: dict, state: dict, npcs: list[dict], exchanges: list[tuple[str, str]],
-                          tracker: str = "full", calendar: dict | None = None) -> list[dict]:
+                          tracker: str = "full", calendar: dict | None = None, status_fields: str = "") -> list[dict]:
         """Ask the model what changed in the latest exchange(s). `lite` skips HP, gold, items and quests."""
         mode = scenario.get("mode", "gm_world")
         npc_names = ", ".join(n["name"] for n in npcs) or "none yet"
@@ -467,7 +473,8 @@ class PromptBuilder:
             ]
         if calendar:
             lines += [
-                "- location: the player's new location name if they moved, else \"\". weather: the new weather if it changed, else \"\".",
+                "- location: the player's new location name if they moved, else \"\"."
+                + ("" if calendar.get("climate", "temperate") != "none" else " weather: the new weather if it changed, else \"\"."),
                 "- minutes_passed: how many in-story minutes the exchange took (a short talk 5, a meal 45, a walk across town 30, "
                 "a night's sleep 480). Do not count time already stated in a line starting with \u23f3 (the app counted it).",
                 "- appointments: future plans with a day that someone states (\"the festival is on Sunday\", \"meet me tomorrow at noon\"): "
@@ -482,6 +489,8 @@ class PromptBuilder:
         lines += [
             "- scene_mood: the feeling of the scene for background music, one of: " + ", ".join(MOODS) + ".",
         ]
+        if status_fields:
+            lines.append(status_fields)
         if full:
             lines += ["- new_locations: newly mentioned places (name, description, connects_to: names of existing places)."]
         lines += [
@@ -563,11 +572,20 @@ _APPOINTMENT = {"type": "object", "properties": {"text": {"type": "string"}, "wh
                                                 "days_from_now": {"type": "integer"}}, "required": ["text", "when", "days_from_now"]}
 
 
-def analysis_schema(tracker: str, calendar: bool = False) -> dict:
+def analysis_schema(tracker: str, calendar: bool = False, status: bool = False) -> dict:
     base = ANALYSIS_SCHEMA if tracker == "full" else ANALYSIS_SCHEMA_LITE
-    if not calendar:
+    if not calendar and not status:
         return base
-    props = {k: v for k, v in base["properties"].items() if k != "time"}
-    props["minutes_passed"] = {"type": "integer"}
-    props["appointments"] = {"type": "array", "items": _APPOINTMENT}
-    return {"type": "object", "properties": props, "required": [k for k in base["required"] if k != "time"] + ["minutes_passed", "appointments"]}
+    props = dict(base["properties"])
+    required = list(base["required"])
+    if calendar:
+        props.pop("time", None)
+        required.remove("time")
+        props["minutes_passed"] = {"type": "integer"}
+        props["appointments"] = {"type": "array", "items": _APPOINTMENT}
+        required += ["minutes_passed", "appointments"]
+    if status:
+        props["status_changes"] = {"type": "array", "items": {"type": "object", "properties": {
+            "field": {"type": "string"}, "value": {"type": "string"}}, "required": ["field", "value"]}}
+        required.append("status_changes")
+    return {"type": "object", "properties": props, "required": required}

@@ -31,6 +31,9 @@ from .modelhub import download_root
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import is_pollinations, polite_fetch
 from .playerlore import parse_suggestions, suggest_prompt
+from .checks import roll_line
+from . import shop
+from . import statusbook
 from . import worldtime
 from .dice import DiceError
 from .engine import BusyError
@@ -565,6 +568,8 @@ def full_conversation(conv_id: int) -> dict:
         "memory_count": s.memory.count(conv_id),
         "pinned_limit": int(s.settings.get("pinned_memory_limit")),
         "features": resolve_features(s.conversations.get(conv_id)["scenario"], s.settings.all()),
+        "status_fields": statusbook.custom_fields(statusbook.template_of(s.conversations.get(conv_id)["scenario"]) or ""),
+        "status_by_app": bool(s.engine._status_template(s.conversations.get(conv_id)["scenario"], s.settings.all())),
     }
 
 
@@ -649,6 +654,49 @@ async def delete_conversation(conv_id: int):
 async def chat(conv_id: int, body: dict[str, Any] = Body(...)):
     svc().conversations.get(conv_id)
     return stream_response(svc().engine.send(conv_id, str(body.get("content", ""))))
+
+
+@app.post("/api/conversations/{conv_id}/check")
+async def roll_check(conv_id: int, body: dict[str, Any] = Body(...)):
+    """Roll a check the GM asked for in its last reply (bonus from the sheet) and send the result to the GM."""
+    s = svc()
+    last = s.conversations.last_message(conv_id)
+    asked = (last or {}).get("meta", {}).get("checks") or []
+    if not last or last["role"] != "assistant" or last["id"] != int(body.get("message_id", 0)):
+        raise ValueError("Only a check from the GM's last reply can be rolled.")
+    index = int(body.get("index", 0))
+    if not 0 <= index < len(asked):
+        raise ValueError("That check is not in the reply.")
+    mode = str(body.get("mode", ""))
+    line = roll_line(s.dice, s.conversations.get_state(conv_id), asked[index], mode if mode in ("advantage", "disadvantage") else "")
+    return stream_response(s.engine.send(conv_id, line))
+
+
+@app.post("/api/conversations/{conv_id}/buy")
+async def buy_offer(conv_id: int, body: dict[str, Any] = Body(...)):
+    """Buy something the GM's last reply offered: the app takes the money and puts the item in the bag."""
+    s = svc()
+    last = s.conversations.last_message(conv_id)
+    offers = (last or {}).get("meta", {}).get("offers") or []
+    if not last or last["role"] != "assistant" or last["id"] != int(body.get("message_id", 0)):
+        raise ValueError("Only things offered in the GM's last reply can be bought.")
+    index = int(body.get("index", 0))
+    if not 0 <= index < len(offers):
+        raise ValueError("That offer is not in the reply.")
+    currency = s.conversations.get(conv_id)["scenario"].get("currency") or "gold"
+    shop.buy(s.conversations.get_state(conv_id), offers[index], int(body.get("qty", 1)), currency)  # fails early when too poor
+    return stream_response(s.engine.send(conv_id, "", prepare=lambda st: shop.buy(st, offers[index], int(body.get("qty", 1)), currency),
+                                         kind="trade"))
+
+
+@app.post("/api/conversations/{conv_id}/pay")
+async def pay_someone(conv_id: int, body: dict[str, Any] = Body(...)):
+    """Pay someone from the Bag tab: the app takes the money and tells the GM."""
+    s = svc()
+    currency = s.conversations.get(conv_id)["scenario"].get("currency") or "gold"
+    args = (int(body.get("amount", 0) or 0), str(body.get("to", "")), str(body.get("why", "")), currency)
+    shop.pay(s.conversations.get_state(conv_id), *args)
+    return stream_response(s.engine.send(conv_id, "", prepare=lambda st: shop.pay(st, *args), kind="trade"))
 
 
 @app.post("/api/conversations/{conv_id}/regenerate")

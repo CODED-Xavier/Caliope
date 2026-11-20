@@ -10,16 +10,19 @@ import PlayerLore from "./PlayerLore.jsx";
 import { CalendarBox } from "./Calendar.jsx";
 
 /* ----------------------------------------------------------------- Status */
-function StatusTab({ messages, every }) {
+function StatusTab({ messages, every, byApp, fields, values, onPatch }) {
   const status = latestStatus(messages);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({});
   if (!status) {
     return (
       <div className="tab-body">
-        <div className="muted small">No status yet. This card's AI writes a status block {every ? `every ${every} replies` : "now and then"}, and it shows up here instead of in the story.</div>
+        <div className="muted small">{byApp ? "The status appears after the first reply." : `No status yet. This card's AI writes a status block ${every ? `every ${every} replies` : "now and then"}, and it shows up here instead of in the story.`}</div>
       </div>
     );
   }
   const lines = status.text.split("\n").map((l) => l.replace(/\*\*/g, "").trim()).filter((l) => l && !/^\[?INFO\]?$/i.test(l));
+  const save = async () => { await onPatch({ card_status: { ...(values || {}), ...draft } }); setEditing(false); };
   return (
     <div className="tab-body status-tab">
       {lines.map((line, i) => {
@@ -35,7 +38,22 @@ function StatusTab({ messages, every }) {
           </div>
         );
       })}
-      <div className="muted tiny">Written by the AI{every ? ` every ${every} replies` : ""}. The app's own relationship meters are in the People tab.</div>
+      {byApp ? (
+        <>
+          <div className="muted tiny">Kept by the app: place, time, items and relationships come from the game; the card's own values change when the story changes them (the tracker reports it). Correct them here if needed.</div>
+          {fields?.length > 0 && !editing && <button className="btn small" onClick={() => { setDraft({}); setEditing(true); }}>✎ Edit the card's values</button>}
+          {editing && (
+            <div className="status-edit">
+              {fields.map((f) => (
+                <label key={f} className="lbl">{f}
+                  <input className="field" defaultValue={(values || {})[f] || ""} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
+                </label>
+              ))}
+              <div className="row gap"><button className="btn small primary" onClick={save}>Save</button><button className="btn small" onClick={() => setEditing(false)}>Cancel</button></div>
+            </div>
+          )}
+        </>
+      ) : <div className="muted tiny">Written by the AI{every ? ` every ${every} replies` : ""}. The app's own relationship meters are in the People tab.</div>}
     </div>
   );
 }
@@ -110,7 +128,27 @@ function SheetTab({ state, onPatch, mode, kind }) {
 }
 
 /* -------------------------------------------------------------------- Bag */
-function BagTab({ state, onPatch }) {
+function PayBox({ gold, currency, onPay, busy }) {
+  const [amount, setAmount] = useState("");
+  const [to, setTo] = useState("");
+  const [why, setWhy] = useState("");
+  const n = parseInt(amount, 10) || 0;
+  return (
+    <form className="pay-box" onSubmit={(e) => { e.preventDefault(); if (n > 0 && n <= gold) { onPay({ amount: n, to, why }); setAmount(""); setTo(""); setWhy(""); } }}>
+      <div className="section-title">💰 {gold} {currency}</div>
+      <div className="row gap">
+        <input className="field num" style={{ width: 64 }} placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <input className="field grow" placeholder="to whom" value={to} onChange={(e) => setTo(e.target.value)} />
+      </div>
+      <div className="row gap">
+        <input className="field grow" placeholder="for what (optional)" value={why} onChange={(e) => setWhy(e.target.value)} />
+        <button className="btn small" type="submit" disabled={busy || n <= 0 || n > gold} title="The app takes the money and tells the GM">Pay</button>
+      </div>
+    </form>
+  );
+}
+
+function BagTab({ state, onPatch, onPay, busy, currency }) {
   const [name, setName] = useState("");
   const [qty, setQty] = useState(1);
   const [quest, setQuest] = useState("");
@@ -118,6 +156,7 @@ function BagTab({ state, onPatch }) {
   const setInv = (next) => onPatch({ inventory: next });
   return (
     <div className="tab-body">
+      {onPay && <PayBox gold={state.gold} currency={currency} onPay={onPay} busy={busy} />}
       <div className="section-title">Inventory ({inv.length})</div>
       {inv.length === 0 && <div className="muted small">Your bag is empty.</div>}
       {inv.map((it, i) => (
@@ -149,6 +188,13 @@ function BagTab({ state, onPatch }) {
             <button className="icon-btn" onClick={() => onPatch({ quests: state.quests.filter((x) => x.id !== q.id) })}>✕</button>
           </div>
           {q.notes && <div className="muted small">{q.notes}</div>}
+          {q.suggested && q.status === "active" && (
+            <div className="quest-suggest small">
+              Looks {q.suggested}.{" "}
+              <button className="btn small" onClick={() => onPatch({ quests: state.quests.map((x) => (x.id === q.id ? { ...x, status: q.suggested, suggested: "" } : x)) })}>✓ Confirm</button>{" "}
+              <button className="btn small ghost" onClick={() => onPatch({ quests: state.quests.map((x) => (x.id === q.id ? { ...x, suggested: "" } : x)) })}>Not yet</button>
+            </div>
+          )}
         </div>
       ))}
       <form className="row gap" onSubmit={(e) => { e.preventDefault(); if (!quest.trim()) return; onPatch({ quests: [...state.quests, { id: Math.random().toString(16).slice(2, 10), title: quest.trim(), status: "active", notes: "" }] }); setQuest(""); }}>
@@ -463,7 +509,7 @@ const TABS = [
   ["journal", "📖", "Journal"],
 ];
 
-export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onCombat, onCombatEdit, style }) {
+export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onPay, onCombat, onCombatEdit, style }) {
   const { state, npcs, conversation } = game;
   const mode = conversation.scenario?.mode;
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
@@ -481,9 +527,11 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         <button className="icon-btn close-panel" onClick={onClose} title="Hide panel">✕</button>
       </div>
       <div className="tab-scroll">
-        {active === "status" && <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every} />}
+        {active === "status" && <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every}
+          byApp={!!game.status_by_app} fields={game.status_fields}
+          values={state.card_status} onPatch={onPatch} />}
         {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} />}
-        {active === "bag" && <BagTab state={state} onPatch={onPatch} />}
+        {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} />}
         {active === "map" && <MapTab state={state} />}
         {active === "combat" && <CombatTab game={game} busy={!canRoll} onCombat={onCombat} onCombatEdit={onCombatEdit} />}

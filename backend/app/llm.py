@@ -86,6 +86,8 @@ class LLMClient:
         self._client = None
         self._auto_model: str | None = None
         self._embed_cache: dict[tuple[str, str], list[float]] = {}  # the same query is often embedded twice a turn
+        self.last_usage: dict | None = None   # real token counts of the last streamed reply (when the server reports them)
+        self._no_usage = False
 
     # ---------------------------------------------------------------- plumbing
     async def _http(self):
@@ -187,35 +189,45 @@ class LLMClient:
         client = await self._http()
         model = await self._resolve_model()
         payload = self._payload(messages, model, True, stop, overrides)
+        if not self._no_usage:
+            payload["stream_options"] = {"include_usage": True}  # the real prompt size, to measure tokens exactly
+        self.last_usage = None
         think = ThinkFilter()
         try:
-            async with client.stream(
-                "POST", f"{self._base()}/chat/completions", json=payload, headers=self._headers()
-            ) as resp:
-                if resp.status_code != 200:
-                    body = (await resp.aread()).decode("utf-8", "replace")
-                    self._auto_model = None
-                    raise LLMError(f"Model server returned {resp.status_code}: {body[:500]}")
-                async for line in resp.aiter_lines():
-                    if not line.startswith("data:"):
+            for attempt in range(2):
+                async with client.stream("POST", f"{self._base()}/chat/completions", json=payload, headers=self._headers()) as resp:
+                    if resp.status_code == 400 and "stream_options" in payload and attempt == 0:
+                        await resp.aread()
+                        self._no_usage = True  # an older server that does not know stream_options: ask again without it
+                        payload.pop("stream_options")
                         continue
-                    data = line[5:].strip()
-                    if data == "[DONE]":
-                        break
-                    try:
-                        obj = json.loads(data)
-                    except ValueError:
-                        continue
-                    if "error" in obj:
-                        raise LLMError(str(obj["error"])[:500])
-                    choices = obj.get("choices") or []
-                    if not choices:
-                        continue
-                    piece = (choices[0].get("delta") or {}).get("content")
-                    if piece:
-                        visible = think.feed(piece)
-                        if visible:
-                            yield visible
+                    if resp.status_code != 200:
+                        body = (await resp.aread()).decode("utf-8", "replace")
+                        self._auto_model = None
+                        raise LLMError(f"Model server returned {resp.status_code}: {body[:500]}")
+                    async for line in resp.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            obj = json.loads(data)
+                        except ValueError:
+                            continue
+                        if "error" in obj:
+                            raise LLMError(str(obj["error"])[:500])
+                        if isinstance(obj.get("usage"), dict):
+                            self.last_usage = obj["usage"]
+                        choices = obj.get("choices") or []
+                        if not choices:
+                            continue
+                        piece = (choices[0].get("delta") or {}).get("content")
+                        if piece:
+                            visible = think.feed(piece)
+                            if visible:
+                                yield visible
+                break
         except httpx.HTTPError as exc:
             raise self._unreachable(exc) from exc
         tail = think.flush()

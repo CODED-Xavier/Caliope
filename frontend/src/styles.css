@@ -408,3 +408,12 @@ body.resizing { user-select: none; cursor: col-resize; }
 .cal-editor .cal-sm { flex: 0 0 64px; width: 64px; text-align: center; }
 .cal-start select.field { flex: 0 1 auto; width: auto; }
 .cal-start { flex-wrap: wrap; }
+
+/* ---- roll buttons for checks the GM asked for ---- */
+.check-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 2px; }
+.check-btn { display: inline-flex; gap: 2px; }
+.check-btn .btn:not(.primary) { padding: 2px 7px; }
+.status-edit { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.status-edit .lbl { display: flex; flex-direction: column; gap: 2px; }
+.pay-box { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.quest-suggest { margin-top: 4px; padding: 4px 6px; background: var(--bg2); border-radius: 6px; }

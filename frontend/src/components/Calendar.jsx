@@ -59,6 +59,16 @@ export function CalendarEditor({ value, onChange }) {
             <label className="lbl">A year is called<input className="field" value={c.year_word} onChange={(e) => set("year_word", e.target.value)} placeholder="year, cycle…" /></label>
             <label className="lbl">Era (after the year)<input className="field" value={c.era} onChange={(e) => set("era", e.target.value)} placeholder="AE, of the Crown…" /></label>
             <label className="lbl">Hours in a day<input className="field num" value={c.hours_per_day} onChange={(e) => set("hours_per_day", num(e.target.value, 24))} /></label>
+            <label className="lbl">Weather (rolled by the app)
+              <select className="field" value={c.climate || "temperate"} onChange={(e) => set("climate", e.target.value)}>
+                <option value="temperate">Temperate (four seasons)</option>
+                <option value="cold">Cold (long winters)</option>
+                <option value="warm">Warm (mild winters)</option>
+                <option value="tropical">Tropical (hot, heavy rains)</option>
+                <option value="dry">Dry (desert, no rain)</option>
+                <option value="none">Off (the AI decides)</option>
+              </select>
+            </label>
           </div>
           <label className="lbl">The story starts on</label>
           <div className="row gap center wrap cal-start">

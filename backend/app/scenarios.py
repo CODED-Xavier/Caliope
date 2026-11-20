@@ -152,6 +152,7 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "rulebooks": _ids(raw.get("rulebooks")),
         "lorebook": normalize_lorebook(raw.get("lorebook")),
         "calendar": normalize_calendar(raw.get("calendar")),
+        "currency": truncate(str(raw.get("currency") or "gold").strip(), 20) or "gold",
         "alternate_openings": [_clip(x, 6000) for x in raw.get("alternate_openings", [])[:10] if str(x).strip()] if isinstance(raw.get("alternate_openings"), list) else [],
         "opening_message": str(raw.get("opening_message", "")),
         "player": raw.get("player") if isinstance(raw.get("player"), dict) else {},

@@ -46,7 +46,26 @@ function speakerAvatar(text, speaker) {
   return { url: moodUrl(speaker.portraits, mood || ""), mood: mood || "", text: stripTags(text) };
 }
 
-const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, scenePictures, onPaint, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, hit }) {
+const CHECK_KIND = { save: "saving throw", check: "check" };
+
+/** Buttons for the rolls the GM just asked for: the app adds the sheet's bonus and tells the GM the result. */
+function CheckButtons({ checks, onCheck }) {
+  return (
+    <div className="check-row">
+      {checks.map((c, i) => (
+        <span key={i} className="check-btn">
+          <button className="btn small primary" onClick={() => onCheck(i, "")} title="Roll with the bonus from your sheet; the result goes to the GM">
+            🎲 {c.skill || c.ability} {CHECK_KIND[c.kind]}{c.dc ? ` · DC ${c.dc}` : ""}
+          </button>
+          <button className="btn small" title="Roll with advantage (two d20, keep the higher)" onClick={() => onCheck(i, "advantage")}>▲</button>
+          <button className="btn small" title="Roll with disadvantage (two d20, keep the lower)" onClick={() => onCheck(i, "disadvantage")}>▼</button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, scenePictures, onPaint, onCheck, onBuy, currency, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, hit }) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -152,6 +171,16 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
               {" "}· prompt ~{m.meta.timing.prompt_tokens} tokens
             </div>
           )}
+          {isLast && canAct && m.meta?.checks?.length > 0 && <CheckButtons checks={m.meta.checks} onCheck={(i, mode) => onCheck(m.id, i, mode)} />}
+          {isLast && canAct && m.meta?.offers?.length > 0 && (
+            <div className="check-row">
+              {m.meta.offers.map((o, i) => (
+                <button key={i} className="btn small" title="Buy one: the app takes the money and puts it in your bag" onClick={() => onBuy(m.id, i)}>
+                  🛒 {o.item} · {o.price} {currency}
+                </button>
+              ))}
+            </div>
+          )}
           {isLastAssistant && lastContext && lastContext.memories.length > 0 && (
             <div className="muted small ctx">🧠 {lastContext.memories.length} memor{lastContext.memories.length === 1 ? "y" : "ies"} recalled</div>
           )}
@@ -177,7 +206,7 @@ const showThoughts = (t) => (t.trimStart().startsWith("/") && !/^\s*\/roll/i.tes
 // While a reply is being written: hide the status block and any half-written portrait tag at the end.
 const liveText = (t) => hideStatus(t).replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, "");
 
-export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint }) {
+export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint, onCheck, onBuy }) {
   const [text, setText] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [query, setQuery] = useState("");
@@ -259,11 +288,13 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
 
   // The same function objects on every render, so the (memoized) messages do not all redraw on every new word.
   const live = useRef({});
-  live.current = { regenerate, onContinue, onFork, onPaint, onEdit, onResend, onRewind };
+  const check = (...args) => { waitingReply.current = true; anchored.current = false; onCheck?.(...args); };
+  const buy = (...args) => { waitingReply.current = true; anchored.current = false; onBuy?.(...args); };
+  live.current = { regenerate, onContinue, onFork, onPaint, onEdit, onResend, onRewind, check, buy };
   const actions = useMemo(() => {
     const call = (name) => (...args) => live.current[name]?.(...args);
     return { regenerate: call("regenerate"), onContinue: call("onContinue"), onFork: call("onFork"), onPaint: call("onPaint"),
-      onEdit: call("onEdit"), onResend: call("onResend"), onRewind: call("onRewind") };
+      onEdit: call("onEdit"), onResend: call("onResend"), onRewind: call("onRewind"), check: call("check"), buy: call("buy") };
   }, []);
 
   const submit = () => {
@@ -299,7 +330,7 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
         <div className="chat-inner">
           {messages.map((m, i) => (
             <Message key={m.id} m={m} npcs={game.npcs} speaker={speaker} playerPic={playerPic} portraitStyle={portraitStyle}
-              scenePictures={scenePictures} onPaint={actions.onPaint} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
+              scenePictures={scenePictures} onPaint={actions.onPaint} onCheck={actions.check} onBuy={actions.buy} currency={game.conversation.scenario?.currency || "gold"} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
               onRegenerate={actions.regenerate} onContinue={actions.onContinue} onFork={actions.onFork}
               hit={m.id === current ? "search-hit current" : hits.includes(m.id) ? "search-hit" : ""} canAct={!busy} lastContext={busy ? null : lastContext}
               onEdit={actions.onEdit} onResend={actions.onResend} onRewind={actions.onRewind} />

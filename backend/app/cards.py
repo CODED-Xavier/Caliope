@@ -19,6 +19,7 @@ PROFILES = {
         "panels": ["sheet", "people", "dice", "journal"],
         "appearance_hints": True,
         "relationships": "app",       # "app": the app's -100..+100 scale wins over any scale written in the card
+        "status_by": "app",           # the card's INFO block: "app" fills it from the game state, "ai" lets the model write it
     },
     "adventure": {
         "tracker": "full",            # also HP, gold, items and quests
@@ -26,6 +27,7 @@ PROFILES = {
         "panels": ["sheet", "bag", "people", "map", "combat", "dice", "journal"],
         "appearance_hints": True,
         "relationships": "app",
+        "status_by": "app",
     },
 }
 
@@ -54,6 +56,8 @@ def normalize_features(raw) -> dict:
         out["appearance_hints"] = raw["appearance_hints"]
     if raw.get("relationships") in ("app", "card"):
         out["relationships"] = raw["relationships"]
+    if raw.get("status_by") in ("app", "ai"):
+        out["status_by"] = raw["status_by"]
     return out
 
 

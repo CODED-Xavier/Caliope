@@ -365,6 +365,10 @@ function Editor({ initial, id, onCancel, onSaved }) {
       <InformationEditor info={d.information} onChange={(v) => set("information", v)} />
       <LorebookEditor book={d.lorebook} onChange={(v) => set("lorebook", v)} />
       <CalendarEditor value={d.calendar} onChange={(v) => set("calendar", v)} />
+      <div className="row gap center">
+        <label className="small">Money is called <HelpTip id="currency" /></label>
+        <input className="field" style={{ width: 140 }} value={d.currency || "gold"} onChange={(e) => set("currency", e.target.value)} />
+      </div>
 
       <SkillPicker attached={d.skills.attached} onChange={(a) => set("skills", { attached: a })} cardText={cardText} />
 
@@ -378,6 +382,15 @@ function Editor({ initial, id, onCancel, onSaved }) {
               <option value="off">Nothing</option>
               <option value="lite">Light (relationships, characters, memories)</option>
               <option value="full">Full (also HP, gold, items, quests)</option>
+            </select>
+          </div>
+        </div>
+        <div className="set-row">
+          <div className="set-label">INFO status block <HelpTip id="status_by" /></div>
+          <div className="set-control">
+            <select className="field" value={d.features.status_by || ""} onChange={(e) => setFeature("status_by", e.target.value)}>
+              <option value="">Kept by the app (default)</option>
+              <option value="ai">Written by the AI</option>
             </select>
           </div>
         </div>

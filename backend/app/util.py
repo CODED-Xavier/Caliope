@@ -12,14 +12,20 @@ def now() -> float:
     return time.time()
 
 
-def estimate_tokens(text: str) -> int:
-    """Cheap token estimate (~3.4 characters per token).
+CHARS_PER_TOKEN = 3.4  # measured from the model server's real counts after each reply (see set_chars_per_token)
 
-    Deliberately a little pessimistic so we never overflow a small context window.
-    """
+
+def set_chars_per_token(value: float) -> None:
+    global CHARS_PER_TOKEN
+    CHARS_PER_TOKEN = max(2.5, min(5.0, float(value)))
+
+
+def estimate_tokens(text: str) -> int:
+    """Token estimate from the measured characters-per-token of the model in use (3.4 until measured),
+    with a 3% safety margin so the small context window never overflows."""
     if not text:
         return 0
-    return int(len(text) / 3.4) + 1
+    return int(len(text) / (CHARS_PER_TOKEN * 0.97)) + 1
 
 
 def slugify(value: str) -> str:

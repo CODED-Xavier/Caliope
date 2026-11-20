@@ -182,12 +182,29 @@ class CardGameTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Gold eyes", system)                   # lorebook-only characters stay out of the fixed part
         self.assertIn("-100 to +100", system)
         self.assertIn("[[show: Name | Mood]]", system)
-        self.assertIn("Do not write the INFO status block", last)
+        self.assertIn("Status (kept by the app; do not write it)", last)
+        self.assertIn("Never write the INFO status block", system)
         self.assertIn("Dan is a new student", system)           # {{user}} replaced
         npcs = {n["name"]: n for n in self.s.conversations.list_npcs(self.cid)}
         self.assertTrue(npcs["Lilia Valenheart"]["met"])
 
+    async def test_status_by_app(self):
+        self.llm.reply = "Story.\n\nINFO\nName: Dan the Bold\nRelationships: Artemis (+5)"
+        await collect(self.s.engine.send(self.cid, "turn 1"))
+        msgs = self.s.conversations.list_messages(self.cid)
+        self.assertEqual(msgs[-1]["content"], "Story.")
+        block = msgs[-1]["meta"]["status"]
+        self.assertTrue(block.startswith("INFO"))
+        self.assertIn("Relationships: Professor Artemis (+0 neutral)", block)  # from the app, not the model's "+5"
+        await collect(self.s.engine.send(self.cid, "turn 2"))
+        history = "\n".join(m["content"] for m in self.llm.stream_calls[-1][1:-1])
+        self.assertNotIn("INFO", history)  # no old blocks in the history: the model is not taught to write them
+
     async def test_status_every_third_reply(self):
+        data = self.s.conversations.get(self.cid)["scenario"]
+        data["features"] = {**data["features"], "status_by": "ai"}
+        sc = self.s.scenarios.create({**data, "name": "AI status"})
+        self.cid = self.s.conversations.create(sc, player_name="Dan")["id"]
         self.llm.reply = "Story.\n\nINFO\nName: Dan\nRelationships: Artemis (+5)"
         for i in range(3):
             await collect(self.s.engine.send(self.cid, f"turn {i}"))

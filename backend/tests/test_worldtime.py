@@ -73,6 +73,22 @@ class CalendarTests(unittest.TestCase):
         self.assertEqual([e["text"] for e in wt.events_between(st, c, 0, 3 * 1440)], ["Harvest festival in the square"])
 
 
+class WeatherTests(unittest.TestCase):
+    def test_seasons_and_persistence(self):
+        c = FANTASY
+        self.assertEqual(wt.season_of(c, 1), "winter")
+        self.assertEqual(wt.season_of(c, 7), "summer")
+        self.assertEqual(wt.weather_on(c, 10, 5), wt.weather_on(c, 10, 5))  # same day, same seed: same weather
+        winter = {wt.weather_on(c, d, 1) for d in range(0, 50)}
+        self.assertTrue(winter <= {w for w, _ in wt.WEATHER["winter"]} | {w for w, _ in wt.WEATHER["autumn"]})
+        dry = dict(c, climate="dry")
+        self.assertFalse(any("rain" in wt.weather_on(dry, d, 3) for d in range(200)))
+        st = {"clock": {"minutes": 0, "seed": 9}}
+        wt.advance(st, c, 1440)
+        self.assertEqual(st["weather"], wt.weather_on(c, wt.day_index(c, 1440), 9))
+        self.assertIsNone(wt.advance({"clock": {"minutes": 0}}, dict(c, climate="none"), 10).get("weather"))
+
+
 class GameTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.llm = FakeLLM()
@@ -82,7 +98,8 @@ class GameTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_start_skip_tracker_and_undo(self):
         st = self.s.conversations.get_state(self.cid)
-        self.assertEqual(st["clock"], {"minutes": 0})
+        self.assertEqual(st["clock"]["minutes"], 0)
+        self.assertTrue(st["weather"])  # rolled by the app from the season
         self.assertIn("Starday, 3 Frostmoon", st["date_label"])
 
         self.llm.analysis = {"minutes_passed": 2000, "appointments": [{"text": "Mira's festival", "when": "Sunday", "days_from_now": 9}],

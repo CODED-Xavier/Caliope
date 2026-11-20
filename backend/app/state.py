@@ -40,6 +40,8 @@ DEFAULT_STATE: dict = {
     "clock": {"minutes": 0},  # world calendar: minutes since the start of the card's starting day (app/worldtime.py)
     "date_label": "",     # "Sunday, 3 Frostmoon, 812 AE · 19:40 (evening)" when the card has a calendar
     "events": [],         # appointments: [{"id", "day", "hour", "text"}]
+    "untracked": 0,       # replies the tracker skipped (quiet turns) and will read next time
+    "card_status": {},    # the card's own INFO-block fields (Tier, EXP...) kept by the app (app/statusbook.py)
 }
 
 TOP_LEVEL_FROM_PLAYER = ("gold", "inventory", "quests", "location", "time", "weather", "scene_mood", "locations")
@@ -95,7 +97,10 @@ def _calendar_part(merged: dict) -> dict:
             events.append({"id": str(e.get("id") or uuid.uuid4().hex[:8]), "day": as_int(e.get("day", 0)),
                            "hour": as_int(hour) if hour not in (None, "") else None, "text": truncate(str(e["text"]).strip(), 160),
                            "date": truncate(str(e.get("date", "")), 60)})
-    return {"clock": {"minutes": max(0, as_int(clock.get("minutes", 0)))}, "events": events[:40],
+    return {"clock": {"minutes": max(0, as_int(clock.get("minutes", 0))), "seed": as_int(clock.get("seed", 0))}, "events": events[:40],
+            "untracked": max(0, as_int(merged.get("untracked", 0))),
+            "card_status": {truncate(str(k), 40): truncate(str(v), 160) for k, v in list(
+                (merged.get("card_status") if isinstance(merged.get("card_status"), dict) else {}).items())[:40]},
             "date_label": truncate(str(merged.get("date_label") or ""), 120)}
 
 
@@ -122,6 +127,8 @@ def normalize_updates(raw) -> dict:
         "new_npcs": [],
         "memories": [],
         "minutes_passed": max(0, as_int(raw.get("minutes_passed", 0))),
+        "status_changes": [{"field": str(c.get("field", "")), "value": str(c.get("value", ""))}
+                           for c in _list(raw.get("status_changes")) if isinstance(c, dict)],
         "appointments": [],
     }
     for ap in _list(raw.get("appointments")):
@@ -217,12 +224,22 @@ def apply_state_updates(state: dict, updates: dict) -> tuple[dict, list[str]]:
         existing = next((x for x in state["quests"] if x["title"].lower() == q["title"].lower()), None)
         if existing:
             if existing["status"] != q["status"]:
-                changes.append(f"Quest '{existing['title']}': {q['status']}")
-            existing["status"] = q["status"]
+                if existing["status"] == "active" and q["status"] in ("completed", "failed"):
+                    # The AI only suggests the end of a quest; the player confirms it in the Bag tab.
+                    if existing.get("suggested") != q["status"]:
+                        existing["suggested"] = q["status"]
+                        changes.append(f"Quest '{existing['title']}' looks {q['status']}: confirm it in the Bag tab")
+                else:
+                    existing["status"] = q["status"]
+                    existing.pop("suggested", None)
+                    changes.append(f"Quest '{existing['title']}': {q['status']}")
             if q["notes"]:
                 existing["notes"] = q["notes"]
         else:
-            state["quests"].append({"id": uuid.uuid4().hex[:8], **q})
+            new = {"id": uuid.uuid4().hex[:8], **q}
+            if q["status"] != "active":  # a quest the AI reports as already over: the player confirms it
+                new.update(status="active", suggested=q["status"])
+            state["quests"].append(new)
             changes.append(f"New quest: {q['title']}")
 
     if updates.get("location"):
