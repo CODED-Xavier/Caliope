@@ -224,3 +224,38 @@ class ContinueTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(last["meta"]["continued"])
         self.assertIn("Continue your last reply", llm.stream_calls[-1][-1]["content"])
         self.assertEqual(len(s.conversations.list_messages(cid)), 3)
+
+
+class UploadTests(unittest.TestCase):
+    def test_save_upload_checks_real_type(self):
+        from app.images import save_upload
+        tmp = Path(tempfile.mkdtemp())
+        png = b"\x89PNG\r\n\x1a\n" + b"x" * 20
+        name = save_upload(png, tmp)
+        self.assertTrue(name.endswith(".png"))
+        self.assertEqual(save_upload(png, tmp), name)  # same picture, same file
+        with self.assertRaises(ImageError):
+            save_upload(b"<script>alert(1)</script>", tmp)
+        with self.assertRaises(ImageError):
+            save_upload(b"", tmp)
+
+    def test_player_portraits_and_local_links(self):
+        from app.state import new_state
+        st = new_state({"portraits": {"default": "/api/uploads/abc.png", "moods": [{"n": 2, "label": "Happy", "url": "javascript:x"}]}})
+        self.assertEqual(st["player"]["portraits"], {"default": "/api/uploads/abc.png", "moods": []})
+
+    def test_character_mode_emotion_rule(self):
+        from app.portraits import portrait_instructions
+        npcs = [{"name": "Mira", "is_main": True, "active": True, "portraits": {"default": "https://x/m.png", "moods": []}}]
+        self.assertIn("Start EVERY reply with a line  [[show: Mira | Mood]]", portrait_instructions(npcs, "character"))
+        self.assertIn("at most 2 portraits", portrait_instructions(npcs, "gm_cast"))
+
+
+class CoverTests(unittest.TestCase):
+    def test_card_list_has_covers(self):
+        s = make_services(FakeLLM())
+        data = parse_card(json.loads(json.dumps(CARD)))["scenario"]
+        sc = s.scenarios.create(data)
+        item = next(x for x in s.scenarios.list() if x["id"] == sc["id"])
+        self.assertEqual(item["covers"][0], f"{BASE}/Lilia/1.png")
+        self.assertLessEqual(len(item["covers"]), 3)

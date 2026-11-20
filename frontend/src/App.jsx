@@ -8,7 +8,7 @@ import SkillsModal from "./components/SkillsModal.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
 import { KIND_LABELS, MODE_LABELS } from "./utils.js";
 
-const VIEW_DEFAULTS = { fontSize: 16, wide: false, compact: false, follow: false, panelWidth: 372 };
+const VIEW_DEFAULTS = { fontSize: 16, wide: false, compact: false, follow: false, panelWidth: 372, portraits: "big" };
 function loadView() {
   try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem("view") || "{}") }; } catch { return { ...VIEW_DEFAULTS }; }
 }
@@ -28,6 +28,14 @@ function ViewMenu({ view, setView, onClose }) {
         <button className="btn small" onClick={() => set("fontSize", Math.max(13, view.fontSize - 1))}>A−</button>
         <span className="small">{view.fontSize}px</span>
         <button className="btn small" onClick={() => set("fontSize", Math.min(24, view.fontSize + 1))}>A+</button>
+      </div>
+      <div className="row gap center">
+        <span className="grow small">Character pictures</span>
+        <select className="field" value={view.portraits} onChange={(e) => set("portraits", e.target.value)}>
+          <option value="big">Big</option>
+          <option value="small">Small</option>
+          <option value="off">Hidden</option>
+        </select>
       </div>
       <label className="check small"><input type="checkbox" checked={view.wide} onChange={(e) => set("wide", e.target.checked)} />Wider story column</label>
       <label className="check small"><input type="checkbox" checked={view.compact} onChange={(e) => set("compact", e.target.checked)} />Compact (less spacing)</label>
@@ -343,7 +351,7 @@ export default function App() {
             <Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
               onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt}
-              follow={view.follow} searchOpen={searchOpen} onCloseSearch={() => setSearchOpen(false)} />
+              follow={view.follow} portraitStyle={view.portraits} searchOpen={searchOpen} onCloseSearch={() => setSearchOpen(false)} />
           </>
         ) : (
           <div className="welcome">

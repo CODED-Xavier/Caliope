@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { MODE_LABELS, timeAgo } from "../utils.js";
 
 export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, onDelete, onSkills, onSettings, health, theme, onToggleTheme }) {
   const online = health?.llm?.ok;
+  const [filter, setFilter] = useState("");
+  const shown = filter.trim() ? convs.filter((c) => (c.title || "").toLowerCase().includes(filter.trim().toLowerCase())) : convs;
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -10,9 +12,11 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, on
       </div>
       <button className="btn primary wide" onClick={onNew}>＋ New game</button>
       <div className="side-label">Your games</div>
+      {convs.length > 6 && <input className="field side-search" placeholder="Find a game…" value={filter} onChange={(e) => setFilter(e.target.value)} />}
       <div className="conv-list">
         {convs.length === 0 && <div className="muted small pad">No games yet. Start one!</div>}
-        {convs.map((c) => (
+        {filter && shown.length === 0 && <div className="muted small pad">No game matches.</div>}
+        {shown.map((c) => (
           <div key={c.id} className={`conv ${c.id === activeId ? "active" : ""}`} onClick={() => onSelect(c.id)} title={c.title}>
             <div className="conv-main">
               <div className="conv-title">{c.title || "Untitled"}</div>

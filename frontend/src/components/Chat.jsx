@@ -1,10 +1,24 @@
 import React, { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Markdown } from "../markdown.jsx";
-import { hideStatus } from "../portraits.js";
+import { firstMood, hideStatus, moodUrl, portraitSrc, stripTags } from "../portraits.js";
 import Story from "./Story.jsx";
 import HelpTip from "./HelpTip.jsx";
 
-const Message = memo(function Message({ m, npcs, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, hit }) {
+/** A small round picture beside a message. Hidden when the picture cannot be loaded. */
+function Avatar({ url, title, size }) {
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) return null;
+  return <img className={`msg-avatar ${size}`} src={portraitSrc(url)} alt={title} title={title} loading="lazy" onError={() => setFailed(true)} />;
+}
+
+/** Character cards: the character's picture beside each reply, in the mood of that reply. */
+function speakerAvatar(text, speaker) {
+  if (!speaker) return null;
+  const mood = firstMood(text);
+  return { url: moodUrl(speaker.portraits, mood || ""), mood: mood || "", text: stripTags(text) };
+}
+
+const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, hit }) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -67,6 +81,7 @@ const Message = memo(function Message({ m, npcs, isLast, isLastAssistant, onRege
     const isDice = m.content.startsWith("\u{1F3B2}");
     return (
       <div className={`msg user ${hit || ""}`} data-mid={m.id}>
+        {playerPic && portraitStyle !== "off" && <Avatar url={playerPic} title="You" size="small" />}
         <div className="user-col">
           {editing ? editor : (
             <>
@@ -81,12 +96,15 @@ const Message = memo(function Message({ m, npcs, isLast, isLastAssistant, onRege
   }
 
   const changes = m.meta?.changes || [];
+  const av = portraitStyle !== "off" ? speakerAvatar(m.content, speaker) : null;
   return (
-    <div className={`msg assistant ${hit || ""}`} data-mid={m.id}>
+    <div className={`msg assistant ${hit || ""} ${av?.url ? `with-avatar ${portraitStyle}` : ""}`} data-mid={m.id}>
+      {av?.url && <Avatar url={av.url} title={`${speaker.name}${av.mood ? ` · ${av.mood}` : ""}`} size={portraitStyle === "small" ? "small" : "big"} />}
+      <div className="msg-body">
       {isOpening && <div className="tag">Opening scene</div>}
       {editing ? editor : (
         <>
-          <Story text={m.content} npcs={npcs} known={m.meta?.portraits} />
+          <Story text={av ? av.text : m.content} npcs={npcs} known={m.meta?.portraits} portraitStyle={portraitStyle} />
           {m.meta?.edited && <span className="muted tiny edited"> (edited)</span>}
           {m.meta?.interrupted && <div className="muted small">⏹ Stopped early</div>}
           {changes.length > 0 && (
@@ -109,6 +127,7 @@ const Message = memo(function Message({ m, npcs, isLast, isLastAssistant, onRege
           {actions}
         </>
       )}
+      </div>
     </div>
   );
 });
@@ -124,7 +143,7 @@ const showThoughts = (t) => (t.trimStart().startsWith("/") && !/^\s*\/roll/i.tes
 // While a reply is being written: hide the status block and any half-written portrait tag at the end.
 const liveText = (t) => hideStatus(t).replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, "");
 
-export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch }) {
+export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch, portraitStyle = "big" }) {
   const [text, setText] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [query, setQuery] = useState("");
@@ -135,6 +154,11 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
   const anchored = useRef(false); // the start of the new reply was already brought into view
   const taRef = useRef(null);
   const messages = game.messages;
+  const mode = game.conversation.scenario?.mode;
+  const main = game.npcs.find((n) => n.is_main);
+  const speaker = mode === "character" && main && (main.portraits?.default || main.portraits?.moods?.length) ? main : null;
+  const playerPic = game.state?.player?.portraits?.default || "";
+  const streamAv = stream?.text && portraitStyle !== "off" ? speakerAvatar(liveText(stream.text), speaker) : null;
   const lastAssistantIdx = (() => { for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === "assistant") return i; return -1; })();
 
   const toBottom = (smooth) => {
@@ -231,7 +255,7 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
       }}>
         <div className="chat-inner">
           {messages.map((m, i) => (
-            <Message key={m.id} m={m} npcs={game.npcs} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
+            <Message key={m.id} m={m} npcs={game.npcs} speaker={speaker} playerPic={playerPic} portraitStyle={portraitStyle} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
               onRegenerate={regenerate} onContinue={onContinue} onFork={onFork}
               hit={m.id === current ? "search-hit current" : hits.includes(m.id) ? "search-hit" : ""} canAct={!busy} lastContext={busy ? null : lastContext}
               onEdit={onEdit} onResend={onResend} onRewind={onRewind} />
@@ -243,14 +267,17 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
             </div>
           )}
           {stream && (
-            <div className="msg assistant streaming" ref={streamRef}>
+            <div className={`msg assistant streaming ${streamAv?.url ? `with-avatar ${portraitStyle}` : ""}`} ref={streamRef}>
+              {streamAv?.url && <Avatar url={streamAv.url} title={speaker.name} size={portraitStyle === "small" ? "small" : "big"} />}
+              <div className="msg-body">
               {stream.continuing && <div className="muted tiny">continuing…</div>}
-              {stream.text ? <Story text={liveText(stream.text)} npcs={game.npcs} /> : null}
+              {stream.text ? <Story text={streamAv ? streamAv.text : liveText(stream.text)} npcs={game.npcs} portraitStyle={portraitStyle} /> : null}
               {stream.phase === "writing" && <span className="cursor">▍</span>}
-              {PHASES[stream.phase] && <div className="muted small phase"><span className="spinner" /> {PHASES[stream.phase]}</div>}
+              {PHASES[stream.phase] && <div className="muted small phase">{stream.phase === "thinking" ? <span className="typing"><i /><i /><i /></span> : <span className="spinner" />} {PHASES[stream.phase]}</div>}
               {stream.context && stream.context.memories.length > 0 && (
                 <div className="muted small ctx">🧠 {stream.context.memories.length} memories recalled</div>
               )}
+              </div>
             </div>
           )}
           {error && (

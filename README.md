@@ -1,4 +1,4 @@
-# Local RPG Chat (v0.7: start screens and writing rules)
+# Local RPG Chat (v0.8: avatars and moods)
 
 A chatbot for RPG and roleplay that runs 100% on your PC: no token limits, no subscription.
 It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
@@ -110,6 +110,14 @@ Thoughts are never read by the tracker and never stored as memories.
 - **Aa** menu: text size, wider column, compact mode. Drag the left edge of the side panel to resize it.
 - **🔍** (or Ctrl+F) searches the story. **⤓** exports it as a Markdown file.
 - **⑂ Save point** on any message starts a new game from that moment (sheet, characters and memories as they were). The original game is not changed.
+
+## 4d. Pictures and moods (v0.8)
+
+- **Your picture**: click the circle next to your name on the Sheet tab. It shows beside your messages.
+- **Character pictures**: open a character in the People tab (or in the card editor) → *Pictures and moods*. There is a main picture plus Standard, Happy, Sad, Angry, Disgusted and Blushing. Each slot takes a picture from your PC (⬆) or a link (🔗). Empty moods use the main picture.
+- **Emotions**: on character cards the character's picture sits beside every reply and changes with the mood of that reply (the AI starts each reply with `[[show: Name | Mood]]`). On Game Master cards the pictures appear above the part where each character speaks.
+- **Aa → Character pictures**: Big, Small (a name chip) or Hidden.
+- Pictures from your PC are saved in `backend/data/portraits/uploads`. Pictures from links are downloaded once into `backend/data/portraits`.
 
 ## 5. Tests
 
