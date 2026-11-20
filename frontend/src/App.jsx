@@ -8,6 +8,7 @@ import SkillsModal from "./components/SkillsModal.jsx";
 import RulebooksModal from "./components/RulebooksModal.jsx";
 import { TABS as PANEL_TABS } from "./components/SidePanel.jsx";
 import ModelsModal from "./components/ModelsModal.jsx";
+import MuseModal from "./components/MuseModal.jsx";
 import { JukeboxModal, JukeboxPlayer } from "./components/Jukebox.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
 import { KIND_LABELS, MODE_LABELS } from "./utils.js";
@@ -384,7 +385,7 @@ export default function App() {
       data-story-colors={view.storyColors === false ? "off" : "on"}>
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => setModal("new")}
-        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onModels={() => setModal("models")} onSettings={() => setModal("settings")}
+        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onModels={() => setModal("models")} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         collapsed={view.sideCollapsed} onCollapse={setSideCollapsed}
       />
@@ -443,6 +444,7 @@ export default function App() {
           onLoreSaved={(conv) => setGame((g) => (g ? { ...g, conversation: { ...g.conversation, player_lore: conv.player_lore } } : g))}
           onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit} />
       )}
+      {modal === "muse" && <MuseModal onClose={() => setModal(null)} />}
       {modal === "models" && <ModelsModal onClose={() => { setModal(null); refreshHealth(); }} />}
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} />}

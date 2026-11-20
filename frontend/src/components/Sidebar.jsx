@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { MODE_LABELS, timeAgo } from "../utils.js";
 
-export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, onDelete, onSkills, onRulebooks, onModels, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
+export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, onDelete, onSkills, onRulebooks, onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
   const online = health?.llm?.ok;
   const [filter, setFilter] = useState("");
   if (collapsed) {
@@ -10,6 +10,7 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, on
         <button className="icon-btn" title="Show your games" onClick={() => onCollapse(false)}>☰</button>
         <button className="icon-btn rail-new" title="New game" onClick={onNew}>＋</button>
         <span className="grow" />
+        <button className="icon-btn" title="The Muse: write stories and cards" onClick={onMuse}>🪶</button>
         <button className="icon-btn" title="Download and manage AI models" onClick={onModels}>🧠</button>
         <button className="icon-btn" title="Skills" onClick={onSkills}>🧩</button>
         <button className="icon-btn" title="Rulebooks" onClick={onRulebooks}>📚</button>
@@ -52,6 +53,7 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, on
           {online ? "Model server online" : "Model server offline"}
         </button>
         <div className="side-tools">
+          <button className="btn ghost grow muse-btn" onClick={onMuse} title="Write stories and cards with the Muse">🪶 The Muse</button>
           <button className="btn ghost grow" onClick={onSkills}>🧩 Skills</button>
           <button className="btn ghost grow" onClick={onRulebooks} title="Rulebooks">📚 Rules</button>
           <button className="btn ghost grow" onClick={onModels} title="Download and manage AI models">🧠 Models</button>

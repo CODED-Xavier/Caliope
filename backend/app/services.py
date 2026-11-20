@@ -17,6 +17,7 @@ from .memory import MemoryManager
 from .rulebooks import RulebookRepository
 from .runtime import EngineManager
 from .modelhub import ModelHub
+from .muse import Muse
 from .scenarios import ScenarioRepository
 from .skills import SkillManager
 
@@ -39,6 +40,7 @@ class Services:
         self.maps = MapRepository(self.db)
         self.music = MusicLibrary(self.db, Path(db_path).parent / "music")
         self.runtime = EngineManager(self.settings.all)
+        self.muse = Muse(self.db, self.llm, self.settings.all)
         self.models = ModelHub(self.db, self.runtime, self.settings.all, self.settings.update)
         self.engine = ChatEngine(self.conversations, self.settings, self.llm, self.memory, self.skills, self.dice,
                                  rulebooks=self.rulebooks)

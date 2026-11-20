@@ -42,7 +42,7 @@ from . import worldtime
 from .dice import DiceError
 from .engine import BusyError
 from .llm import LLMError
-from .scenarios import generate_scenario
+from .scenarios import generate_scenario, normalize_scenario
 from .services import Services
 from .skills import SkillError
 from .state import normalize_state
@@ -509,6 +509,70 @@ async def import_card(body: dict[str, Any] = Body(...)):
     if str(body.get("name", "")).strip():
         data["name"] = str(body["name"]).strip()
     return svc().scenarios.create(data)
+
+
+# ------------------------------------------------------------------ the Muse (writer's room)
+_MUSE_LOCK = asyncio.Lock()
+
+
+@app.get("/api/muse")
+async def muse_list():
+    return svc().muse.list()
+
+
+@app.post("/api/muse")
+async def muse_create(body: dict = Body(default={})):
+    return svc().muse.create(str(body.get("title", "")))
+
+
+@app.get("/api/muse/{talk_id}")
+async def muse_get(talk_id: int):
+    return svc().muse.get(talk_id)
+
+
+@app.patch("/api/muse/{talk_id}")
+async def muse_rename(talk_id: int, body: dict = Body(...)):
+    return svc().muse.rename(talk_id, str(body.get("title", "")))
+
+
+@app.delete("/api/muse/{talk_id}")
+async def muse_delete(talk_id: int):
+    svc().muse.delete(talk_id)
+    return {"deleted": True}
+
+
+@app.post("/api/muse/{talk_id}/undo")
+async def muse_undo(talk_id: int):
+    svc().muse.undo_last(talk_id)
+    return svc().muse.get(talk_id)
+
+
+async def _one_at_a_time(events):
+    if _MUSE_LOCK.locked():
+        yield {"type": "error", "message": "The Muse is still busy with the last request."}
+        return
+    async with _MUSE_LOCK:
+        async with aclosing(events) as stream:
+            async for e in stream:
+                yield e
+
+
+@app.post("/api/muse/{talk_id}/message")
+async def muse_message(talk_id: int, body: dict = Body(...)):
+    svc().muse.get(talk_id)
+    return stream_response(_one_at_a_time(svc().muse.talk(talk_id, str(body.get("content", "")))))
+
+
+@app.post("/api/muse/{talk_id}/card")
+async def muse_card(talk_id: int):
+    svc().muse.get(talk_id)
+    return stream_response(_one_at_a_time(svc().muse.make_card(talk_id)))
+
+
+@app.post("/api/cards/export")
+async def card_to_file(body: dict = Body(...)):
+    """A card the Muse made, as a standard Character Card file (without adding it to Calíope)."""
+    return export_card(normalize_scenario(body.get("card") or {}))
 
 
 # ------------------------------------------------------------------ a card's pictures from a folder on this PC

@@ -478,3 +478,16 @@ body.resizing { user-select: none; cursor: col-resize; }
 .starts-pick { flex-wrap: wrap; }
 .pics-folder { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
 .pics-found { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+
+/* the Muse */
+.muse { display: flex; gap: 12px; height: min(70vh, 720px); }
+.muse-list { width: 210px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; border-right: 1px solid var(--border); padding-right: 10px; }
+.muse-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.muse-msgs { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+.muse-empty { margin: auto; max-width: 440px; text-align: center; }
+.muse-card { border-color: var(--accent-2); }
+.muse-btn { color: var(--accent-2); }
+.pre { white-space: pre-wrap; }
+.muse .composer { max-width: none; width: 100%; margin: 0; }
+.muse .composer textarea { flex: 1; }
+.muse-list .conv { display: block; }

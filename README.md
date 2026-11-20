@@ -269,6 +269,10 @@ Play.bat and Caliope.exe open the game in a window of its own (Microsoft Edge's 
 - **Pictures from a folder** (card editor, *Characters*): pick a folder with one subfolder per character holding `1.png`…`6.png` (1 Standard, 2 Happy, 3 Sad, 4 Angry, 5 Disgusted, 6 Blushing), or a single `Name.png`. Names match without caring about capitals, accents or a missing surname; a preview shows what matched and lets you assign the rest by hand. Missing moods use the closest one. The pictures are copied into the app (`data\cardpics`) and also replace them in games already using the card. Run it again whenever you add pictures.
 - **Private cloud (Cloudflare R2)**: Settings > *Pictures in the cloud* takes your R2 account ID, bucket and keys; ☁ in the card editor uploads the card's pictures. The bucket stays private: the app signs every download, keeps a copy on this PC, and the card only holds `r2:` links that nobody else can open.
 
+## 4p. The Muse (v2.2)
+**🪶 The Muse** (left sidebar) is a writer's room with the same model that plays your games: brainstorm worlds, characters, a new route for a card. Talks are saved; long talks are summarized as they go. **↶ Undo last** removes her last answer to ask differently.
+**✨ Make it a card** turns the talk into a card, asking the model for one piece at a time (title, pitch, world, tone, each character's sheet, the opening) so the card always comes out valid. The preview offers **＋ Add to Calíope** (it appears in New game, ✎ to edit) or **⤓ Save file** (a standard Character Card JSON you can import later). It takes one or two minutes on an RX 580. The Muse and a game share the model, so one waits for the other.
+
 ## 5. Tests
 
 ```
