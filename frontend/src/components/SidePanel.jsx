@@ -8,6 +8,7 @@ import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from 
 import { latestStatus, portraitSrc } from "../portraits.js";
 import PlayerLore from "./PlayerLore.jsx";
 import { CalendarBox } from "./Calendar.jsx";
+import { CantosBox, MapBag } from "./Cantos.jsx";
 
 /* ----------------------------------------------------------------- Status */
 function StatusTab({ messages, every, byApp, fields, values, onPatch }) {
@@ -404,7 +405,7 @@ function layoutNodes(locations, current) {
   return { pos, edges, W, H };
 }
 
-function MapTab({ state }) {
+function MapTab({ state, convId, refreshKey }) {
   const locs = state.locations;
   const [sel, setSel] = useState(null);
   const key = JSON.stringify(locs.map((l) => [l.name, l.connections]));
@@ -440,6 +441,7 @@ function MapTab({ state }) {
           {chosen.connections.length > 0 && <div className="muted small">Connects to: {chosen.connections.join(", ")}</div>}
         </div>
       )}
+      <MapBag convId={convId} refreshKey={refreshKey} />
     </div>
   );
 }
@@ -521,7 +523,7 @@ function PinnedBox({ value, limit, onSave }) {
   );
 }
 
-function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinnedSave, lore, onLoreSaved, state, onState }) {
+function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinnedSave, lore, onLoreSaved, state, onState, cantos, onCantos, busy }) {
   const [mems, setMems] = useState([]);
   const [filter, setFilter] = useState("");
   const [text, setText] = useState("");
@@ -533,6 +535,7 @@ function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinned
   return (
     <div className="tab-body">
       {state?.date_label && <CalendarBox convId={convId} state={state} onState={onState} />}
+      <CantosBox convId={convId} cantos={cantos} onCantos={onCantos} busy={busy} />
       <PinnedBox value={pinned} limit={pinnedLimit} onSave={onPinnedSave} />
       <PlayerLore key={convId} entries={lore} convId={convId} onSaved={onLoreSaved} />
       <div className="section-title">Story so far</div>
@@ -569,12 +572,13 @@ export const TABS = [
   ["journal", "📖", "Journal"],
 ];
 
-export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onPay, onPower, onRest, onCombat, onCombatEdit, style }) {
+export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onPay, onPower, onRest, onCombat, onCombatEdit, onCantos, style }) {
   const { state, npcs, conversation } = game;
   const mode = conversation.scenario?.mode;
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
   const allowed = [...(game.features?.panels || TABS.map(([k]) => k)), ...(state.combat?.active ? ["combat"] : []),
-    ...(Object.keys(state.resources || {}).length || game.card_has_resources ? ["sheet"] : [])];  // resources live on the sheet
+    ...(Object.keys(state.resources || {}).length || game.card_has_resources ? ["sheet"] : []),  // resources live on the sheet
+    ...((game.messages || []).some((m) => m.meta?.scene_picture) ? ["map"] : [])];  // the map bag lives on the map tab
   const tabs = TABS.filter(([k]) => allowed.includes(k));
   const active = tabs.some(([k]) => k === tab) ? tab : tabs[0]?.[0];
   return (
@@ -595,12 +599,13 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
           convId={conversation.id} onState={onStateLoaded} />}
         {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} />}
-        {active === "map" && <MapTab state={state} />}
+        {active === "map" && <MapTab state={state} convId={conversation.id} refreshKey={game.messages?.length} />}
         {active === "combat" && <CombatTab game={game} busy={!canRoll} onCombat={onCombat} onCombatEdit={onCombatEdit} />}
         {active === "dice" && <DiceTab onRollToChat={onRollToChat} canRoll={canRoll} />}
         {active === "journal" && <JournalTab convId={conversation.id} summary={conversation.summary} refreshKey={memoryKey}
           pinned={conversation.pinned_memory} pinnedLimit={game.pinned_limit || 2000} onPinnedSave={onPinnedSave}
-          lore={conversation.player_lore} onLoreSaved={onLoreSaved} state={state} onState={onStateLoaded} />}
+          lore={conversation.player_lore} onLoreSaved={onLoreSaved} state={state} onState={onStateLoaded}
+          cantos={game.cantos} onCantos={onCantos} busy={!canRoll} />}
       </div>
     </aside>
   );

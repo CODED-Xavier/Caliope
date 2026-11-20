@@ -104,6 +104,7 @@ class BusyError(Exception):
 class ChatEngine:
     def __init__(self, repo: ConversationRepository, settings: SettingsStore, llm, memory: MemoryManager,
                  skills: SkillManager, dice: DiceRoller, rulebooks=None):
+        self.cantos = None  # set by Services (chapters, recap, map bag)
         self.repo = repo
         self.settings = settings
         self.llm = llm
@@ -328,6 +329,8 @@ class ChatEngine:
             self.repo.restore_snapshot(conv_id, snap_msg["snapshot"])
         for m in rows:
             self.memory.delete_by_message(m["id"])
+            if m is rows[0] and self.cantos:
+                self.cantos.trim(conv_id, m["id"])
             self.repo.delete_message(m["id"])
         conv = self.repo.get(conv_id)
         if conv["summary"] and conv["summary_upto"] >= rows[0]["id"]:
@@ -418,6 +421,8 @@ class ChatEngine:
             if last.get("snapshot"):  # a fight action or a time skip changed the state before this message
                 self.repo.restore_snapshot(conv_id, last["snapshot"])
             self.repo.delete_message(last["id"])
+            if self.cantos:
+                self.cantos.trim(conv_id, last["id"])
             removed += 1
         return {"removed": removed}
 
@@ -427,6 +432,8 @@ class ChatEngine:
         if snap:
             self.repo.restore_snapshot(conv_id, snap)
         self.memory.delete_by_message(message["id"])
+        if self.cantos:
+            self.cantos.trim(conv_id, message["id"])
         self.repo.delete_message(message["id"])
         conv = self.repo.get(conv_id)
         if conv["summary_upto"] >= message["id"]:  # summary covered a message that no longer exists
@@ -471,6 +478,7 @@ class ChatEngine:
             app_status=statusbook.render(tpl, state, npcs) if tpl else None, pinned=conv.get("pinned_memory", ""), player_lore=conv.get("player_lore"),
             appearance_hint=hint, lore=lore, status_due=None if tpl else self._status_due(conv_id, scenario),
             player_name=state["player"].get("name") or "", rules=rules, house_rules=house,
+            cantos=self.cantos.prompt_section(conv_id, int(settings["context_window"]) * 3 // 10) if self.cantos else "",
         )
         yield {"type": "context", "debug": debug, "skills": [s["name"] for s in skills],
                "memories": [m["text"] for m in memories][: debug["memories"]], "rules": debug.get("rules", [])}
@@ -586,7 +594,12 @@ class ChatEngine:
             if new_scene:
                 pic = await self._scene_picture(conv_id, assistant_msg["id"], reply, settings)
                 if pic:
+                    if self.cantos and settings.get("auto_keep_pictures", True):  # the first picture of each place goes in the map bag
+                        kept = self.cantos.auto_keep(conv_id, assistant_msg["id"], pic, self.repo.get_state(conv_id))
+                        if kept:
+                            self.repo.update_message_meta(assistant_msg["id"], {"kept_picture": kept["id"]})
                     yield {"type": "scene_picture", "message_id": assistant_msg["id"], "picture": pic}
+                    yield {"type": "message_updated", "message": self.repo.get_message(assistant_msg["id"])}
 
         if tpl:  # the status block for this reply, filled by the app after the tracker ran
             block = statusbook.render(tpl, self.repo.get_state(conv_id), self.repo.list_npcs(conv_id))

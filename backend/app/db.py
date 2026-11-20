@@ -66,6 +66,32 @@ CREATE TRIGGER IF NOT EXISTS rule_chunks_ad AFTER DELETE ON rule_chunks BEGIN
     INSERT INTO rule_chunks_fts(rule_chunks_fts, rowid, heading, text) VALUES ('delete', old.id, old.heading, old.text);
 END;
 
+CREATE TABLE IF NOT EXISTS cantos (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id  INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    number           INTEGER NOT NULL,
+    title            TEXT NOT NULL DEFAULT '',
+    chronicle        TEXT NOT NULL DEFAULT '',
+    first_message_id INTEGER NOT NULL DEFAULT 0,
+    last_message_id  INTEGER,
+    closed_at        REAL,
+    created_at       REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cantos_conv ON cantos(conversation_id, number);
+CREATE TABLE IF NOT EXISTS kept_pictures (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    message_id      INTEGER,
+    url             TEXT NOT NULL,
+    prompt          TEXT NOT NULL DEFAULT '',
+    title           TEXT NOT NULL DEFAULT '',
+    location        TEXT NOT NULL DEFAULT '',
+    date_label      TEXT NOT NULL DEFAULT '',
+    canto           INTEGER,
+    auto            INTEGER NOT NULL DEFAULT 0,
+    created_at      REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_kept_pictures_conv ON kept_pictures(conversation_id);
 CREATE TABLE IF NOT EXISTS muse_talks (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     title        TEXT NOT NULL,

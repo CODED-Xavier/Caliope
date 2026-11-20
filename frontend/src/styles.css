@@ -491,3 +491,16 @@ body.resizing { user-select: none; cursor: col-resize; }
 .muse .composer { max-width: none; width: 100%; margin: 0; }
 .muse .composer textarea { flex: 1; }
 .muse-list .conv { display: block; }
+
+/* Cantos, recap and the map bag */
+.canto-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0 10px; color: var(--accent-2); font: 600 13px var(--serif); letter-spacing: 0.06em; text-transform: uppercase; }
+.canto-divider::before, .canto-divider::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-2), transparent); }
+.canto summary { cursor: pointer; }
+.canto.open { border-style: dashed; }
+.recap .recap-card { background: var(--panel); color: var(--text); border: 1px solid var(--accent-2); border-radius: 14px; padding: 18px 20px; max-width: 560px; width: 100%; display: flex; flex-direction: column; gap: 10px; cursor: default; }
+.recap-text { font-family: var(--serif); font-size: 15.5px; line-height: 1.6; white-space: pre-wrap; }
+.bag-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.bag-pic { margin: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.bag-pic img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; cursor: zoom-in; background: var(--bg2); }
+.bag-pic figcaption { padding: 4px 6px; }
+.bag-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

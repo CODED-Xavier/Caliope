@@ -3,9 +3,10 @@ import { Markdown } from "../markdown.jsx";
 import { firstMood, hideStatus, moodUrl, portraitSrc, stripTags } from "../portraits.js";
 import Story from "./Story.jsx";
 import HelpTip from "./HelpTip.jsx";
+import { cantoStarts } from "./Cantos.jsx";
 
 /** A picture of the scene, painted by Pollinations.ai the first time it is shown (can take up to a minute). */
-function ScenePicture({ pic, onReroll, canAct }) {
+function ScenePicture({ pic, onReroll, canAct, kept, onKeep }) {
   const [state, setState] = useState("loading");
   const [tries, setTries] = useState(0);
   const [hidden, setHidden] = useState(false);
@@ -25,6 +26,8 @@ function ScenePicture({ pic, onReroll, canAct }) {
       {state === "loading" && <div className="scene-wait"><span className="spinner" /> Painting the scene… (up to a minute)</div>}
       {state === "error" && <div className="scene-wait">{tries >= 2 ? "The picture service did not answer. Try 🎲 later." : "The picture service is busy; trying again in 30 s…"}</div>}
       <figcaption>
+        {!kept && state === "ok" && <button className="icon-btn" title="Keep it in the map bag (Map tab)" onClick={onKeep}>📌</button>}
+        {kept && <span className="tiny muted" title="In the map bag (Map tab)">📌 kept</span>}
         {canAct && <button className="icon-btn" title="Another version of this picture" onClick={onReroll}>🎲</button>}
         <button className="icon-btn" title="Hide" onClick={() => setHidden(true)}>✕</button>
       </figcaption>
@@ -153,7 +156,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
       {isOpening && <div className="tag">Opening scene</div>}
       {editing ? editor : (
         <>
-          {m.meta?.scene_picture && portraitStyle !== "off" && <ScenePicture pic={m.meta.scene_picture} canAct={canAct} onReroll={() => onPaint(m.id, true)} />}
+          {m.meta?.scene_picture && portraitStyle !== "off" && <ScenePicture pic={m.meta.scene_picture} canAct={canAct} onReroll={() => onPaint(m.id, true)} kept={!!m.meta.kept_picture} onKeep={() => onPaint(m.id, "keep")} />}
           <Story text={av ? av.text : m.content} npcs={npcs} known={m.meta?.portraits} portraitStyle={portraitStyle} />
           {m.meta?.edited && <span className="muted tiny edited"> (edited)</span>}
           {m.meta?.interrupted && <div className="muted small">⏹ Stopped early</div>}
@@ -217,6 +220,7 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
   const anchored = useRef(false); // the start of the new reply was already brought into view
   const taRef = useRef(null);
   const messages = game.messages;
+  const dividers = useMemo(() => cantoStarts(game.cantos, messages), [game.cantos, messages]);
   const mode = game.conversation.scenario?.mode;
   const main = game.npcs.find((n) => n.is_main);
   const speaker = mode === "character" && main && (main.portraits?.default || main.portraits?.moods?.length) ? main : null;
@@ -329,11 +333,14 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
       }}>
         <div className="chat-inner">
           {messages.map((m, i) => (
+            <React.Fragment key={m.id}>
+            {dividers[m.id] && <div className="canto-divider"><span>{dividers[m.id].label}{dividers[m.id].title ? ` · ${dividers[m.id].title}` : ""}</span></div>}
             <Message key={m.id} m={m} npcs={game.npcs} speaker={speaker} playerPic={playerPic} portraitStyle={portraitStyle}
               scenePictures={scenePictures} onPaint={actions.onPaint} onCheck={actions.check} onBuy={actions.buy} currency={game.conversation.scenario?.currency || "gold"} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
               onRegenerate={actions.regenerate} onContinue={actions.onContinue} onFork={actions.onFork}
               hit={m.id === current ? "search-hit current" : hits.includes(m.id) ? "search-hit" : ""} canAct={!busy} lastContext={busy ? null : lastContext}
               onEdit={actions.onEdit} onResend={actions.onResend} onRewind={actions.onRewind} />
+            </React.Fragment>
           ))}
           {!busy && messages.length > 0 && messages[messages.length - 1].role === "user" && (
             <div className="retry">

@@ -198,7 +198,7 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
 SECTION_ORDER = [
     "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "route",
     "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
-    "player", "pinned", "opening", "summary",
+    "player", "pinned", "opening", "cantos", "summary",
 ]
 
 
@@ -214,7 +214,7 @@ class PromptBuilder:
               appearance_hint: str = "", lore: tuple[list[dict], list[dict]] = ([], []),
               status_due: bool | None = None, player_name: str = "", rules: list[dict] | None = None,
               house_rules: list[tuple[str, str]] | None = None, player_lore: list[dict] | None = None,
-              app_status: str | None = None) -> tuple[list[dict], dict]:
+              app_status: str | None = None, cantos: str = "") -> tuple[list[dict], dict]:
         """Return (messages, debug_info). History items need id, role, content and meta."""
         ctx = int(settings["context_window"])
         reserve = reply_token_limit(settings) + 150
@@ -245,6 +245,8 @@ class PromptBuilder:
             sections["rules"] = sections["rules"].replace(TIME_RULE, CAL_TIME_RULE)
         if player_lore:
             sections["player_lore"] = always_section(player_lore)
+        if cantos:
+            sections["cantos"] = cantos
         route = scenario.get("route")
         if route_section(route):
             sections["route"] = route_section(route)
@@ -262,6 +264,9 @@ class PromptBuilder:
         if estimate_tokens(self._join(sections)) > cap and "opening" in sections:
             sections.pop("opening")
             dropped.append("opening")
+        if estimate_tokens(self._join(sections)) > cap and "cantos" in sections:
+            sections["cantos"] = truncate(sections["cantos"], 1500)
+            dropped.append("cantos (shortened)")
         if estimate_tokens(self._join(sections)) > cap and "summary" in sections:
             sections["summary"] = truncate(sections["summary"], 900)
             dropped.append("summary (shortened)")

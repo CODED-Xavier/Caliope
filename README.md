@@ -273,6 +273,11 @@ Play.bat and Caliope.exe open the game in a window of its own (Microsoft Edge's 
 **🪶 The Muse** (left sidebar) is a writer's room with the same model that plays your games: brainstorm worlds, characters, a new route for a card. Talks are saved; long talks are summarized as they go. **↶ Undo last** removes her last answer to ask differently.
 **✨ Make it a card** turns the talk into a card, asking the model for one piece at a time (title, pitch, world, tone, each character's sheet, the opening) so the card always comes out valid. The preview offers **＋ Add to Calíope** (it appears in New game, ✎ to edit) or **⤓ Save file** (a standard Character Card JSON you can import later). It takes one or two minutes on an RX 580. The Muse and a game share the model, so one waits for the other.
 
+## 4q. Cantos, recap and the map bag (v2.3)
+- **Cantos** (Journal tab): your story's chapters. *Close this Canto* at a natural break: the Aedo writes a short chronicle, a divider marks the new Canto in the chat, and the chronicles of past Cantos stay in what the Aedo always knows. Rewinding or undoing into a closed Canto opens it again.
+- **📜 Recap** (top of the chat): "Previously, in…", written only when you click it and never added to the story.
+- **🎒 Map bag** (Map tab): scene pictures you keep, with place, in-game date and Canto. The first picture of each place is kept on its own; 📌 on any scene picture keeps it; click to see it big, ✎ to name it. The Map tab appears for any game with scene pictures.
+
 ## 5. Tests
 
 ```

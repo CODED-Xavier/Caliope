@@ -72,6 +72,7 @@ DEFAULT_SETTINGS: dict = {
     "rules_char_budget": 1400,        # characters of rulebook passages added to a turn (about 350 tokens)
     # --- Scene pictures (optional, uses the free Pollinations.ai service over the internet) ---
     "scene_pictures": False,
+    "auto_keep_pictures": True,   # the first scene picture of each place goes in the map bag
     "picture_service": "pollinations",  # pollinations (free, no account) | pixai (your own API key)
     "pixai_api_key": "",
     "pixai_model": "",            # PixAI model version ID

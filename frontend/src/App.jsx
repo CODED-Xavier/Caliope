@@ -9,6 +9,7 @@ import RulebooksModal from "./components/RulebooksModal.jsx";
 import { TABS as PANEL_TABS } from "./components/SidePanel.jsx";
 import ModelsModal from "./components/ModelsModal.jsx";
 import MuseModal from "./components/MuseModal.jsx";
+import { RecapView } from "./components/Cantos.jsx";
 import { JukeboxModal, JukeboxPlayer } from "./components/Jukebox.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
 import { KIND_LABELS, MODE_LABELS } from "./utils.js";
@@ -264,6 +265,12 @@ export default function App() {
   const continueReply = () => runTurn(`/api/conversations/${activeRef.current}/continue`, {});
   const stop = () => abortRef.current?.abort();
 
+  const [recap, setRecap] = useState(null);
+  const showRecap = async () => {
+    if (!activeId) return;
+    setRecap({ loading: true, text: "" });
+    try { const r = await api.recap(activeId); setRecap({ loading: false, text: r.text }); } catch (e) { setRecap(null); setError(e.message); }
+  };
   const undo = async () => {
     if (busy || !activeId) return;
     if (!window.confirm("Remove the last exchange (your message and the reply)? Sheet and relationships go back to how they were.")) return;
@@ -297,7 +304,9 @@ export default function App() {
 
   const paintScene = async (messageId, reroll = false) => {
     try {
-      const msg = await api.paintScene(activeId, messageId, reroll);
+      const msg = reroll === "keep"
+        ? (await api.keepPicture(activeId, messageId)).message  // 📌: into the map bag
+        : await api.paintScene(activeId, messageId, reroll);
       setGame((g) => (g ? { ...g, messages: g.messages.map((m) => (m.id === msg.id ? msg : m)) } : g));
     } catch (e) { setError(e.message); }
   };
@@ -408,6 +417,7 @@ export default function App() {
                 <button className="btn small view-btn" title="Text size, column width, scrolling" onClick={() => setViewOpen(!viewOpen)}>Aa</button>
                 {viewOpen && <ViewMenu view={view} setView={setView} onClose={() => setViewOpen(false)} />}
               </div>
+              <button className="btn small" onClick={showRecap} disabled={busy} title="Previously, in this story… (written only when you ask; never added to the story)">📜 Recap</button>
               <button className="btn small" onClick={undo} disabled={busy} title="Remove the last exchange">↶ Undo</button>
               <button className="btn small" onClick={() => setPanelOpen(!panelOpen)} title="Show or hide the sheet panel">{panelOpen ? "Hide panel ⇥" : "⇤ Show panel"}</button>
             </div>
@@ -442,8 +452,10 @@ export default function App() {
           onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} onPinnedSave={savePinned}
           onStateLoaded={(st) => setGame((g) => (g ? { ...g, state: st } : g))}
           onLoreSaved={(conv) => setGame((g) => (g ? { ...g, conversation: { ...g.conversation, player_lore: conv.player_lore } } : g))}
-          onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit} />
+          onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit}
+          onCantos={(list) => setGame((g) => (g ? { ...g, cantos: list } : g))} />
       )}
+      {recap && <RecapView text={recap.text} loading={recap.loading} onClose={() => setRecap(null)} onAgain={showRecap} />}
       {modal === "muse" && <MuseModal onClose={() => setModal(null)} />}
       {modal === "models" && <ModelsModal onClose={() => { setModal(null); refreshHealth(); }} />}
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}

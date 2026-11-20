@@ -511,6 +511,67 @@ async def import_card(body: dict[str, Any] = Body(...)):
     return svc().scenarios.create(data)
 
 
+# ------------------------------------------------------------------ Cantos, recap and the map bag
+@app.get("/api/conversations/{conv_id}/cantos")
+async def cantos_list(conv_id: int):
+    svc().conversations.get(conv_id)
+    return svc().cantos.list(conv_id)
+
+
+@app.post("/api/conversations/{conv_id}/cantos/close")
+async def cantos_close(conv_id: int, body: dict = Body(default={})):
+    """Write the chronicle of the current Canto and begin the next one."""
+    if svc().engine.is_busy(conv_id):
+        raise BusyError("Wait for the current reply to finish.")
+    svc().conversations.get(conv_id)
+    return await svc().cantos.close(conv_id, str(body.get("title", "")))
+
+
+@app.patch("/api/cantos/{canto_id}")
+async def cantos_rename(canto_id: int, body: dict = Body(...)):
+    return svc().cantos.rename(canto_id, str(body.get("title", "")))
+
+
+@app.post("/api/conversations/{conv_id}/recap")
+async def recap(conv_id: int):
+    """"Previously, in…": written only when asked, never added to the story."""
+    conv = svc().conversations.get(conv_id)
+    language = conv["scenario"].get("language") or svc().settings.get("response_language")
+    return {"text": await svc().cantos.recap(conv_id, conv["title"], conv["summary"], language)}
+
+
+@app.get("/api/conversations/{conv_id}/gallery")
+async def gallery(conv_id: int):
+    return svc().cantos.gallery(conv_id)
+
+
+@app.post("/api/conversations/{conv_id}/gallery")
+async def gallery_keep(conv_id: int, body: dict = Body(...)):
+    msg = svc().conversations.get_message(int(body.get("message_id", 0)))
+    pic = msg["meta"].get("scene_picture")
+    if msg["conversation_id"] != conv_id or not pic:
+        raise NotFound("That message has no scene picture.")
+    kept = svc().cantos.keep(conv_id, msg["id"], pic, svc().conversations.get_state(conv_id), str(body.get("title", "")))
+    svc().conversations.update_message_meta(msg["id"], {"kept_picture": kept["id"]})
+    return {"picture": kept, "message": svc().conversations.get_message(msg["id"])}
+
+
+@app.patch("/api/gallery/{pic_id}")
+async def gallery_rename(pic_id: int, body: dict = Body(...)):
+    return svc().cantos.rename_picture(pic_id, str(body.get("title", "")))
+
+
+@app.delete("/api/gallery/{pic_id}")
+async def gallery_remove(pic_id: int):
+    row = svc().cantos.remove_picture(pic_id)
+    if row and row.get("message_id"):
+        try:
+            svc().conversations.update_message_meta(row["message_id"], {}, drop=("kept_picture",))
+        except NotFound:
+            pass
+    return {"removed": True}
+
+
 # ------------------------------------------------------------------ the Muse (writer's room)
 _MUSE_LOCK = asyncio.Lock()
 
@@ -780,6 +841,7 @@ def full_conversation(conv_id: int) -> dict:
         "status_fields": statusbook.custom_fields(statusbook.template_of(s.conversations.get(conv_id)["scenario"]) or ""),
         "status_by_app": bool(s.engine._status_template(s.conversations.get(conv_id)["scenario"], s.settings.all())),
         "card_has_resources": _card_has_resources(conv_id),
+        "cantos": s.cantos.list(conv_id),
     }
 
 

@@ -18,6 +18,7 @@ from .rulebooks import RulebookRepository
 from .runtime import EngineManager
 from .modelhub import ModelHub
 from .muse import Muse
+from .cantos import CantoBook
 from .scenarios import ScenarioRepository
 from .skills import SkillManager
 
@@ -44,6 +45,8 @@ class Services:
         self.models = ModelHub(self.db, self.runtime, self.settings.all, self.settings.update)
         self.engine = ChatEngine(self.conversations, self.settings, self.llm, self.memory, self.skills, self.dice,
                                  rulebooks=self.rulebooks)
+        self.cantos = CantoBook(self.db, self.llm)
+        self.engine.cantos = self.cantos
 
     async def close(self) -> None:
         for key in list(self.models.downloads):
