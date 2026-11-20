@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import logging
 from contextlib import aclosing, asynccontextmanager
 from pathlib import Path
@@ -17,7 +18,7 @@ from .config import DB_PATH
 from .conversations import NotFound
 from .drafts import draft_card_field, draft_player
 from .exporting import export_markdown
-from .images import ImageError, get_image
+from .images import UPLOAD_NAME, ImageError, get_image, save_upload
 from .dice import DiceError
 from .engine import BusyError
 from .llm import LLMError
@@ -211,6 +212,25 @@ async def export_scenario(scenario_id: int):
 
 
 PORTRAIT_DIR = Path(DB_PATH).parent / "portraits"
+UPLOAD_DIR = PORTRAIT_DIR / "uploads"
+
+
+@app.post("/api/uploads")
+async def upload_picture(request: Request):
+    """A picture from this PC (sent as the raw request body). Returns a link the app can use as a portrait."""
+    data = await request.body()
+    try:
+        name = save_upload(data, UPLOAD_DIR)
+    except ImageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"url": f"/api/uploads/{name}"}
+
+
+@app.get("/api/uploads/{name}")
+async def uploaded_picture(name: str):
+    if not re.match(UPLOAD_NAME, name) or not (UPLOAD_DIR / name).is_file():
+        raise HTTPException(status_code=404, detail="Picture not found")
+    return FileResponse(UPLOAD_DIR / name, headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @app.get("/api/portrait")

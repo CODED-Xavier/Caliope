@@ -9,6 +9,7 @@ import copy
 import uuid
 
 from .appearance import normalize_appearance
+from .portraits import normalize_portraits
 from .util import as_int, clamp, deep_merge, truncate
 
 DEFAULT_STATE: dict = {
@@ -24,6 +25,7 @@ DEFAULT_STATE: dict = {
         "hp": {"current": 10, "max": 10},
         "ac": 10,
         "skills": [],
+        "portraits": {"default": "", "moods": []},   # your own picture(s), shown beside your messages
     },
     "gold": 0,
     "inventory": [],      # [{"name": str, "qty": int, "notes": str}]
@@ -66,6 +68,7 @@ def new_state(template: dict | None = None, player_name: str | None = None) -> d
     hp["current"] = int(clamp(as_int(hp.get("current", hp["max"]), hp["max"]), 0, hp["max"]))
     state["gold"] = max(0, as_int(state.get("gold", 0)))
     state["inventory"] = [i for i in (_norm_item(x) for x in state.get("inventory", [])) if i]
+    state["player"]["portraits"] = normalize_portraits(state["player"].get("portraits"))
     return state
 
 

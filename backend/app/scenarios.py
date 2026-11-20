@@ -14,6 +14,7 @@ from pathlib import Path
 from .appearance import normalize_appearance
 from .cards import KINDS, default_kind, normalize_features
 from .db import Database
+from .portraits import _url, normalize_portraits  # noqa: F401  (kept here for older imports)
 from .status import split_template
 from .util import extract_json, now, slugify, truncate
 
@@ -22,26 +23,6 @@ MODES = ("gm_world", "gm_cast", "character")
 
 def _clip(value, limit: int) -> str:
     return str(value or "").replace("\r\n", "\n")[:limit]
-
-
-def _url(value) -> str:
-    v = str(value or "").strip()
-    return v if v.startswith(("http://", "https://", "/")) and len(v) < 600 else ""
-
-
-def normalize_portraits(raw) -> dict:
-    """{"default": url, "moods": [{"n": 2, "label": "Happy", "url": url}, ...]} (at most 12 moods)."""
-    if not isinstance(raw, dict):
-        return {"default": "", "moods": []}
-    moods = []
-    for m in raw.get("moods", [])[:12] if isinstance(raw.get("moods"), list) else []:
-        if isinstance(m, dict) and _url(m.get("url")) and str(m.get("label", "")).strip():
-            try:
-                n = int(m["n"]) if m.get("n") not in (None, "") else None
-            except (TypeError, ValueError):
-                n = None
-            moods.append({"n": n, "label": str(m["label"]).strip()[:40], "url": _url(m["url"])})
-    return {"default": _url(raw.get("default")), "moods": moods}
 
 
 def normalize_lorebook(raw) -> dict:
@@ -164,6 +145,19 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
     }
 
 
+def _covers(data: dict) -> list[str]:
+    """Up to 3 portrait links for the card picker (main character first)."""
+    out = []
+    for n in data.get("npcs", []):
+        p = n.get("portraits") or {}
+        url = (p.get("moods") or [{}])[0].get("url") or p.get("default")
+        if url:
+            out.append(url)
+        if len(out) == 3:
+            break
+    return out
+
+
 class ScenarioRepository:
     def __init__(self, db: Database):
         self.db = db
@@ -179,6 +173,7 @@ class ScenarioRepository:
             "kind": data.get("kind") or default_kind(row["mode"]),
             "description": data.get("description", ""),
             "npc_count": len(data.get("npcs", [])),
+            "covers": _covers(data),
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }

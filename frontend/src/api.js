@@ -67,6 +67,11 @@ export const api = {
   deleteScenario: (id) => request("DELETE", `/api/scenarios/${id}`),
   generateScenario: (body) => request("POST", "/api/scenarios/generate", body),
 
+  async uploadPicture(file) {
+    const res = await fetch("/api/uploads", { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    return res.json();
+  },
   draftField: (field, card, hint = "") => request("POST", "/api/drafts/card-field", { field, card, hint }),
   draftPlayer: (scenarioId, player) => request("POST", "/api/drafts/player", { scenario_id: scenarioId, player }),
   fork: (id, messageId) => request("POST", `/api/conversations/${id}/fork`, { message_id: messageId }),

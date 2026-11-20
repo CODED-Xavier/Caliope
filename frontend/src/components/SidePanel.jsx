@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api.js";
 import { NumberField, TextField } from "./Fields.jsx";
 import HelpTip from "./HelpTip.jsx";
+import MoodEditor from "./MoodEditor.jsx";
 import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
 import { latestStatus, portraitSrc } from "../portraits.js";
 
@@ -39,12 +40,19 @@ function StatusTab({ messages, every }) {
 /* ------------------------------------------------------------------ Sheet */
 function SheetTab({ state, onPatch, mode, kind }) {
   const p = state.player;
+  const [picOpen, setPicOpen] = useState(false);
   const numbers = kind !== "roleplay";
   const hp = p.hp;
   const pct = clamp((hp.current / Math.max(1, hp.max)) * 100, 0, 100);
   return (
     <div className="tab-body">
-      <TextField className="title-input" value={p.name} onCommit={(v) => onPatch({ player: { name: v } })} />
+      <div className="row gap center">
+        <button type="button" className="player-pic" title="Your picture (shown beside your messages)" onClick={() => setPicOpen(!picOpen)}>
+          {p.portraits?.default ? <img src={portraitSrc(p.portraits.default)} alt="" /> : <span>＋</span>}
+        </button>
+        <div className="grow"><TextField className="title-input" value={p.name} onCommit={(v) => onPatch({ player: { name: v } })} /></div>
+      </div>
+      {picOpen && <MoodEditor portraits={p.portraits} mainOnly onChange={(v) => onPatch({ player: { portraits: v } })} />}
       <div className="row gap">
         <TextField value={p.race} placeholder="Race" onCommit={(v) => onPatch({ player: { race: v } })} />
         <TextField value={p.class} placeholder="Class" onCommit={(v) => onPatch({ player: { class: v } })} />
@@ -89,7 +97,7 @@ function SheetTab({ state, onPatch, mode, kind }) {
       <TextField multiline rows={2} value={p.background} placeholder="Where you come from" onCommit={(v) => onPatch({ player: { background: v } })} /></>}
       <label className="lbl">Personality</label>
       <TextField value={p.traits || ""} placeholder="Personality" onCommit={(v) => onPatch({ player: { traits: v } })} />
-      <label className="lbl">Appearance / background</label>
+      <label className="lbl">Appearance</label>
       <TextField multiline rows={3} value={p.description} placeholder="Describe your character…" onCommit={(v) => onPatch({ player: { description: v } })} />
       <label className="lbl">Your notes</label>
       <TextField multiline rows={3} value={state.notes} placeholder="Private notes (the AI does not see these)" onCommit={(v) => onPatch({ notes: v })} />
@@ -208,19 +216,8 @@ function NpcCard({ npc, onUpdate, onDelete }) {
           <TextField multiline value={npc.personality} onCommit={(v) => onUpdate(npc.id, { personality: v })} />
           <label className="lbl">Speech style</label>
           <TextField value={npc.speech_style} onCommit={(v) => onUpdate(npc.id, { speech_style: v })} />
-          <label className="lbl">Portrait link <HelpTip id="portraits" /></label>
-          <TextField value={pics.default || ""} placeholder="https://… (PNG, JPG or WebP)"
-            onCommit={(v) => onUpdate(npc.id, { portraits: { ...pics, default: v } })} />
-          {pics.moods?.length > 0 && (
-            <div className="mood-strip">
-              {pics.moods.map((m) => (
-                <figure key={m.n} title={m.url}>
-                  <img src={portraitSrc(m.url)} alt={m.label} loading="lazy" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
-                  <figcaption className="tiny">{m.label}</figcaption>
-                </figure>
-              ))}
-            </div>
-          )}
+          <label className="lbl">Pictures and moods <HelpTip id="portraits" /></label>
+          <MoodEditor portraits={pics} compact onChange={(v) => onUpdate(npc.id, { portraits: v })} />
           <label className="check small"><input type="checkbox" checked={npc.in_prompt !== false} onChange={(e) => onUpdate(npc.id, { in_prompt: e.target.checked })} />
             Profile always in the prompt <HelpTip id="in_prompt" /></label>
           <label className="check small"><input type="checkbox" checked={npc.met !== false} onChange={(e) => onUpdate(npc.id, { met: e.target.checked })} />

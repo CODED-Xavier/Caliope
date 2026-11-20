@@ -76,3 +76,37 @@ async def get_image(url: str, cache_dir: Path, fetch: Fetcher = http_fetch, chec
     path = cache_dir / f"{cache_key(url)}{TYPES[ctype]}"
     path.write_bytes(data)
     return path
+
+
+# ------------------------------------------------------------------ pictures from this PC
+UPLOAD_NAME = r"^[0-9a-f]{40}\.(png|jpg|webp|gif)$"
+
+
+def sniff_type(data: bytes) -> str | None:
+    """The real image type from the first bytes (the file name or browser header can lie)."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return ".gif"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return ".webp"
+    return None
+
+
+def save_upload(data: bytes, upload_dir: Path) -> str:
+    """Save a picture chosen on this PC and return its file name (the same picture always gets the same name)."""
+    if not data:
+        raise ImageError("The file is empty.")
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ImageError("The image is larger than 8 MB.")
+    ext = sniff_type(data)
+    if not ext:
+        raise ImageError("That file is not a PNG, JPEG, WebP or GIF image.")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    name = hashlib.sha1(data).hexdigest() + ext
+    path = upload_dir / name
+    if not path.exists():
+        path.write_bytes(data)
+    return name

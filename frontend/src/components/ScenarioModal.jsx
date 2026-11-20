@@ -3,6 +3,8 @@ import Modal from "./Modal.jsx";
 import HelpTip from "./HelpTip.jsx";
 import KindPicker from "./KindPicker.jsx";
 import SetupView from "./SetupView.jsx";
+import MoodEditor from "./MoodEditor.jsx";
+import { portraitSrc } from "../portraits.js";
 import { api } from "../api.js";
 import { KIND_LABELS, MODE_LABELS } from "../utils.js";
 
@@ -328,12 +330,10 @@ function Editor({ initial, id, onCancel, onSaved }) {
               <input key={key} className="field" placeholder={label} value={(n.appearance || {})[key] || ""} onChange={(e) => setLook(i, key, e.target.value)} />
             ))}
           </div>
-          <div className="row gap center">
-            <input className="field grow" placeholder="Portrait link (https://…)" value={n.portraits?.default || ""}
-              onChange={(e) => setNpc(i, "portraits", { moods: [], ...(n.portraits || {}), default: e.target.value })} />
-            {n.portraits?.moods?.length > 0 && <span className="muted tiny">+{n.portraits.moods.length} moods</span>}
-            <HelpTip id="portraits" />
-          </div>
+          <details className="npc-pics">
+            <summary className="small">Pictures and moods {(n.portraits?.default || n.portraits?.moods?.length) ? <span className="muted tiny">({(n.portraits.moods || []).length} moods)</span> : <span className="muted tiny">(none)</span>} <HelpTip id="portraits" /></summary>
+            <MoodEditor portraits={n.portraits} compact onChange={(v) => setNpc(i, "portraits", v)} />
+          </details>
           <label className="check small"><input type="checkbox" checked={n.in_prompt !== false} onChange={(e) => setNpc(i, "in_prompt", e.target.checked)} />
             Profile always in the prompt <HelpTip id="in_prompt" /></label>
         </div>
@@ -447,6 +447,11 @@ export default function ScenarioModal({ onClose, onStart }) {
               <button className="icon-btn" title="Edit" onClick={(e) => { e.stopPropagation(); edit(s.id); }}>✎</button>
               <button className="icon-btn" title="Delete" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete card "${s.name}"? Your saved games stay.`)) api.deleteScenario(s.id).then(() => load()).catch((er) => setError(er.message)); }}>🗑</button>
             </div>
+            {s.covers?.length > 0 && (
+              <div className="scn-covers">
+                {s.covers.map((u, k) => <img key={k} src={portraitSrc(u)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />)}
+              </div>
+            )}
             <div><span className={`tag kind-${s.kind}`}>{KIND_LABELS[s.kind] || "Adventure"}</span><span className="tag">{MODE_LABELS[s.mode]}</span></div>
             <div className="muted small">{s.description}</div>
           </div>

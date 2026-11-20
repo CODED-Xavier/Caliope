@@ -363,7 +363,7 @@ class PromptBuilder:
                          "affinity scale the card mentions (for example -3 to +3) and never write affinity scores yourself.")
         if info.get("status_every"):
             rules.append("Only write the INFO status block when the GM notes ask for it.")
-        pics = portrait_instructions(npcs)
+        pics = portrait_instructions(npcs, scenario.get("mode", "gm_world"))
         if pics:
             rules.append("Use the portrait format below instead of any image-link format the card describes.")
             sec["portraits"] = pics

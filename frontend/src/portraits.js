@@ -1,7 +1,25 @@
 // Helpers for imported cards: big portraits inside replies, the INFO status block, characters met.
 
 /** Portraits are served by the backend, which keeps a copy on this PC after the first download. */
-export const portraitSrc = (url) => (url ? `/api/portrait?url=${encodeURIComponent(url)}` : "");
+export const portraitSrc = (url) => (!url ? "" : url.startsWith("/") ? url : `/api/portrait?url=${encodeURIComponent(url)}`);
+
+/** The six moods most cards use, in their usual order. */
+export const STANDARD_MOODS = [[1, "Standard"], [2, "Happy"], [3, "Sad"], [4, "Angry"], [5, "Disgusted"], [6, "Blushing"]];
+
+/** Picture of a character for a mood (or the standard one). */
+export function moodUrl(portraits, mood = "") {
+  if (!portraits) return "";
+  return pickMood(portraits, mood)?.url || portraits.default || "";
+}
+
+/** The first [[show: Name | Mood]] in a reply (character cards start each reply with one). */
+export function firstMood(text) {
+  const m = String(text || "").match(/\[\[\s*show\s*:\s*[^|\]\n]+?\s*(?:\|\s*([^\]\n]*?)\s*)?\]\]/i);
+  return m ? (m[1] || "") : null;
+}
+
+/** The reply without portrait tags (when the picture is shown beside the message instead). */
+export const stripTags = (text) => String(text || "").replace(/^[ \t]*\[\[\s*show\s*:[^\]\n]*\]\][ \t]*\n?/gim, "").replace(/!\[[^\]\n]*\]\([^)\s]*\)\n?/g, "");
 
 const INFO_LINE = /^[ \t]*(?:\*\*|\[)?INFO(?:\*\*|\])?[ \t]*$/m;
 
