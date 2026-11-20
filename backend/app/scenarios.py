@@ -63,6 +63,18 @@ def normalize_lorebook(raw) -> dict:
     }
 
 
+def _ids(raw) -> list[int]:
+    out: list[int] = []
+    for v in raw if isinstance(raw, list) else []:
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            continue
+        if n > 0 and n not in out:
+            out.append(n)
+    return out[:6]
+
+
 def normalize_information(raw) -> dict:
     """The long texts of a card (what a character card calls description, scenario, post-history...)."""
     raw = raw if isinstance(raw, dict) else {}
@@ -136,6 +148,7 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "tone": str(raw.get("tone", "")),
         "species": species,
         "information": normalize_information(raw.get("information")),
+        "rulebooks": _ids(raw.get("rulebooks")),
         "lorebook": normalize_lorebook(raw.get("lorebook")),
         "alternate_openings": [_clip(x, 6000) for x in raw.get("alternate_openings", [])[:10] if str(x).strip()] if isinstance(raw.get("alternate_openings"), list) else [],
         "opening_message": str(raw.get("opening_message", "")),

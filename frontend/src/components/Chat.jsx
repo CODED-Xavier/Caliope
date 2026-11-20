@@ -124,6 +124,9 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
           {isLastAssistant && lastContext && lastContext.memories.length > 0 && (
             <div className="muted small ctx">🧠 {lastContext.memories.length} memor{lastContext.memories.length === 1 ? "y" : "ies"} recalled</div>
           )}
+          {isLastAssistant && lastContext && lastContext.rules?.length > 0 && (
+            <div className="muted small ctx" title={lastContext.rules.join("\n")}>📖 Rules used: {lastContext.rules.join(" · ")}</div>
+          )}
           {actions}
         </>
       )}

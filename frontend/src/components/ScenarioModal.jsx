@@ -135,6 +135,26 @@ function ImportView({ onCancel, onImported }) {
   );
 }
 
+/* ---------------------------------------------------------- rulebooks for a card */
+function RulebookPicker({ attached, onChange }) {
+  const [books, setBooks] = useState(null);
+  useEffect(() => { api.rulebooks().then((r) => setBooks(r.books)).catch(() => setBooks([])); }, []);
+  if (!books) return null;
+  const toggle = (id) => onChange(attached.includes(id) ? attached.filter((x) => x !== id) : [...attached, id]);
+  return (
+    <details open={attached.length > 0}>
+      <summary className="muted small">Rulebooks <HelpTip id="rulebooks" /> {attached.length > 0 && <span className="tiny">({attached.length} attached)</span>}</summary>
+      {books.length === 0 && <div className="muted small">No rulebooks imported yet. Use 📚 Rules in the sidebar to import one.</div>}
+      {books.map((b) => (
+        <label key={b.id} className={`check small ${b.status !== "ready" ? "dim" : ""}`}>
+          <input type="checkbox" checked={attached.includes(b.id)} onChange={() => toggle(b.id)} disabled={b.status !== "ready" && !attached.includes(b.id)} />
+          {b.name} <span className="muted tiny">{b.status === "ready" ? `${b.sections} sections` : b.status}</span>
+        </label>
+      ))}
+    </details>
+  );
+}
+
 /* ---------------------------------------------------------- card texts / lorebook */
 const INFO_FIELDS = [
   ["description", "Description", 6], ["scenario", "Scenario", 3], ["personality", "Personality", 3],
@@ -340,6 +360,7 @@ function Editor({ initial, id, onCancel, onSaved }) {
       ))}
       <button className="btn small" onClick={() => set("npcs", [...d.npcs, { name: "", description: "", personality: "", speech_style: "", relationship: 0, appearance: {} }])}>＋ Add character</button>
 
+      <RulebookPicker attached={d.rulebooks || []} onChange={(v) => set("rulebooks", v)} />
       <InformationEditor info={d.information} onChange={(v) => set("information", v)} />
       <LorebookEditor book={d.lorebook} onChange={(v) => set("lorebook", v)} />
 

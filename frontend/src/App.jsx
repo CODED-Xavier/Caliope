@@ -5,6 +5,7 @@ import Chat from "./components/Chat.jsx";
 import SidePanel from "./components/SidePanel.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import SkillsModal from "./components/SkillsModal.jsx";
+import RulebooksModal from "./components/RulebooksModal.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
 import { KIND_LABELS, MODE_LABELS } from "./utils.js";
 
@@ -146,7 +147,7 @@ export default function App() {
         break;
       case "context":
         setStream((s) => (s ? { ...s, context: ev } : s));
-        setLastContext({ skills: ev.skills || [], memories: ev.memories || [] });
+        setLastContext({ skills: ev.skills || [], memories: ev.memories || [], rules: ev.rules || [] });
         break;
       case "token":
         bufferRef.current += ev.text;
@@ -325,7 +326,7 @@ export default function App() {
       style={{ "--story-font": `${view.fontSize}px`, "--panel-w": `${view.panelWidth}px` }}>
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => setModal("new")}
-        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onSettings={() => setModal("settings")}
+        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
       <main className="main">
@@ -372,6 +373,7 @@ export default function App() {
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={refreshHealth} />}
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}
+      {modal === "rulebooks" && <RulebooksModal onClose={() => setModal(null)} />}
     </div>
   );
 }

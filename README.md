@@ -1,4 +1,4 @@
-# Local RPG Chat (v0.9: one-click start)
+# Local RPG Chat (v0.10: rulebooks)
 
 A chatbot for RPG and roleplay that runs 100% on your PC: no token limits, no subscription.
 It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
@@ -126,6 +126,21 @@ Thoughts are never read by the tracker and never stored as memories.
 - **Emotions**: on character cards the character's picture sits beside every reply and changes with the mood of that reply (the AI starts each reply with `[[show: Name | Mood]]`). On Game Master cards the pictures appear above the part where each character speaks.
 - **Aa → Character pictures**: Big, Small (a name chip) or Hidden.
 - Pictures from your PC are saved in `backend/data/portraits/uploads`. Pictures from links are downloaded once into `backend/data/portraits`.
+
+## 4e. Rulebooks (v0.10)
+
+1. Sidebar → **📚 Rules** → **Import PDF or text**. A PDF with selectable text works best; a `.txt` or `.md`
+   file also works (lines starting with `#` become headings). Big books take a minute; progress is shown.
+2. Open a card with ✎ → **Rulebooks** and tick the books it uses.
+3. Play. When a turn touches a rule (grappling, falling, frenzy…), the GM gets the one or two matching sections
+   (about 350 tokens at most). Under the reply, **📖 Rules used** shows which ones.
+
+- **House rules** (button on each book) are sent every turn and win over the book.
+- **Look something up** in the Rulebooks window searches all your books.
+- **Scanned books** (pages that are pictures) need the free [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki)
+  installed. Restart the app afterwards. OCR takes about 2 to 4 seconds per page.
+- If you set an embedding model in Settings, books are also searched by meaning, not only by words.
+- Good free start: the **D&D System Reference Document 5.2** (Creative Commons), a PDF on dndbeyond.com.
 
 ## 5. Tests
 

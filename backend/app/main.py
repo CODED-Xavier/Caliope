@@ -18,6 +18,7 @@ from .config import DB_PATH
 from .conversations import NotFound
 from .drafts import draft_card_field, draft_player
 from .exporting import export_markdown
+from .rulebooks import RulebookError, ocr_available
 from .images import UPLOAD_NAME, ImageError, get_image, save_upload
 from .dice import DiceError
 from .engine import BusyError
@@ -160,6 +161,60 @@ async def delete_scenario(scenario_id: int):
     if not svc().scenarios.delete(scenario_id):
         raise NotFound(f"Scenario {scenario_id} not found")
     return {"deleted": True}
+
+
+# ------------------------------------------------------------------ rulebooks
+@app.exception_handler(RulebookError)
+async def _rulebook_error(_: Request, exc: RulebookError):
+    return JSONResponse({"detail": str(exc)}, status_code=400)
+
+
+@app.get("/api/rulebooks")
+async def list_rulebooks():
+    return {"books": svc().rulebooks.list(), "ocr_available": ocr_available()}
+
+
+_BACKGROUND: set = set()
+
+
+async def _import_book(book_id: int, data: bytes, filename: str) -> None:
+    book = await asyncio.to_thread(svc().rulebooks.import_bytes, book_id, data, filename)
+    if book["status"] == "ready":
+        try:
+            await svc().rulebooks.embed_book(book_id)
+        except Exception as exc:  # meaning-based search is optional; keyword search still works
+            logging.getLogger("rpg").warning("Embedding the rulebook failed: %s", exc)
+
+
+@app.post("/api/rulebooks")
+async def upload_rulebook(request: Request, name: str = Query(""), system: str = Query("other"), filename: str = Query("")):
+    """Upload a PDF, .txt or .md as the raw request body. Reading runs in the background; poll GET /api/rulebooks."""
+    data = await request.body()
+    if not data:
+        raise RulebookError("The file is empty.")
+    book = svc().rulebooks.create(name or filename.rsplit(".", 1)[0] or "Rulebook", system, filename)
+    task = asyncio.create_task(_import_book(book["id"], data, filename))
+    _BACKGROUND.add(task)  # keep a reference so the task is not garbage-collected
+    task.add_done_callback(_BACKGROUND.discard)
+    return book
+
+
+@app.patch("/api/rulebooks/{book_id}")
+async def update_rulebook(book_id: int, body: dict[str, Any] = Body(...)):
+    return svc().rulebooks.update(book_id, body.get("name"), body.get("house_rules"), body.get("system"))
+
+
+@app.delete("/api/rulebooks/{book_id}")
+async def delete_rulebook(book_id: int):
+    svc().rulebooks.delete(book_id)
+    return {"deleted": True}
+
+
+@app.get("/api/rulebooks/search")
+async def search_rulebooks(q: str = Query(...), ids: str = Query("")):
+    """Look something up in your rulebooks (all of them when `ids` is empty)."""
+    book_ids = [int(x) for x in ids.split(",") if x.strip().isdigit()] or [b["id"] for b in svc().rulebooks.list() if b["status"] == "ready"]
+    return {"results": await svc().rulebooks.search(book_ids, q, k=6)}
 
 
 # ------------------------------------------------------------------ AI drafts

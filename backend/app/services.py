@@ -10,6 +10,7 @@ from .dice import DiceRoller
 from .engine import ChatEngine
 from .llm import LLMClient
 from .memory import MemoryManager
+from .rulebooks import RulebookRepository
 from .scenarios import ScenarioRepository
 from .skills import SkillManager
 
@@ -26,7 +27,9 @@ class Services:
         self.memory = MemoryManager(self.db, self.llm, self.settings.all)
         self.skills = SkillManager(self.db, Path(skills_dir), self.llm, self.settings.all)
         self.dice = DiceRoller()
-        self.engine = ChatEngine(self.conversations, self.settings, self.llm, self.memory, self.skills, self.dice)
+        self.rulebooks = RulebookRepository(self.db, self.llm, self.settings.all)
+        self.engine = ChatEngine(self.conversations, self.settings, self.llm, self.memory, self.skills, self.dice,
+                                 rulebooks=self.rulebooks)
 
     async def close(self) -> None:
         aclose = getattr(self.llm, "aclose", None)

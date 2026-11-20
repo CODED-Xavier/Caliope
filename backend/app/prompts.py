@@ -183,7 +183,7 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
 
 SECTION_ORDER = [
     "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario",
-    "lore_always", "game_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
+    "lore_always", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
     "player", "pinned", "opening", "summary",
 ]
 
@@ -198,7 +198,8 @@ class PromptBuilder:
     def build(self, *, scenario: dict, state: dict, npcs: list[dict], summary: str, memories: list[dict],
               skills: list[dict], history: list[dict], settings: dict, pinned: str = "",
               appearance_hint: str = "", lore: tuple[list[dict], list[dict]] = ([], []),
-              status_due: bool | None = None, player_name: str = "") -> tuple[list[dict], dict]:
+              status_due: bool | None = None, player_name: str = "", rules: list[dict] | None = None,
+              house_rules: list[tuple[str, str]] | None = None) -> tuple[list[dict], dict]:
         """Return (messages, debug_info). History items need id, role, content and meta."""
         ctx = int(settings["context_window"])
         reserve = reply_token_limit(settings) + 150
@@ -219,6 +220,9 @@ class PromptBuilder:
         sections = self._stable_sections(scenario, prompt_npcs, summary, pinned, language, settings, mode, opening, skills)
         sections.update(self._card_sections(scenario, npcs, lore[0], macro))
         sections["writing"] = WRITING_RULES
+        if house_rules:
+            sections["house_rules"] = "## House rules (they win over the rulebook)\n" + "\n\n".join(
+                (f"{name}:\n" if len(house_rules) > 1 else "") + text for name, text in house_rules)
         kind = scenario.get("kind") or ("roleplay" if mode == "character" else "adventure")
         sections["player"] = describe_player(state, numbers=(kind == "adventure"))
         # Parts that change most often go last, so the model can reuse everything before them.
@@ -236,6 +240,10 @@ class PromptBuilder:
         used_memories = fit_memories(memories, mem_budget)
         met = [n for n in npcs if n.get("met", True)]
         extra = self._card_volatile(scenario, lore[1], status_due, macro)
+        if rules:
+            ref = "## Rules reference (from the rulebook; apply it, do not quote it at length)\n" + "\n\n".join(
+                f"[{r['book']}, p. {r['page']}{' - ' + r['heading'] if r['heading'] else ''}]\n{r['text']}" for r in rules)
+            extra = ref + ("\n\n" + extra if extra else "")
         early = sum(1 for h in history if h["role"] == "user") <= 2  # the first turns of a game
         volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra, early)
         budget = ctx - reserve - estimate_tokens(system_text) - estimate_tokens(volatile)
@@ -294,6 +302,7 @@ class PromptBuilder:
             "memories": len(used_memories),
             "lore_entries": [e["name"] or (e["keys"][:1] or ["?"])[0] for e in lore[0] + lore[1]],
             "status_due": bool(status_due),
+            "rules": [f"{r['book']} p.{r['page']} {r['heading']}".strip() for r in (rules or [])],
         }
         return messages, debug
 
