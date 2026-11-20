@@ -1,4 +1,4 @@
-# Local RPG Chat (v0.10: rulebooks)
+# Local RPG Chat (v0.11: combat)
 
 A chatbot for RPG and roleplay that runs 100% on your PC: no token limits, no subscription.
 It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
@@ -122,7 +122,7 @@ Thoughts are never read by the tracker and never stored as memories.
 ## 4d. Pictures and moods (v0.8)
 
 - **Your picture**: click the circle next to your name on the Sheet tab. It shows beside your messages.
-- **Character pictures**: open a character in the People tab (or in the card editor) → *Pictures and moods*. There is a main picture plus Standard, Happy, Sad, Angry, Disgusted and Blushing. Each slot takes a picture from your PC (⬆) or a link (🔗). Empty moods use the main picture.
+- **Character pictures**: open a character in the People tab (or in the card editor) → *🖼 Pictures and moods*. There is a main picture plus Standard, Happy, Sad, Angry, Disgusted and Blushing. Each slot takes a picture from your PC (⬆) or a link (🔗). Empty moods use the main picture. **＋ Add mood** creates a mood with your own name (Smug, Crying, Scared…, up to 12 per character); the AI is told about it.
 - **Emotions**: on character cards the character's picture sits beside every reply and changes with the mood of that reply (the AI starts each reply with `[[show: Name | Mood]]`). On Game Master cards the pictures appear above the part where each character speaks.
 - **Aa → Character pictures**: Big, Small (a name chip) or Hidden.
 - Pictures from your PC are saved in `backend/data/portraits/uploads`. Pictures from links are downloaded once into `backend/data/portraits`.
@@ -141,6 +141,37 @@ Thoughts are never read by the tracker and never stored as memories.
   installed. Restart the app afterwards. OCR takes about 2 to 4 seconds per page.
 - If you set an embedding model in Settings, books are also searched by meaning, not only by words.
 - Good free start: the **D&D System Reference Document 5.2** (Creative Commons), a PDF on dndbeyond.com.
+
+## 4f. Combat (v0.11)
+
+Side panel → **⚔ Combat** (Adventure cards show it always; any card shows it during a fight).
+
+1. Choose the rules: **d20** (D&D 5e) or **d10 dice pool** (Vampire 5e).
+2. Add enemies, or press **✨ Suggest from the scene**: the AI reads the last messages and fills them in. Check the numbers.
+   Your own numbers come from your sheet (change them for this fight if needed).
+3. **Start the fight.** The app rolls initiative and places everyone on the map.
+4. Each round: **Attack** (pick a target, normal/advantage/disadvantage), **Dodge**, or **Something else** (a spell, a trick…).
+   The app rolls your action and every other combatant's, updates HP and conditions, and sends the GM one ⚔️ line
+   with the exact results. The GM only narrates them: one reply per round.
+- Click a token to select it (enemies become your target), then click an empty square to move it (distance in squares and feet).
+- **−/＋** changes HP by hand; select a fighter to toggle conditions (prone, grappled, poisoned…), which change advantage.
+- **Others act** lets everyone else act now; **End fight** stops it. The fight also ends by itself when one side is down.
+- Your HP on the sheet always follows the fight. **Undo/rewind also undo the dice.**
+
+**Maps and terrain:** in the start form choose **Generate** (open field, forest, dungeon, cave, tavern, river crossing,
+town street, plus extra rocks/trees/bushes/barrels/water/mud, 🎲 reroll), **one of my maps**, or an empty grid.
+✨ Suggest also picks the map type for the scene. **🗺 My maps / editor** lets you paint your own maps (walls, trees,
+rocks, crates, water, mud, bushes, doors), optionally over a picture, and save them in a library.
+- Walls, trees, rocks, crates and deep water block movement. Something solid between attacker and target gives
+  **cover** (+2 AC, or +1 defense die). Standing in bushes also gives cover. Mud and bushes are difficult terrain.
+- Enemies walk around obstacles (6 squares a turn) to reach you; enemies with a **Range** above 1 shoot from afar.
+
+**What the chat shows:** one ⚔️ card per round, each action as its own block: who attacks whom, then 🎲 the roll,
+then 💥 the damage. The GM then narrates the actions in the same order.
+
+**d20 rules:** attack = d20 + bonus vs AC; natural 20 always hits and doubles the damage dice; natural 1 always misses.
+**Dice pool rules:** each d10 of 6+ is a success, each pair of 10s adds 2; attacks are contested by the defender's
+pool, and damage = margin + weapon bonus.
 
 ## 5. Tests
 

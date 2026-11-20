@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from .appearance import appearance_line
+from .combat import COMBAT_RULES, describe_combat
 from .portraits import portrait_instructions
 from .status import split_template
 from .util import estimate_tokens, render_macros, truncate
@@ -400,6 +401,9 @@ class PromptBuilder:
     @staticmethod
     def _volatile(state, npcs, memories, mode, appearance_hint: str = "", extra: str = "", early: bool = False) -> str:
         parts: list[str] = []
+        fight = describe_combat(state.get("combat") or {})
+        if fight:
+            parts.append("## Combat (tracked by the app)\n" + fight + "\n" + COMBAT_RULES)
         if mode != "character":
             parts.append("## Current game state\n" + describe_state(state))
         elif describe_scene(state):

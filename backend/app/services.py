@@ -9,6 +9,8 @@ from .db import Database
 from .dice import DiceRoller
 from .engine import ChatEngine
 from .llm import LLMClient
+from .combat import CombatEngine
+from .maps import MapRepository
 from .memory import MemoryManager
 from .rulebooks import RulebookRepository
 from .scenarios import ScenarioRepository
@@ -28,6 +30,8 @@ class Services:
         self.skills = SkillManager(self.db, Path(skills_dir), self.llm, self.settings.all)
         self.dice = DiceRoller()
         self.rulebooks = RulebookRepository(self.db, self.llm, self.settings.all)
+        self.combat = CombatEngine(self.dice)
+        self.maps = MapRepository(self.db)
         self.engine = ChatEngine(self.conversations, self.settings, self.llm, self.memory, self.skills, self.dice,
                                  rulebooks=self.rulebooks)
 

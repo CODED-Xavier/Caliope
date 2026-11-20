@@ -350,8 +350,8 @@ function Editor({ initial, id, onCancel, onSaved }) {
               <input key={key} className="field" placeholder={label} value={(n.appearance || {})[key] || ""} onChange={(e) => setLook(i, key, e.target.value)} />
             ))}
           </div>
-          <details className="npc-pics">
-            <summary className="small">Pictures and moods {(n.portraits?.default || n.portraits?.moods?.length) ? <span className="muted tiny">({(n.portraits.moods || []).length} moods)</span> : <span className="muted tiny">(none)</span>} <HelpTip id="portraits" /></summary>
+          <details className="npc-pics" open={d.npcs.length <= 6}>
+            <summary className="small">🖼 Pictures and moods (one picture per mood) {(n.portraits?.default || n.portraits?.moods?.length) ? <span className="muted tiny">({(n.portraits.moods || []).length} moods)</span> : <span className="muted tiny">(none)</span>} <HelpTip id="portraits" /></summary>
             <MoodEditor portraits={n.portraits} compact onChange={(v) => setNpc(i, "portraits", v)} />
           </details>
           <label className="check small"><input type="checkbox" checked={n.in_prompt !== false} onChange={(e) => setNpc(i, "in_prompt", e.target.checked)} />
