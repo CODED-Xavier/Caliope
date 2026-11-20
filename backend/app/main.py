@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from .cardio import export_card, parse_card
+from .cards import resolve_features
 from .config import DB_PATH, FRONTEND_DIST
 from .conversations import NotFound
 from .drafts import draft_card_field, draft_player
