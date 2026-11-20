@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .appearance import appearance_line
 from .combat import COMBAT_RULES, describe_combat
+from .jukebox import MOODS
 from .portraits import portrait_instructions
 from .status import split_template
 from .util import estimate_tokens, render_macros, truncate
@@ -441,6 +442,7 @@ class PromptBuilder:
         lines += [
             "- location: the player's new location name if they moved, else \"\". time: the new time of day if it changed, else \"\". "
             "weather: the new weather if it changed, else \"\".",
+            "- scene_mood: the feeling of the scene for background music, one of: " + ", ".join(MOODS) + ".",
         ]
         if full:
             lines += ["- new_locations: newly mentioned places (name, description, connects_to: names of existing places)."]
@@ -501,16 +503,17 @@ ANALYSIS_SCHEMA = {
         "location": {"type": "string"},
         "time": {"type": "string"},
         "weather": {"type": "string"},
+        "scene_mood": {"type": "string", "enum": list(MOODS)},
         "new_locations": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "connects_to": {"type": "array", "items": {"type": "string"}}}, "required": ["name", "description", "connects_to"]}},
         "relationship_changes": {"type": "array", "items": {"type": "object", "properties": {"npc": {"type": "string"}, "delta": {"type": "integer"}, "reason": {"type": "string"}}, "required": ["npc", "delta", "reason"]}},
         "new_npcs": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "personality": {"type": "string"}, "appearance": _APPEARANCE_SCHEMA}, "required": ["name", "description", "personality", "appearance"]}},
         "memories": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "importance": {"type": "integer"}, "characters": {"type": "array", "items": {"type": "string"}}}, "required": ["text", "importance", "characters"]}},
     },
-    "required": ["hp_change", "gold_change", "inventory_add", "inventory_remove", "quests", "location", "time", "weather",
+    "required": ["hp_change", "gold_change", "inventory_add", "inventory_remove", "quests", "location", "time", "weather", "scene_mood",
                  "new_locations", "relationship_changes", "new_npcs", "memories"],
 }
 
-_LITE_KEYS = ("location", "time", "weather", "relationship_changes", "new_npcs", "memories")
+_LITE_KEYS = ("location", "time", "weather", "scene_mood", "relationship_changes", "new_npcs", "memories")
 ANALYSIS_SCHEMA_LITE = {
     "type": "object",
     "properties": {k: ANALYSIS_SCHEMA["properties"][k] for k in _LITE_KEYS},

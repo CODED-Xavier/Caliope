@@ -23,6 +23,8 @@ from .maps import FEATURES as MAP_FEATURES
 from .maps import TILES as MAP_TILES
 from .maps import TYPES as MAP_TYPES
 from .maps import MapError, generate as generate_map
+from .jukebox import MOODS as MUSIC_MOODS
+from .jukebox import MusicError
 from .rulebooks import RulebookError, ocr_available
 from .images import UPLOAD_NAME, ImageError, get_image, save_upload
 from .dice import DiceError
@@ -221,6 +223,47 @@ async def combat_edit(conv_id: int, cid: str, body: dict[str, Any] = Body(...)):
     state = s.combat.edit(s.conversations.get_state(conv_id), cid, body.get("hp"), body.get("conditions"), body.get("x"), body.get("y"))
     s.conversations.save_state(conv_id, state)
     return state
+
+
+# ------------------------------------------------------------------ jukebox
+@app.exception_handler(MusicError)
+async def _music_error(_: Request, exc: MusicError):
+    return JSONResponse({"detail": str(exc)}, status_code=400)
+
+
+@app.get("/api/music")
+async def list_music():
+    return {"tracks": svc().music.list(), "moods": list(MUSIC_MOODS)}
+
+
+@app.post("/api/music/upload")
+async def upload_music(request: Request, name: str = Query(""), tags: str = Query("")):
+    """A song from this PC, sent as the raw request body."""
+    return svc().music.add_file(await request.body(), name, tags.split(","))
+
+
+@app.post("/api/music")
+async def add_music_link(body: dict[str, Any] = Body(...)):
+    return svc().music.add_link(str(body.get("url", "")), str(body.get("name", "")), body.get("tags"), body.get("cards"))
+
+
+@app.patch("/api/music/{track_id}")
+async def update_music(track_id: int, body: dict[str, Any] = Body(...)):
+    return svc().music.update(track_id, body.get("name"), body.get("tags"), body.get("cards"))
+
+
+@app.delete("/api/music/{track_id}")
+async def delete_music(track_id: int):
+    svc().music.delete(track_id)
+    return {"deleted": True}
+
+
+@app.get("/api/music/files/{name}")
+async def music_file(name: str):
+    path = svc().music.file_path(name)
+    if not path:
+        raise HTTPException(status_code=404, detail="Song not found")
+    return FileResponse(path, headers={"Cache-Control": "public, max-age=31536000, immutable", "Accept-Ranges": "bytes"})
 
 
 # ------------------------------------------------------------------ battle maps

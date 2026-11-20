@@ -21,6 +21,7 @@ from .config import SettingsStore
 from .conversations import ConversationRepository, NotFound
 from .dice import DiceError, DiceRoller
 from .llm import LLMError
+from .jukebox import guess_mood
 from .lorebook import select_entries
 from .memory import MemoryManager
 from .portraits import process_reply
@@ -439,6 +440,12 @@ class ChatEngine:
             pass  # a message to the GM, outside the story: nothing to track or remember
         elif tracker == "off":
             await self._remember_exchange(conv_id, user_msg["content"], reply, assistant_msg["id"])
+            mood = guess_mood(reply)  # no tracker: a quick keyword check names the scene's mood for the Jukebox
+            st = self.repo.get_state(conv_id)
+            if mood and mood != st.get("scene_mood"):
+                st["scene_mood"] = mood
+                self.repo.save_state(conv_id, st)
+                yield {"type": "state", "state": st, "npcs": self.repo.list_npcs(conv_id), "changes": []}
         else:
             count, exchanges = self._tracking_context(conv_id, features["tracker_interval"])
             if count % features["tracker_interval"] == 0:  # the tracker runs every N replies and reads all N exchanges

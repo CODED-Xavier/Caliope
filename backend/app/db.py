@@ -8,6 +8,16 @@ from pathlib import Path
 from typing import Any, Iterable
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS tracks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    url         TEXT NOT NULL DEFAULT '',
+    file        TEXT NOT NULL DEFAULT '',
+    tags        TEXT NOT NULL DEFAULT '[]',
+    cards       TEXT NOT NULL DEFAULT '[]',
+    created_at  REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS maps (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
