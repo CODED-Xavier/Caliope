@@ -81,13 +81,14 @@ class BusyError(Exception):
 
 class ChatEngine:
     def __init__(self, repo: ConversationRepository, settings: SettingsStore, llm, memory: MemoryManager,
-                 skills: SkillManager, dice: DiceRoller):
+                 skills: SkillManager, dice: DiceRoller, rulebooks=None):
         self.repo = repo
         self.settings = settings
         self.llm = llm
         self.memory = memory
         self.skills = skills
         self.dice = dice
+        self.rulebooks = rulebooks
         self.prompts = PromptBuilder()
         self.rng = random.Random()
         self._locks: dict[int, asyncio.Lock] = {}
@@ -177,11 +178,12 @@ class ChatEngine:
             history = self.repo.list_messages(conv_id, after_id=conv["summary_upto"])
             recent = [m["content"] for m in reversed(history)]
             lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
+            _, house = await self._rules_for(scenario, "", settings)
             messages, _debug = self.prompts.build(
                 scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=[],
                 skills=self.skills.attached((scenario.get("skills") or {}).get("attached", [])),
                 history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""),
-                lore=lore, player_name=state["player"].get("name") or "",
+                lore=lore, player_name=state["player"].get("name") or "", house_rules=house,
             )
             messages.append({"role": "user", "content": CONTINUE_PROMPT})
             yield {"type": "continue_start", "message_id": last["id"]}
@@ -353,14 +355,15 @@ class ChatEngine:
 
         recent = [m["content"] for m in reversed(history)]  # newest first, for the lorebook keyword scan
         lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
+        rules, house = await self._rules_for(scenario, said + " " + previous_text[-250:], settings)
         messages, debug = self.prompts.build(
             scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=memories,
             skills=skills, history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""),
             appearance_hint=hint, lore=lore, status_due=self._status_due(conv_id, scenario),
-            player_name=state["player"].get("name") or "",
+            player_name=state["player"].get("name") or "", rules=rules, house_rules=house,
         )
         yield {"type": "context", "debug": debug, "skills": [s["name"] for s in skills],
-               "memories": [m["text"] for m in memories][: debug["memories"]]}
+               "memories": [m["text"] for m in memories][: debug["memories"]], "rules": debug.get("rules", [])}
 
         player_name = state["player"].get("name") or "Player"
         stop = [f"\n{player_name}:", "\nPlayer:", "\nUser:"]
@@ -444,6 +447,16 @@ class ChatEngine:
             self.repo.update_message_meta(assistant_msg["id"], {"timing": timing})
             yield {"type": "timing", "timing": timing}
         yield {"type": "done"}
+
+    async def _rules_for(self, scenario: dict, query: str, settings: dict) -> tuple[list[dict], list[tuple[str, str]]]:
+        """Rulebook passages that fit this turn, and the house rules of the card's books."""
+        if not self.rulebooks or not scenario.get("rulebooks"):
+            return [], []
+        ids = self.rulebooks.ready_ids(scenario["rulebooks"])
+        if not ids:
+            return [], []
+        passages = await self.rulebooks.passages_for_turn(ids, query, int(settings.get("rules_char_budget", 1400)))
+        return passages, self.rulebooks.house_rules(ids)
 
     def _status_due(self, conv_id: int, scenario: dict) -> bool | None:
         """None when the card has no status block; otherwise whether this reply should write one."""

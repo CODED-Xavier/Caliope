@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { MODE_LABELS, timeAgo } from "../utils.js";
 
-export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, onDelete, onSkills, onSettings, health, theme, onToggleTheme }) {
+export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, onDelete, onSkills, onRulebooks, onSettings, health, theme, onToggleTheme }) {
   const online = health?.llm?.ok;
   const [filter, setFilter] = useState("");
   const shown = filter.trim() ? convs.filter((c) => (c.title || "").toLowerCase().includes(filter.trim().toLowerCase())) : convs;
@@ -9,6 +9,7 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, on
     <aside className="sidebar">
       <div className="brand">
         <span className="brand-dice">🎲</span> Local RPG
+        <button className="icon-btn theme-btn" onClick={onToggleTheme} title="Toggle light/dark">{theme === "dark" ? "☀" : "☾"}</button>
       </div>
       <button className="btn primary wide" onClick={onNew}>＋ New game</button>
       <div className="side-label">Your games</div>
@@ -36,8 +37,8 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, on
         </button>
         <div className="row gap">
           <button className="btn ghost grow" onClick={onSkills}>🧩 Skills</button>
+          <button className="btn ghost grow" onClick={onRulebooks} title="Rulebooks">📚 Rules</button>
           <button className="btn ghost grow" onClick={onSettings}>⚙ Settings</button>
-          <button className="btn ghost" onClick={onToggleTheme} title="Toggle light/dark">{theme === "dark" ? "☀" : "☾"}</button>
         </div>
       </div>
     </aside>

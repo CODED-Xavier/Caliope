@@ -8,6 +8,39 @@ from pathlib import Path
 from typing import Any, Iterable
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS rulebooks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    system      TEXT NOT NULL DEFAULT 'other',
+    source      TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'processing',
+    progress    REAL NOT NULL DEFAULT 0,
+    message     TEXT NOT NULL DEFAULT '',
+    info        TEXT NOT NULL DEFAULT '{}',
+    house_rules TEXT NOT NULL DEFAULT '',
+    created_at  REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS rule_chunks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id     INTEGER NOT NULL REFERENCES rulebooks(id) ON DELETE CASCADE,
+    seq         INTEGER NOT NULL DEFAULT 0,
+    heading     TEXT NOT NULL DEFAULT '',
+    page        INTEGER NOT NULL DEFAULT 0,
+    text        TEXT NOT NULL,
+    embedding   BLOB,
+    embed_model TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_rule_chunks_book ON rule_chunks(book_id, seq);
+CREATE VIRTUAL TABLE IF NOT EXISTS rule_chunks_fts USING fts5(
+    heading, text, content='rule_chunks', content_rowid='id', tokenize='porter unicode61 remove_diacritics 2'
+);
+CREATE TRIGGER IF NOT EXISTS rule_chunks_ai AFTER INSERT ON rule_chunks BEGIN
+    INSERT INTO rule_chunks_fts(rowid, heading, text) VALUES (new.id, new.heading, new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS rule_chunks_ad AFTER DELETE ON rule_chunks BEGIN
+    INSERT INTO rule_chunks_fts(rule_chunks_fts, rowid, heading, text) VALUES ('delete', old.id, old.heading, old.text);
+END;
+
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL

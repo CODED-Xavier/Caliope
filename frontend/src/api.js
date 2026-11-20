@@ -72,6 +72,16 @@ export const api = {
     if (!res.ok) throw new Error(await errorMessage(res));
     return res.json();
   },
+  rulebooks: () => request("GET", "/api/rulebooks"),
+  async uploadRulebook(file, name, system) {
+    const qs = new URLSearchParams({ name, system, filename: file.name });
+    const res = await fetch(`/api/rulebooks?${qs}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    return res.json();
+  },
+  updateRulebook: (id, body) => request("PATCH", `/api/rulebooks/${id}`, body),
+  deleteRulebook: (id) => request("DELETE", `/api/rulebooks/${id}`),
+  searchRulebooks: (q, ids = []) => request("GET", `/api/rulebooks/search?${new URLSearchParams({ q, ids: ids.join(",") })}`),
   draftField: (field, card, hint = "") => request("POST", "/api/drafts/card-field", { field, card, hint }),
   draftPlayer: (scenarioId, player) => request("POST", "/api/drafts/player", { scenario_id: scenarioId, player }),
   fork: (id, messageId) => request("POST", `/api/conversations/${id}/fork`, { message_id: messageId }),

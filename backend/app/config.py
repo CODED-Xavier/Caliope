@@ -45,6 +45,8 @@ DEFAULT_SETTINGS: dict = {
     # --- Cards and skills ---
     "default_card_kind": "roleplay",  # type used for new cards: roleplay | adventure
     "skills_char_budget": 3500,       # max characters of attached skill text shared by one card's skills
+    # --- Rulebooks ---
+    "rules_char_budget": 1400,        # characters of rulebook passages added to a turn (about 350 tokens)
 }
 
 
