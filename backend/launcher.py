@@ -193,6 +193,62 @@ def first_run_questions() -> None:
 
 
 # ------------------------------------------------------------------ main
+# ------------------------------------------------------------------ the app's own window
+def _browser_for_window() -> str | None:
+    """Edge (on every Windows 10/11), else Chrome or Brave: they can show a page as an app window (no tabs, no address bar)."""
+    if os.name != "nt":
+        return None
+    roots = [os.environ.get(k, "") for k in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
+    for rel in (r"Microsoft\Edge\Application\msedge.exe", r"Google\Chrome\Application\chrome.exe",
+                r"BraveSoftware\Brave-Browser\Application\brave.exe"):
+        for root in roots:
+            p = Path(root) / rel
+            if root and p.is_file():
+                return str(p)
+    return None
+
+
+def open_app_window(url: str, profile: Path):
+    """Open the app in a window of its own. Returns the window's process, or None (then the normal browser is used)."""
+    exe = _browser_for_window()
+    if not exe:
+        return None
+    profile.mkdir(parents=True, exist_ok=True)
+    try:
+        return subprocess.Popen([exe, f"--app={url}", f"--user-data-dir={profile}", "--window-size=1400,900",
+                                 "--no-first-run", "--no-default-browser-check", "--disable-features=Translate"])
+    except OSError:
+        return None
+
+
+def minimize_console() -> None:
+    if os.name == "nt":
+        try:
+            import ctypes
+            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE: errors are still there if you open it
+        except Exception:
+            pass
+
+
+def show_app(settings: dict, url: str = APP_URL):
+    """The app's own window when the setting is on (the default), else a browser tab. Returns the window process or None."""
+    if settings.get("app_window", True):
+        win = open_app_window(url, BACKEND / "data" / "window")
+        if win:
+            return win
+    webbrowser.open(url)
+    return None
+
+
+def wait_window(win) -> bool:
+    """Wait until the app window is closed. False when the window handed itself to one already open (then keep running)."""
+    started = time.monotonic()
+    win.wait()
+    return time.monotonic() - started > 5
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Start Local RPG")
     ap.add_argument("--no-browser", action="store_true", help="do not open the browser")
@@ -209,7 +265,7 @@ def main() -> int:
     if get_json(APP_URL + "/api/health"):
         say("  The app is already running. Opening it...")
         if not args.no_browser:
-            webbrowser.open(APP_URL)
+            show_app(get_json(APP_URL + "/api/settings") or {})
         return 0
 
     first_run_questions()
@@ -229,9 +285,20 @@ def main() -> int:
         elif not args.no_lmstudio:
             prepare_lmstudio(settings)
         say(f"\n  Ready: {APP_URL}")
+        win = None if args.no_browser else show_app(settings)
+        if win:
+            say("  The game opened in its own window. Closing that window stops everything.")
+            say("  (This black window holds the messages and errors; it is minimized.)\n")
+            minimize_console()
+            if wait_window(win):
+                say("  Window closed: stopping...")
+                server.terminate()
+                try:
+                    server.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    server.kill()
+                return 0
         say("  Keep this window open while you play. Close it (or press Ctrl+C) to stop.\n")
-        if not args.no_browser:
-            webbrowser.open(APP_URL)
         return server.wait()
     except KeyboardInterrupt:
         say("\n  Stopping...")
