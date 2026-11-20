@@ -1,4 +1,4 @@
-# Local RPG Chat (v0.8: avatars and moods)
+# Local RPG Chat (v0.9: one-click start)
 
 A chatbot for RPG and roleplay that runs 100% on your PC: no token limits, no subscription.
 It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
@@ -6,15 +6,23 @@ It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
 
 ## 0. Quick start (every time you play)
 
-1. Open **LM Studio**, load the model and switch the local server on.
-2. Double-click **`start-backend.bat`** (keep that window open).
-3. Double-click **`start-frontend.bat`**. The first run installs packages (needs internet), then your browser opens
-   at **http://localhost:5173**. This mode reloads automatically when the code changes.
+Double-click **`Play.bat`**. That's it. It:
 
-Prefer a single window? Double-click **`build-frontend.bat`** once, then only run `start-backend.bat`
-and open **http://127.0.0.1:8000**. (Run the build again after any interface change.)
+1. sets up Python packages the first time (and again only when they change),
+2. builds the interface when it is missing or its code changed (needs Node.js for that),
+3. starts the app,
+4. starts LM Studio's server and loads your model with your context size, if they are not running yet,
+5. opens **http://127.0.0.1:8000** in your browser.
 
-Needs: Python 3.12 (`py install 3.12`) and Node.js LTS.
+Keep the black window open while you play; close it to stop. The first run asks whether to put a
+**Local RPG** shortcut on your desktop (or run `Play.bat --shortcut` any time).
+
+Options: `Play.bat --no-browser` (don't open the browser), `Play.bat --no-lmstudio` (don't touch LM Studio).
+
+Needs: Python 3.12 (`py install 3.12`), Node.js LTS (only to build the interface) and LM Studio.
+
+**For development** (the interface reloads as you edit the code): run `start-backend.bat` and
+`start-frontend.bat`, then open http://localhost:5173.
 
 ### What the interface has
 - Sidebar with your games, new-game picker (3 example scenarios, your own, or "generate from an idea")
