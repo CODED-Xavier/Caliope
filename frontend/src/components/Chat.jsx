@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Markdown } from "../markdown.jsx";
 import { firstMood, hideStatus, moodUrl, portraitSrc, stripTags } from "../portraits.js";
 import Story from "./Story.jsx";
@@ -257,6 +257,15 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
 
   const regenerate = () => { waitingReply.current = true; anchored.current = false; onRegenerate(); };
 
+  // The same function objects on every render, so the (memoized) messages do not all redraw on every new word.
+  const live = useRef({});
+  live.current = { regenerate, onContinue, onFork, onPaint, onEdit, onResend, onRewind };
+  const actions = useMemo(() => {
+    const call = (name) => (...args) => live.current[name]?.(...args);
+    return { regenerate: call("regenerate"), onContinue: call("onContinue"), onFork: call("onFork"), onPaint: call("onPaint"),
+      onEdit: call("onEdit"), onResend: call("onResend"), onRewind: call("onRewind") };
+  }, []);
+
   const submit = () => {
     const t = text.trim();
     if (!t || busy) return;
@@ -290,10 +299,10 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
         <div className="chat-inner">
           {messages.map((m, i) => (
             <Message key={m.id} m={m} npcs={game.npcs} speaker={speaker} playerPic={playerPic} portraitStyle={portraitStyle}
-              scenePictures={scenePictures} onPaint={onPaint} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
-              onRegenerate={regenerate} onContinue={onContinue} onFork={onFork}
+              scenePictures={scenePictures} onPaint={actions.onPaint} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
+              onRegenerate={actions.regenerate} onContinue={actions.onContinue} onFork={actions.onFork}
               hit={m.id === current ? "search-hit current" : hits.includes(m.id) ? "search-hit" : ""} canAct={!busy} lastContext={busy ? null : lastContext}
-              onEdit={onEdit} onResend={onResend} onRewind={onRewind} />
+              onEdit={actions.onEdit} onResend={actions.onResend} onRewind={actions.onRewind} />
           ))}
           {!busy && messages.length > 0 && messages[messages.length - 1].role === "user" && (
             <div className="retry">

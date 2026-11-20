@@ -85,6 +85,7 @@ class LLMClient:
         self._get = get_settings
         self._client = None
         self._auto_model: str | None = None
+        self._embed_cache: dict[tuple[str, str], list[float]] = {}  # the same query is often embedded twice a turn
 
     # ---------------------------------------------------------------- plumbing
     async def _http(self):
@@ -261,6 +262,8 @@ class LLMClient:
         model = embedding_key(self._get())
         if not model or not texts:
             return None
+        if len(texts) == 1 and (model, texts[0]) in self._embed_cache:
+            return [self._embed_cache[(model, texts[0])]]
         import httpx
 
         client = await self._http()
@@ -275,7 +278,12 @@ class LLMClient:
                 log.warning("Embedding request failed: %s %s", resp.status_code, resp.text[:200])
                 return None
             data = sorted(resp.json()["data"], key=lambda d: d.get("index", 0))
-            return [d["embedding"] for d in data]
+            out = [d["embedding"] for d in data]
+            if len(texts) == 1 and out:
+                if len(self._embed_cache) >= 64:
+                    self._embed_cache.pop(next(iter(self._embed_cache)))
+                self._embed_cache[(model, texts[0])] = out[0]
+            return out
         except (httpx.HTTPError, KeyError, ValueError) as exc:
             log.warning("Embedding request failed: %s", exc)
             return None

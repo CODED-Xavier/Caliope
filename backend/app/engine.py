@@ -405,7 +405,7 @@ class ChatEngine:
 
         recent = [m["content"] for m in reversed(history)]  # newest first, for the lorebook keyword scan
         lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
-        rules, house = await self._rules_for(scenario, said + " " + previous_text[-250:], settings)
+        rules, house = await self._rules_for(scenario, query, settings)  # same text as the memory search: embedded once
         messages, debug = self.prompts.build(
             scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=memories,
             skills=skills, history=with_latest_status(history), settings=settings, pinned=conv.get("pinned_memory", ""), player_lore=conv.get("player_lore"),
@@ -483,7 +483,7 @@ class ChatEngine:
                 yield {"type": "state", "state": st, "npcs": self.repo.list_npcs(conv_id), "changes": []}
         else:
             count, exchanges = self._tracking_context(conv_id, features["tracker_interval"])
-            if count % features["tracker_interval"] == 0:  # the tracker runs every N replies and reads all N exchanges
+            if exchanges and count % features["tracker_interval"] == 0:  # the tracker runs every N replies and reads all N exchanges
                 yield {"type": "analysis_start"}
                 t0 = time.perf_counter()
                 result = await self._analyze(conv_id, scenario, exchanges, assistant_msg["id"], settings, tracker)
@@ -495,7 +495,7 @@ class ChatEngine:
 
         if settings.get("scene_pictures") and not is_gm_message(user_msg["content"]):
             place_now = self.repo.get_state(conv_id).get("location", "")
-            first = not any(m["meta"].get("scene_picture") for m in self.repo.list_messages(conv_id))
+            first = not self.repo.has_meta(conv_id, "scene_picture")
             new_scene = first or (place_now and place_now != place_before) or "\u2694\ufe0f Combat starts" in user_msg["content"]
             if new_scene:
                 pic = await self._scene_picture(conv_id, assistant_msg["id"], reply, settings)
@@ -563,14 +563,13 @@ class ChatEngine:
         every = int(info.get("status_every") or 0)
         if not every or not split_template(info.get("post_history") or "")[1]:
             return None
-        done = sum(1 for m in self.repo.list_messages(conv_id)
-                   if m["role"] == "assistant" and not m["meta"].get("opening") and not m["meta"].get("interrupted"))
-        return (done + 1) % every == 0
+        return (self.repo.count_replies(conv_id) + 1) % every == 0
 
     def _tracking_context(self, conv_id: int, interval: int) -> tuple[int, list[tuple[str, str]]]:
         """(number of finished replies so far, the last `interval` exchanges as (player text, reply) pairs)."""
-        msgs = [m for m in self.repo.list_messages(conv_id) if not m["meta"].get("opening") and not m["meta"].get("interrupted")]
-        count = sum(1 for m in msgs if m["role"] == "assistant")
+        count = self.repo.count_replies(conv_id)
+        recent = self.repo.recent_messages(conv_id, interval * 2 + 8)  # only the last exchanges are read
+        msgs = [m for m in recent if not m["meta"].get("opening") and not m["meta"].get("interrupted")]
         pairs: list[tuple[str, str]] = []
         i = len(msgs) - 1
         while i >= 1 and len(pairs) < interval:

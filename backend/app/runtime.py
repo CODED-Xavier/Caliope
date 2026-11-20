@@ -144,8 +144,13 @@ class EngineManager:
 
     @staticmethod
     def log_tail(lines: int = 12) -> str:
+        """The end of the engine log (only the last few KB are read: the settings window asks every 1.5 s)."""
         try:
-            text = LOG_PATH.read_text("utf-8", errors="replace")
+            with open(LOG_PATH, "rb") as fh:
+                fh.seek(0, os.SEEK_END)
+                size = fh.tell()
+                fh.seek(max(0, size - 8192))
+                text = fh.read().decode("utf-8", errors="replace")
         except OSError:
             return ""
         return "\n".join(text.splitlines()[-lines:])
@@ -153,14 +158,23 @@ class EngineManager:
     # ---- start / stop
     def _spawn(self, cmd: list[str]) -> subprocess.Popen:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
-        logf = open(LOG_PATH, "a", encoding="utf-8", errors="replace")  # noqa: SIM115 (kept open by the child)
-        logf.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} {' '.join(cmd)}\n")
-        logf.flush()
-        flags = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW
-        proc = subprocess.Popen(cmd, stdout=logf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, creationflags=flags,
-                                cwd=str(Path(cmd[0]).parent))
+        with open(LOG_PATH, "a", encoding="utf-8", errors="replace") as logf:  # the child keeps its own copy open
+            logf.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} {' '.join(cmd)}\n")
+            logf.flush()
+            flags = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW
+            proc = subprocess.Popen(cmd, stdout=logf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, creationflags=flags,
+                                    cwd=str(Path(cmd[0]).parent))
         _kill_with_parent(proc)
         return proc
+
+    @staticmethod
+    def _rotate_log() -> None:
+        """One log per engine start (the previous one is kept as engine.log.1), so it never grows without end."""
+        try:
+            if LOG_PATH.exists():
+                LOG_PATH.replace(LOG_PATH.with_name(LOG_PATH.name + ".1"))
+        except OSError:
+            pass
 
     async def start(self, wait: bool = True) -> dict:
         async with self._lock:
@@ -180,6 +194,7 @@ class EngineManager:
                 return self.status()
             port = int(s.get("engine_port", 8091))
             self._kill_stale()
+            self._rotate_log()
             self.chat = self._spawn(build_command(binary, model, int(s.get("context_window", 8192)), port,
                                                   str(s.get("engine_gpu_layers", "auto"))))
             emb = s.get("engine_embedding_path", "")

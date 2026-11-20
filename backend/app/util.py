@@ -116,7 +116,7 @@ def as_int(value: Any, default: int = 0) -> int:
         if isinstance(value, str):
             value = value.strip().replace("+", "")
         return int(float(value))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):  # "1e999" from a model would be infinite
         return default
 
 

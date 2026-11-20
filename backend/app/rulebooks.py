@@ -200,11 +200,45 @@ def _fts_query(query: str) -> str:
     return " OR ".join(f'"{t}"*' if len(t) >= 4 else f'"{t}"' for t in tokens[:14])
 
 
+def _similarities(rows: list[dict], q: list[float]) -> list[tuple[float, int]]:
+    """Cosine similarity of the query with every stored vector (numpy when available: ~100x faster)."""
+    try:
+        import numpy as np
+        dim = len(q)
+        good = [r for r in rows if len(r["embedding"]) == dim * 4]
+        if not good:
+            return []
+        mat = np.frombuffer(b"".join(r["embedding"] for r in good), dtype=np.float32).reshape(len(good), dim)
+        qv = np.asarray(q, dtype=np.float32)
+        sims = (mat @ qv) / (np.linalg.norm(mat, axis=1) * np.linalg.norm(qv) + 1e-9)
+        return [(float(x), r["id"]) for x, r in zip(sims, good)]
+    except ImportError:  # pragma: no cover
+        from .memory import cosine
+        out = []
+        for r in rows:
+            v = array("f")
+            v.frombytes(r["embedding"])
+            if len(v) == len(q):
+                out.append((cosine(list(v), q), r["id"]))
+        return out
+
+
 class RulebookRepository:
     def __init__(self, db: Database, llm=None, get_settings: Callable[[], dict] = dict):
         self.db = db
         self.llm = llm
         self._get = get_settings
+        # A book that was being read when the app closed would say "processing" forever.
+        db.execute("UPDATE rulebooks SET status = 'error', progress = 0, "
+                   "message = 'The import was interrupted when the app closed. Delete the book and import it again.' "
+                   "WHERE status = 'processing'")
+
+    async def embed_missing(self) -> int:
+        """Give every ready book vectors for the current embedding model (after the model changed)."""
+        done = 0
+        for row in self.db.query("SELECT id FROM rulebooks WHERE status = 'ready'"):
+            done += await self.embed_book(row["id"])
+        return done
 
     # ---- books
     def create(self, name: str, system: str = "other", source: str = "") -> dict:
@@ -327,9 +361,9 @@ class RulebookRepository:
         if not model or not book_ids or self.llm is None or not query.strip():
             return []
         marks = ",".join("?" * len(book_ids))
+        # Vectors only first (a book has thousands of passages); the text is read for the few best ones.
         rows = self.db.query(
-            f"SELECT c.id, c.book_id, c.heading, c.page, c.text, c.embedding, b.name AS book FROM rule_chunks c "
-            f"JOIN rulebooks b ON b.id = c.book_id WHERE c.book_id IN ({marks}) AND c.embedding IS NOT NULL AND c.embed_model = ?",
+            f"SELECT id, embedding FROM rule_chunks WHERE book_id IN ({marks}) AND embedding IS NOT NULL AND embed_model = ?",
             (*book_ids, model),
         )
         if not rows:
@@ -337,17 +371,18 @@ class RulebookRepository:
         vecs = await self.llm.embed([query])
         if not vecs:
             return []
-        from .memory import cosine
         q = vecs[0]
-        scored = []
-        for r in rows:
-            v = array("f")
-            v.frombytes(r["embedding"])
-            if len(v) == len(q):
-                scored.append((cosine(list(v), q), r))
+        scored = _similarities(rows, q)
         scored = [t for t in scored if t[0] >= 0.45]
         scored.sort(key=lambda t: t[0], reverse=True)
-        return [{k: v for k, v in r.items() if k != "embedding"} | {"similarity": s} for s, r in scored[:limit]]
+        best = scored[:limit]
+        if not best:
+            return []
+        ids = [r_id for _, r_id in best]
+        texts = {r["id"]: r for r in self.db.query(
+            f"SELECT c.id, c.book_id, c.heading, c.page, c.text, b.name AS book FROM rule_chunks c JOIN rulebooks b ON b.id = c.book_id "
+            f"WHERE c.id IN ({','.join('?' * len(ids))})", tuple(ids))}
+        return [texts[i] | {"similarity": s} for s, i in best if i in texts]
 
     async def search(self, book_ids: list[int], query: str, k: int = 3) -> list[dict]:
         keyword = self.search_keyword(book_ids, query, limit=k * 3)

@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import json
+import re
 
 from .appearance import normalize_appearance
-from .db import Database
+from .db import Database, pack_snapshot, unpack_snapshot
 from .scenarios import normalize_portraits, normalize_scenario
 from .state import new_state
 from .portraits import process_reply
@@ -109,13 +110,15 @@ class ConversationRepository:
 
     def list(self) -> list[dict]:
         rows = self.db.query(
-            "SELECT c.id, c.title, c.scenario_id, c.scenario_snapshot, c.created_at, c.updated_at, "
+            # Only the card's name and mode are needed: read them inside SQLite instead of parsing every card copy.
+            "SELECT c.id, c.title, c.scenario_id, json_extract(c.scenario_snapshot, '$.name') AS sname, "
+            "json_extract(c.scenario_snapshot, '$.mode') AS smode, c.created_at, c.updated_at, "
             "(SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS message_count "
             "FROM conversations c ORDER BY c.updated_at DESC"
         )
         out = []
         for r in rows:
-            snap = json.loads(r["scenario_snapshot"] or "{}")
+            snap = {"name": r["sname"] or "", "mode": r["smode"] or ""}
             out.append(
                 {
                     "id": r["id"],
@@ -161,10 +164,11 @@ class ConversationRepository:
         self.db.execute("UPDATE conversations SET summary = ?, summary_upto = ? WHERE id = ?", (summary, upto, conv_id))
 
     # ----------------------------------------------------------------- messages
+    _COLS = "id, conversation_id, role, content, meta, created_at"
+
     @staticmethod
     def _msg(row: dict, with_snapshot: bool = False) -> dict:
         meta = json.loads(row["meta"] or "{}")
-        snap = meta.pop("snapshot", None)
         out = {
             "id": row["id"],
             "conversation_id": row["conversation_id"],
@@ -174,26 +178,44 @@ class ConversationRepository:
             "created_at": row["created_at"],
         }
         if with_snapshot:
-            out["snapshot"] = snap
+            out["snapshot"] = unpack_snapshot(row.get("snapshot"))
         return out
 
     def add_message(self, conv_id: int, role: str, content: str, meta: dict | None = None) -> dict:
+        meta = dict(meta or {})
+        snap = meta.pop("snapshot", None)  # undo data lives compressed in its own column
         cur = self.db.execute(
-            "INSERT INTO messages(conversation_id, role, content, meta, created_at) VALUES(?,?,?,?,?)",
-            (conv_id, role, content, json.dumps(meta or {}, ensure_ascii=False), now()),
+            "INSERT INTO messages(conversation_id, role, content, meta, snapshot, created_at) VALUES(?,?,?,?,?,?)",
+            (conv_id, role, content, json.dumps(meta, ensure_ascii=False), pack_snapshot(snap), now()),
         )
         self.touch(conv_id)
         return self.get_message(cur.lastrowid)
 
     def get_message(self, message_id: int, with_snapshot: bool = False) -> dict:
-        row = self.db.query_one("SELECT * FROM messages WHERE id = ?", (message_id,))
+        cols = self._COLS + (", snapshot" if with_snapshot else "")
+        row = self.db.query_one(f"SELECT {cols} FROM messages WHERE id = ?", (message_id,))
         if not row:
             raise NotFound(f"Message {message_id} not found")
         return self._msg(row, with_snapshot)
 
     def list_messages(self, conv_id: int, after_id: int = 0, with_snapshot: bool = False) -> list[dict]:
-        rows = self.db.query("SELECT * FROM messages WHERE conversation_id = ? AND id > ? ORDER BY id", (conv_id, after_id))
+        cols = self._COLS + (", snapshot" if with_snapshot else "")
+        rows = self.db.query(f"SELECT {cols} FROM messages WHERE conversation_id = ? AND id > ? ORDER BY id", (conv_id, after_id))
         return [self._msg(r, with_snapshot) for r in rows]
+
+    def count_replies(self, conv_id: int) -> int:
+        """Finished replies of the GM (no opening scene, no reply cut off by an error or Stop)."""
+        return self.db.query_one(
+            "SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ? AND role = 'assistant' "
+            "AND json_extract(meta, '$.opening') IS NULL AND json_extract(meta, '$.interrupted') IS NULL", (conv_id,))["n"]
+
+    def recent_messages(self, conv_id: int, limit: int) -> list[dict]:
+        rows = self.db.query(f"SELECT {self._COLS} FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?", (conv_id, limit))
+        return [self._msg(r) for r in reversed(rows)]
+
+    def has_meta(self, conv_id: int, key: str) -> bool:
+        return self.db.query_one(f"SELECT 1 AS x FROM messages WHERE conversation_id = ? AND json_extract(meta, '$.{key}') IS NOT NULL LIMIT 1",
+                                 (conv_id,)) is not None
 
     def last_message(self, conv_id: int) -> dict | None:
         row = self.db.query_one("SELECT * FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1", (conv_id,))
@@ -251,9 +273,10 @@ class ConversationRepository:
         for n in npcs:
             if n["name"].lower() == name:
                 return n
-        for n in npcs:  # partial match ("Captain Varro" vs "Varro")
-            low = n["name"].lower()
-            if name in low or low in name:
+        words = set(re.findall(r"[^\W_]+", name))
+        for n in npcs:  # partial match on whole words ("Captain Varro" vs "Varro"), never "Al" inside "Albert"
+            theirs = set(re.findall(r"[^\W_]+", n["name"].lower()))
+            if words and theirs and (words <= theirs or theirs <= words):
                 return n
         return None
 
@@ -325,14 +348,17 @@ class ConversationRepository:
         keep = [r for r in rows if r["id"] <= message_id]
         later = [r for r in rows if r["id"] > message_id]
         metas = {r["id"]: json.loads(r["meta"] or "{}") for r in rows}
-        point = next((metas[r["id"]]["snapshot"] for r in later if r["role"] == "assistant" and metas[r["id"]].get("snapshot")), None)
+        snaps = {r["id"]: unpack_snapshot(r.get("snapshot")) for r in rows}
+        # The state right after this message is the undo data of the first later message that has any
+        # (a reply, or a fight action / time skip on a player message).
+        point = next((snaps[r["id"]] for r in later if snaps[r["id"]]), None)
         state = point["state"] if point else self.get_state(conv_id)
         npcs = point["npcs"] if point else self.list_npcs(conv_id)
 
         # Characters get new ids in the copy; the undo data inside old messages is rewritten to match.
         old_ids: list[int] = [n["id"] for n in npcs]
         for r in keep:
-            for n in (metas[r["id"]].get("snapshot") or {}).get("npcs", []):
+            for n in (snaps[r["id"]] or {}).get("npcs", []):
                 if n["id"] not in old_ids:
                     old_ids.append(n["id"])
         base = (self.db.query_one("SELECT COALESCE(MAX(id), 0) AS m FROM npcs") or {"m": 0})["m"]
@@ -353,12 +379,12 @@ class ConversationRepository:
             msg_map: dict[int, int] = {}
             for r in keep:
                 meta = metas[r["id"]]
-                if meta.get("snapshot"):
-                    snap = meta["snapshot"]
-                    meta["snapshot"] = {**snap, "npcs": [{**n, "id": npc_map[n["id"]]} for n in snap.get("npcs", [])]}
+                snap = snaps[r["id"]]
+                if snap:
+                    snap = {**snap, "npcs": [{**n, "id": npc_map[n["id"]]} for n in snap.get("npcs", [])]}
                 c = self.db.execute(
-                    "INSERT INTO messages(conversation_id, role, content, meta, created_at) VALUES(?,?,?,?,?)",
-                    (new_id, r["role"], r["content"], json.dumps(meta, ensure_ascii=False), r["created_at"]),
+                    "INSERT INTO messages(conversation_id, role, content, meta, snapshot, created_at) VALUES(?,?,?,?,?,?)",
+                    (new_id, r["role"], r["content"], json.dumps(meta, ensure_ascii=False), pack_snapshot(snap), r["created_at"]),
                 )
                 msg_map[r["id"]] = c.lastrowid
             if conv["summary"] and conv["summary_upto"] in msg_map:

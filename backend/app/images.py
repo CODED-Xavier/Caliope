@@ -51,14 +51,27 @@ def find_cached(cache_dir: Path, url: str) -> Path | None:
 Fetcher = Callable[[str], Awaitable[tuple[bytes, str]]]
 
 
-async def http_fetch(url: str, timeout: float = 20.0) -> tuple[bytes, str]:
+async def http_fetch(url: str, timeout: float = 20.0, check: Callable[[str], str] | None = None) -> tuple[bytes, str]:
+    """Download an image: every redirect is checked again (a public link must not bounce into your own
+    network), and the download stops past the size limit instead of filling the memory."""
     import httpx
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
-        resp = await client.get(url, headers={"User-Agent": "LocalRPGChat/0.6"})
-        if resp.status_code != 200:
-            raise ImageError(f"The image server answered {resp.status_code}.")
-        return resp.content, resp.headers.get("content-type", "").split(";")[0].strip().lower()
+    check = check or validate_url
+    async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
+        for _ in range(5):
+            async with client.stream("GET", url, headers={"User-Agent": "LocalRPGChat/1.0"}) as resp:
+                if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get("location"):
+                    url = check(str(resp.url.join(resp.headers["location"])))
+                    continue
+                if resp.status_code != 200:
+                    raise ImageError(f"The image server answered {resp.status_code}.")
+                buf = bytearray()
+                async for chunk in resp.aiter_bytes(1 << 16):
+                    buf.extend(chunk)
+                    if len(buf) > MAX_IMAGE_BYTES:
+                        raise ImageError("The image is larger than 8 MB.")
+                return bytes(buf), resp.headers.get("content-type", "").split(";")[0].strip().lower()
+    raise ImageError("Too many redirects.")
 
 
 async def get_image(url: str, cache_dir: Path, fetch: Fetcher = http_fetch, check: Callable[[str], str] = validate_url) -> Path:
@@ -69,11 +82,12 @@ async def get_image(url: str, cache_dir: Path, fetch: Fetcher = http_fetch, chec
         return cached
     check(url)
     data, ctype = await fetch(url)
-    if ctype not in TYPES:
+    ext = sniff_type(data) or TYPES.get(ctype)  # trust the bytes over the server's label
+    if not ext or (sniff_type(data) is None and data[:1] == b"<"):
         raise ImageError("That link is not a PNG, JPEG, WebP or GIF image.")
     if len(data) > MAX_IMAGE_BYTES:
         raise ImageError("The image is larger than 8 MB.")
-    path = cache_dir / f"{cache_key(url)}{TYPES[ctype]}"
+    path = cache_dir / f"{cache_key(url)}{ext}"
     path.write_bytes(data)
     return path
 

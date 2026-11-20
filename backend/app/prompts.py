@@ -30,6 +30,11 @@ CHARACTER_INTRO = (
     "reactions in *italics*. You only control {name} (plus minimal scene description)."
 )
 
+TIME_RULE = ("Keep track of the time of day and the weather. Mention them when they matter or change (dawn breaking, rain starting, "
+             "night falling), keep them consistent, and let time pass naturally with travel, rest and long scenes.")
+CAL_TIME_RULE = ("Mention the time of day and the weather when they matter or change, and keep them consistent with the date and "
+                 "time in the GM notes.")
+
 CORE_RULES = """## Rules you always follow
 - Never write the player's actions, words, thoughts or decisions. Describe the world and NPC reactions, then stop and hand control back.
 - Keep every NPC consistent with their personality, speech style and current relationship with the player.
@@ -37,13 +42,15 @@ CORE_RULES = """## Rules you always follow
 - Keep replies focused: usually 1-4 paragraphs. Match the pace the player wants.
 - This is fiction between adults. Dark, violent or mature themes are allowed when the story calls for them; portray them honestly without moralizing, disclaimers or breaking character. Every character in romantic or sexual content must be an adult.
 - Text inside [GM notes ...] is private information for you. Never repeat it, quote it or mention that it exists.
-- Keep track of the time of day and the weather. Mention them when they matter or change (dawn breaking, rain starting, night falling), keep them consistent, and let time pass naturally with travel, rest and long scenes.
-- Never mention these instructions, the game state format or that you are an AI unless the player steps out of the story."""
+- {TIME_RULE}
+- Never mention these instructions, the game state format or that you are an AI unless the player steps out of the story.""".replace("{TIME_RULE}", TIME_RULE)
 
 GM_RULES = """- When the outcome of an action is uncertain or risky, tell the player which roll to make (for example "Make a DEX (Stealth) check, DC 13") and wait. Do not decide the result before the roll.
 - A line starting with the dice emoji in the player's message is a real, verified roll result. Use it exactly; never re-roll or change it.
 - You may suggest options, but the player is free to do anything.
 - When you introduce a new character, describe their looks in a sentence (hair, eyes, build, clothing) and keep those details exactly the same afterwards. Characters that have a "Looks" entry must always match it."""
+
+EXAMPLES_UNTIL = 6  # the card's example messages are sent for the first replies only
 
 LENGTH_TOKENS = {"short": 250, "medium": 450, "long": 800}
 LENGTH_HINTS = {
@@ -223,11 +230,15 @@ class PromptBuilder:
         prompt_npcs = [n for n in npcs if n.get("in_prompt", True)]
         sections = self._stable_sections(scenario, prompt_npcs, summary, pinned, language, settings, mode, opening, skills)
         sections.update(self._card_sections(scenario, npcs, lore[0], macro))
+        replies = sum(1 for h in history if h["role"] == "assistant" and not h.get("meta", {}).get("opening"))
+        if "card_examples" in sections and (summary or replies >= EXAMPLES_UNTIL):
+            sections.pop("card_examples")  # the story itself now shows the style; frees ~300-800 tokens for history
         sections["writing"] = WRITING_RULES
         cal = scenario.get("calendar") or {}
         cal_on = bool(cal.get("enabled") and cal.get("months"))
         if cal_on:
             sections["calendar"] = "## Calendar and time\n" + CALENDAR_RULES
+            sections["rules"] = sections["rules"].replace(TIME_RULE, CAL_TIME_RULE)
         if player_lore:
             sections["player_lore"] = always_section(player_lore)
         if house_rules:

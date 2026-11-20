@@ -1,8 +1,10 @@
 """SQLite database wrapper. Everything the app remembers lives in one local file."""
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
+import zlib
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable
@@ -170,6 +172,19 @@ CREATE TABLE IF NOT EXISTS skill_embeddings (
 """
 
 
+def pack_snapshot(snap) -> bytes | None:
+    return zlib.compress(json.dumps(snap, ensure_ascii=False).encode("utf-8"), 6) if snap else None
+
+
+def unpack_snapshot(blob) -> dict | None:
+    if not blob:
+        return None
+    try:
+        return json.loads(zlib.decompress(blob).decode("utf-8"))
+    except (zlib.error, ValueError):
+        return None
+
+
 class Database:
     """Thin, thread-safe wrapper around one SQLite connection."""
 
@@ -187,6 +202,7 @@ class Database:
             self.conn.execute("PRAGMA foreign_keys = ON")
             if path != ":memory:":
                 self.conn.execute("PRAGMA journal_mode = WAL")
+                self.conn.execute("PRAGMA synchronous = NORMAL")  # safe with WAL, much faster writes
             self.conn.executescript(SCHEMA)
             self._migrate()
 
@@ -204,6 +220,31 @@ class Database:
         self._ensure_column("npcs", "portraits", "TEXT NOT NULL DEFAULT ''")
         self._ensure_column("npcs", "in_prompt", "INTEGER NOT NULL DEFAULT 1")
         self._ensure_column("npcs", "met", "INTEGER NOT NULL DEFAULT 1")
+        self._ensure_column("messages", "snapshot", "BLOB")
+        self._move_snapshots()
+
+    def _move_snapshots(self) -> None:
+        """Older versions kept the undo data (a full copy of the sheet and characters) inside each message's
+        meta, so every read of the chat had to parse all of it. It now lives compressed in its own column."""
+        while True:
+            rows = self.conn.execute(
+                "SELECT id, meta FROM messages WHERE meta LIKE '%\"snapshot\"%' LIMIT 200").fetchall()
+            moved = 0
+            self.conn.execute("BEGIN")
+            for row in rows:
+                try:
+                    meta = json.loads(row["meta"] or "{}")
+                except ValueError:
+                    continue
+                snap = meta.pop("snapshot", None)
+                if snap is None:
+                    continue
+                self.conn.execute("UPDATE messages SET meta = ?, snapshot = ? WHERE id = ?",
+                                  (json.dumps(meta, ensure_ascii=False), pack_snapshot(snap), row["id"]))
+                moved += 1
+            self.conn.execute("COMMIT")
+            if moved == 0:
+                break
 
     @contextmanager
     def transaction(self):

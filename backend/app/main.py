@@ -50,8 +50,31 @@ async def lifespan(app: FastAPI):
     app.state.tasks = set()
     if app.state.svc.settings.get("ai_engine") == "builtin":
         background(app.state.svc.runtime.start())  # the app opens at once; the model loads behind it
+    background(catch_up_embeddings())
     yield
     await app.state.svc.close()
+
+
+async def catch_up_embeddings() -> None:
+    """Memories and rulebooks saved before an embedding model was chosen (or with another one) get vectors for
+    the current model, so search by meaning covers everything. Waits for the model server to answer first."""
+    s = svc()
+    from .config import embedding_key
+    if not embedding_key(s.settings.all()):
+        return
+    for _ in range(60):  # up to 5 minutes (the built-in engine may still be loading)
+        if await s.llm.embed(["ready?"]):
+            break
+        await asyncio.sleep(5)
+    else:
+        return
+    try:
+        mem = await s.memory.reindex()
+        books = await s.rulebooks.embed_missing()
+        if mem or books:
+            logging.getLogger("rpg").info("Embedded %s memories and %s rulebook passages for the current model", mem, books)
+    except Exception as exc:  # optional: keyword search keeps working
+        logging.getLogger("rpg").warning("Catching up embeddings failed: %s", exc)
 
 
 def background(coro) -> None:
@@ -68,6 +91,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+_LOCAL_HOSTS = {"127.0.0.1", "localhost", "[::1]"}
+
+
+def _host_of(value: str) -> str:
+    value = (value or "").strip().lower()
+    if value.startswith("["):
+        return value.split("]")[0] + "]"
+    return value.split(":")[0]
+
+
+@app.middleware("http")
+async def local_only(request: Request, call_next):
+    """The app is only for this PC. Refuse requests that name another host (a web page that points its own
+    domain at 127.0.0.1, "DNS rebinding"), and changes sent by other web sites open in the browser."""
+    if _host_of(request.headers.get("host", "")) not in _LOCAL_HOSTS:
+        return JSONResponse({"detail": "Local RPG only answers on this PC (127.0.0.1)."}, status_code=403)
+    origin = request.headers.get("origin")
+    if origin and request.method not in ("GET", "HEAD", "OPTIONS"):
+        from urllib.parse import urlparse
+        if _host_of(urlparse(origin).netloc) not in _LOCAL_HOSTS:
+            return JSONResponse({"detail": "Requests from other web sites are not allowed."}, status_code=403)
+    return await call_next(request)
 
 
 def svc() -> Services:
@@ -140,8 +187,11 @@ async def put_settings(values: dict[str, Any] = Body(...)):
 
 def apply_settings(values: dict) -> dict:
     """Save settings; reload or stop the built-in engine when one of its settings changed."""
+    from .config import embedding_key
     before = svc().settings.all()
     after = svc().settings.update(values)
+    if embedding_key(after) and embedding_key(after) != embedding_key(before):
+        background(catch_up_embeddings())
     if any(before.get(k) != after.get(k) for k in ENGINE_KEYS):  # model, port, context... changed: reload the engine
         if after.get("ai_engine") == "builtin":
             background(svc().runtime.start())
@@ -500,6 +550,11 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
     return full_conversation(conv["id"])
 
 
+def not_busy(conv_id: int) -> None:
+    if svc().engine.is_busy(conv_id):
+        raise BusyError("Wait for the current reply to finish.")
+
+
 def full_conversation(conv_id: int) -> dict:
     s = svc()
     return {
@@ -563,6 +618,7 @@ async def calendar_preview(body: dict[str, Any] = Body(...)):
 @app.post("/api/conversations/{conv_id}/events")
 async def add_event(conv_id: int, body: dict[str, Any] = Body(...)):
     """An appointment the player adds by hand ("Sunday: Mira's festival")."""
+    not_busy(conv_id)
     cal = svc().conversations.get(conv_id)["scenario"].get("calendar") or {}
     if not cal.get("enabled"):
         raise ValueError("This card has no calendar.")
@@ -575,6 +631,7 @@ async def add_event(conv_id: int, body: dict[str, Any] = Body(...)):
 
 @app.delete("/api/conversations/{conv_id}/events/{event_id}")
 async def delete_event(conv_id: int, event_id: str):
+    not_busy(conv_id)
     state = svc().conversations.get_state(conv_id)
     state["events"] = [e for e in state.get("events", []) if e["id"] != event_id]
     svc().conversations.save_state(conv_id, state)
@@ -583,6 +640,7 @@ async def delete_event(conv_id: int, event_id: str):
 
 @app.delete("/api/conversations/{conv_id}")
 async def delete_conversation(conv_id: int):
+    not_busy(conv_id)
     svc().conversations.delete(conv_id)
     return {"deleted": True}
 
@@ -630,6 +688,7 @@ async def continue_reply(conv_id: int):
 @app.post("/api/conversations/{conv_id}/undo")
 async def undo(conv_id: int):
     svc().conversations.get(conv_id)
+    not_busy(conv_id)
     result = svc().engine.undo(conv_id)
     return {**result, **full_conversation(conv_id)}
 
@@ -664,6 +723,7 @@ async def get_state(conv_id: int):
 
 @app.patch("/api/conversations/{conv_id}/state")
 async def patch_state(conv_id: int, patch: dict[str, Any] = Body(...)):
+    not_busy(conv_id)  # the turn in progress would overwrite the change
     state = normalize_state(deep_merge(svc().conversations.get_state(conv_id), patch))
     svc().conversations.save_state(conv_id, state)
     return state
