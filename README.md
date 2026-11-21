@@ -1,303 +1,399 @@
-# Calíope (v2.0)
+# Calíope
 
-Calíope, named after the muse of epic poetry, is a roleplay and tabletop RPG app that runs 100% on your PC: no token limits, no subscription.
-In Calíope the game master is **the Aedo** (the singer of the Homeric epics), chapters are **Cantos**, and the AI that helps you write stories and cards is **the Muse**.
-It keeps everything it needs in a local SQLite file (`backend/data/rpg.db`).
+**Calíope** (named after the muse of epic poetry) is a roleplay and tabletop RPG app that runs entirely on your PC.
+There are no token limits and no subscription, and your stories never leave your computer.
 
+Inside Calíope:
+- the game master is **the Aedo**, the singer of the Homeric epics
+- the chapters of a story are **Cantos**
+- the AI that helps you write stories and cards is **the Muse**
 
-## 0. Quick start (every time you play)
+Current version: **v2.5**. The version history is at the end of this file.
 
-Double-click **`Play.bat`**. That's it. It:
+---
 
-1. sets up Python packages the first time (and again only when they change),
-2. builds the interface when it is missing or its code changed (needs Node.js for that),
-3. starts the app,
-4. starts LM Studio's server and loads your model with your context size, if they are not running yet,
-5. opens **http://127.0.0.1:8000** in your browser.
+## Contents
+1. [Quick start](#1-quick-start)
+2. [The AI model](#2-the-ai-model)
+3. [Playing a game](#3-playing-a-game)
+4. [Cards](#4-cards)
+5. [The Muse](#5-the-muse)
+6. [Pictures, music and voice](#6-pictures-music-and-voice)
+7. [How the Aedo remembers](#7-how-the-aedo-remembers)
+8. [Rulebooks and skills](#8-rulebooks-and-skills)
+9. [Your data, backups and privacy](#9-your-data-backups-and-privacy)
+10. [The Windows program (Caliope.exe)](#10-the-windows-program-caliopeexe)
+11. [Settings worth knowing](#11-settings-worth-knowing)
+12. [Troubleshooting](#12-troubleshooting)
+13. [For developers](#13-for-developers)
+14. [Version history](#14-version-history)
 
-Keep the black window open while you play; close it to stop. The first run asks whether to put a
-**Caliope** shortcut on your desktop (or run `Play.bat --shortcut` any time).
+---
 
-Options: `Play.bat --no-browser` (don't open the browser), `Play.bat --no-lmstudio` (don't touch LM Studio).
+## 1. Quick start
 
-Needs: Python 3.12 (`py install 3.12`), Node.js LTS (only to build the interface) and LM Studio.
+**You need this once:**
+- [Python 3.12](https://www.python.org/) (tick "Add Python to PATH"), or run `py install 3.12` in PowerShell
+- [Node.js LTS](https://nodejs.org/), used only to build the interface
 
-**For development** (the interface reloads as you edit the code): run `start-backend.bat` and
-`start-frontend.bat`, then open http://localhost:5173.
+**Every time you play:** double-click **`Play.bat`**. It:
+1. installs the Python packages the first time (and again only when they change)
+2. builds the interface when it is missing or its code changed
+3. starts the app, plus the AI (the built-in engine, or LM Studio if you use it)
+4. opens Calíope in **its own window**: no browser tabs, no address bar
 
-### What the interface has
-- Sidebar with your games, new-game picker (3 example scenarios, your own, or "generate from an idea")
-- Streaming chat with markdown, Stop, Regenerate, Undo
-- Side panel: **Sheet** (HP, abilities, gold, location), **Bag** (items, quests), **People** (relationship -100 to +100, personality),
-  **Map** (places the story names), **Dice**, **Journal** (story summary and long-term memories)
-- Settings (model, creativity, language, extra instructions) and Skills manager
-- Light and dark themes
+The black window is minimized; it holds messages and errors. **Closing the game window stops everything.**
+The first run offers a **Caliope** desktop shortcut (or run `Play.bat --shortcut` any time).
 
-## 1. Install (once)
+Options: `Play.bat --no-browser`, `Play.bat --no-lmstudio`.
 
-1. Install **Python 3.12** from python.org (tick "Add Python to PATH").
-2. Install **LM Studio** from lmstudio.ai.
-3. Double-click `start-backend.bat`. The first run creates the environment and installs the packages.
-   Open http://127.0.0.1:8000/docs to see the API.
+Before your first game, give it a model ([section 2](#2-the-ai-model)).
 
-## 2. Set up the model in LM Studio
+---
 
-Your PC (RX 580 8GB) cannot run DeepSeek's large models, so use a smaller roleplay model.
+## 2. The AI model
 
-1. In LM Studio, open **Discover** and search for **`L3-8B-Stheno-v3.2`** (GGUF).
-   Download the **Q4_K_M** file (about 5 GB). It is a roleplay-focused 8B model that fits your 8GB GPU.
-   (Alternative to try later: a Qwen3.5 9B uncensored GGUF. Reasoning "think" text is hidden automatically.)
-2. Open **Settings > Runtime** and choose the **Vulkan** llama.cpp runtime (the RX 580 has no ROCm support on Windows).
-3. Open the **Developer** tab, load the model and set:
-   - **Context length: 8192**
-   - **GPU offload: maximum** (all layers). If LM Studio crashes or runs out of memory, lower the context to 6144 or turn Flash Attention off.
-4. Start the **local server** (Developer tab, "Start server"). Default address: `http://localhost:1234`.
-5. Optional but recommended: also download a small embedding model (search `nomic-embed-text`) and load it.
-   Then set `embedding_model` in the app settings (see below). Without it, memory and skill search still work using keywords.
+Calíope works with a local roleplay model. On an 8 GB graphics card (such as the RX 580), a good choice is
+**L3-8B-Stheno-v3.2** in **Q4_K_M** or **Q4_K_S** (about 5 GB).
 
-Check the connection: http://127.0.0.1:8000/api/health  should show `"ok": true` and your model name.
-Put that exact model name in the `model` setting (`PUT /api/settings {"model": "..."}`).
+### Option A: the built-in engine (recommended; no LM Studio)
+1. Sidebar → **🧠 Models**.
+2. **Download engine** (about 30 MB): llama.cpp's official Vulkan build, which works on AMD cards.
+3. Get a model:
+   - *Browse this PC*: use models you already have, such as LM Studio's, without copying them. **Browse…** opens Windows' file picker, or you can paste a folder's address.
+   - *Find more*: search Hugging Face. Each file size has a note on quality and on whether it fits 8 GB. Downloads resume after a pause and are checked against Hugging Face's checksums.
+4. *My models* → **Load**. Optionally, **Use for memory** on a small embedding model (e.g. `nomic-embed-text`) for memory search by meaning.
 
-## 3. How it works
+The engine starts with the app and stops when you close it.
+- If loading fails with "out of memory", lower the **Context window** or set **GPU layers** to about 28 in Settings.
+- Close LM Studio's own model first, so the two don't fight over video memory.
 
-- **Scenarios** define a game: mode, rules, world, cast, player template. Three modes:
-  `gm_world` (AI is the GM and invents everything), `gm_cast` (AI is the GM with your preset NPCs), `character` (AI plays one character; the story is about your relationship).
-  Three examples are installed on first run. `POST /api/scenarios/generate` drafts a new one from an idea.
-- **Memory** has four layers: full chat history (never deleted), a rolling summary of older events,
-  the game state (HP, gold, inventory, quests, places) and searchable long-term memories pulled back automatically.
-- **State tracking**: after each reply the model is asked, in a second short call, what changed
-  (HP, items, relationships from -100 to +100...). All changes are validated in code. Turn it off with `state_tracking: false` if replies feel slow.
-- **Dice** are rolled by the program. Type `/roll 1d20+5` (also `adv`/`dis`, `4d6kh3`) in the chat, or call `POST /api/dice/roll`.
-- **Skills** are folders with a `SKILL.md`. Put them in `backend/skills/` or install them from the API
-  (`POST /api/skills/install` with a folder path, GitHub link or .zip link). In `auto` mode the best matches for each message are
-  added to the prompt for that turn. With no skills installed everything works the same. Skill scripts are never executed.
-- **Regenerate / undo** restore HP, items and relationships to how they were before that reply.
+### Option B: LM Studio
+In LM Studio:
+1. Choose the **Vulkan** runtime (Settings > Runtime).
+2. Load the model with **Context length 8192** and **GPU offload: max**.
+3. Start the **local server**.
 
-## 4. Important settings (`GET/PUT /api/settings`)
+In Calíope: Settings > AI engine > *LM Studio*, address `http://localhost:1234/v1`. Play.bat can start LM Studio's server for you.
 
-| Setting | Meaning |
-|---|---|
-| `model` | Exact model id from LM Studio (`/api/models`) |
-| `context_window` | Must match the context length loaded in LM Studio (8192) |
-| `max_tokens` | Maximum length of each reply |
-| `response_language` | `en`, `pt-BR` or `auto` |
-| `embedding_model` | Embedding model id, enables semantic memory/skill search |
-| `extra_instructions` | Text added to every prompt (your own style rules) |
-| `state_tracking` | Extra call after each turn to update the sheet and memories |
+### Online services
+Settings > *API key* also works with services that speak the same language (OpenRouter, for example): put their address in *Server address* and your key in *API key*. Remember that they see your story, charge per use, and may refuse dark scenes.
 
-## 4b. Importing character cards (v0.6)
+---
 
-New game → **Import a card** → choose a `.json` file (Character Card V2, the SillyTavern format, or a card exported from this app with ⤓).
+## 3. Playing a game
 
-- **Card texts** (description, scenario, personality, reminders, example messages) are kept in their own fields. Edit them with ✎ → *Card texts*. `{{user}}` becomes your character's name.
-- **Lorebook**: entries are added to the AI's notes only when one of their keywords appears in the last few messages. Entries marked *Always* are always included.
-- **Characters** listed in the lorebook (`- Name (…): … Base URL: …`) become NPCs with portraits. Their profile reaches the AI through the lorebook, so 30+ characters do not fill the prompt. The People tab shows the ones you have met; the rest are under *Not met yet*.
-- **Portraits**: the AI writes `[[show: Name | Mood]]` and the app shows a big picture above that part of the reply (max 2 per reply). Garbled image links from the AI are fixed by name and mood. Each picture is downloaded once and kept in `backend/data/portraits`.
-- **Status block**: if the card asks for an `INFO` block, it is hidden from the story, shown in the **Status** tab and requested only every N replies (3 by default).
-- **Relationships** always use the app's -100 to +100 scale, even if the card describes another one.
-- **Continue ▸** under the last reply makes the AI keep writing the same reply.
+### Starting
+1. **＋ New game** → pick a card. 👥 shows its characters with picture, name and role.
+2. If the card has several starts, choose one in **Choose your start** (for example, Lumencia's default start or another route).
+3. **Create your sheet** (Adventure cards) or **Who are you?** (Roleplay cards).
+   - Or choose *Let the story ask me* for cards that create your character in the chat.
+   - **✨ Fill the empty fields** suggests a background, looks and personality.
+   - **Your world additions**: lore of your own (a great house, a home village, a secret order). It is canon in this game, even where the card says otherwise.
 
-## 4c. Playing (v0.7)
-
-**How to write** (shown under the message box):
-
+### How to write
 | You write | Meaning |
 |---|---|
 | `"Hello there."` | Your character speaks |
 | `*I draw my sword*` | Your character acts |
-| `'He is lying.'` | Your character thinks: only the GM knows it, characters never do. The GM may give subtle hints from it. |
-| `/how much gold do I have?` | A message to the GM outside the story |
-| `/roll 1d20+3` | Rolls dice |
-| no marks | The GM decides |
+| `'He is lying.'` | Your character thinks. Only the Aedo knows (characters never do) and may give subtle hints. |
+| `/how much gold do I have?` | A message to the Aedo outside the story |
+| `/roll 1d20+3` | Dice, rolled by the app (`adv`, `dis`, `4d6kh3` work too) |
+| `/wait 3 days`, `/wait until morning` | Time passes, only when you choose |
+| no marks | The Aedo decides |
 
-Thoughts are never read by the tracker and never stored as memories.
+### Under the replies
+- **Continue ▸**: keeps writing the same reply. **↻ Regenerate**: writes it again.
+- **↶ Undo**, **edit** or **re-send** a message, and **⏪ rewind** to any point. Sheet, money, HP, dice and the clock go back too.
+- **⑂ Save point**: a new game from that moment; the original is not changed.
+- **🎲 roll buttons** appear when the Aedo asks for a check ("DEX (Stealth), DC 13"). The app adds your sheet's bonus and rolls.
+- **🛒 buy buttons** appear for prices in a reply. The app checks your money and puts the item in your bag.
+- **🔊** reads the reply aloud (needs a voice, [section 6](#6-pictures-music-and-voice)).
+- **🖼** paints the scene; **📌** keeps a picture in the map bag.
 
-- **Start screen**: after picking a card, *Create your sheet* (adventure) or *Who are you?* (roleplay). Or choose *Let the story ask me* for cards that create the character in the chat. *✨ Fill the empty fields* suggests a background, looks and personality.
-- **✨ Write with AI** in the card editor drafts the teaser, world, rules, tone or opening from the rest of the card.
-- The GM keeps track of the **time of day and weather** (also on the Sheet tab).
-- **Scrolling**: the view stops at the start of each new reply. *↓ Latest* jumps to the end. To follow the text as it is written, turn it on in **Aa**.
-- **Aa** menu: text size, wider column, compact mode. Drag the left edge of the side panel to resize it.
-- **🔍** (or Ctrl+F) searches the story. **⤓** exports it as a Markdown file.
-- **⑂ Save point** on any message starts a new game from that moment (sheet, characters and memories as they were). The original game is not changed.
+### At the top of the chat
+- **📜 Recap**: "Previously, in…", written only when you ask and never added to the story.
+- **🎵 Music**, **🔍 search** (Ctrl+F), **⤓ export** to Markdown.
+- **Aa**: text size, wider column, compact mode, story colours (grey narration, bright speech, coloured thoughts), character picture size, follow the text as it is written.
+- The **date and hour** of the story.
 
-## 4d. Pictures and moods (v0.8)
+### The side panel
+Tabs appear when the card uses them. Drag the panel's edge to resize it; « and » collapse the sidebars.
+- **Sheet**: HP, attributes, money, place, time and weather, resource bars (Mana, Aura…), powers with **Use**, short and long rest.
+- **Bag**: items, quests (when a quest seems finished, you confirm it), **Pay** box.
+- **People**: everyone you have met, with relationships from −100 to +100. Characters count as met only when they actually interact with you.
+- **Status**: the card's INFO block, kept by the app (cards like Lumencia).
+- **Map**: places, plus the **🎒 map bag** of kept scene pictures.
+- **⚔ Combat**: fights with a battle map ([below](#combat)).
+- **Dice** and **Journal**: Cantos, the pinned memory box, summary, memories, calendar appointments, your world additions.
 
-- **Your picture**: click the circle next to your name on the Sheet tab. It shows beside your messages.
-- **Character pictures**: open a character in the People tab (or in the card editor) → *🖼 Pictures and moods*. There is a main picture plus Standard, Happy, Sad, Angry, Disgusted and Blushing. Each slot takes a picture from your PC (⬆) or a link (🔗). Empty moods use the main picture. **＋ Add mood** creates a mood with your own name (Smug, Crying, Scared…, up to 12 per character); the AI is told about it.
-- **Emotions**: on character cards the character's picture sits beside every reply and changes with the mood of that reply (the AI starts each reply with `[[show: Name | Mood]]`). On Game Master cards the pictures appear above the part where each character speaks.
-- **Aa → Character pictures**: Big, Small (a name chip) or Hidden.
-- Pictures from your PC are saved in `backend/data/portraits/uploads`. Pictures from links are downloaded once into `backend/data/portraits`.
+### Cantos (chapters)
+Journal → **Close this Canto** at a natural break. The Aedo writes a short chronicle, a divider marks the new Canto in the
+chat, and the chronicles of past Cantos stay in what the Aedo always knows. Rewinding into a closed Canto opens it again.
 
-## 4e. Rulebooks (v0.10)
+### Time and the calendar
+Each card can have its own calendar (card editor > Calendar). **The app keeps the clock, not the AI.**
+- Scenes move the clock by minutes or hours. **Days pass only when you choose** (`/wait`, or "I sleep until morning").
+- Appointments ("the festival is on Sunday") land on the exact day.
+- The weather comes from the season and the card's climate.
 
-1. Sidebar → **📚 Rules** → **Import PDF or text**. A PDF with selectable text works best; a `.txt` or `.md`
-   file also works (lines starting with `#` become headings). Big books take a minute; progress is shown.
-2. Open a card with ✎ → **Rulebooks** and tick the books it uses.
-3. Play. When a turn touches a rule (grappling, falling, frenzy…), the GM gets the one or two matching sections
-   (about 350 tokens at most). Under the reply, **📖 Rules used** shows which ones.
+### Combat
+⚔ Combat → choose **d20** (D&D 5e) or a **d10 dice pool** (Vampire 5e) → add enemies, or **✨ Suggest from the scene** → pick a map → **Start the fight**.
+- The app rolls everything (initiative, attacks, damage, powers, enemy spells). The Aedo only narrates one ⚔️ card per round.
+- Maps: generated (forest, dungeon, tavern, river…) or your own from **🗺 My maps**. Walls block, obstacles give **cover**, and mud and bushes slow you.
+- Undo and rewind also undo the dice.
 
-- **House rules** (button on each book) are sent every turn and win over the book.
-- **Look something up** in the Rulebooks window searches all your books.
-- **Scanned books** (pages that are pictures) need the free [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki)
-  installed. Restart the app afterwards. OCR takes about 2 to 4 seconds per page.
-- If you set an embedding model in Settings, books are also searched by meaning, not only by words.
-- Good free start: the **D&D System Reference Document 5.2** (Creative Commons), a PDF on dndbeyond.com.
+### Resources and powers
+Card editor > **Resources and powers**: pools (Mana, Aura, Stamina…) with maximum, colour and refill (per round, rest, night, day), and powers that spend them.
+- The Sheet and Combat tabs have **Use** buttons; the app pays the cost and rolls.
+- When the story spends a resource without a button ("you pour your aura into the barrier"), the tracker subtracts it.
 
-## 4f. Combat (v0.11)
+---
 
-Side panel → **⚔ Combat** (Adventure cards show it always; any card shows it during a fight).
+## 4. Cards
 
-1. Choose the rules: **d20** (D&D 5e) or **d10 dice pool** (Vampire 5e).
-2. Add enemies, or press **✨ Suggest from the scene**: the AI reads the last messages and fills them in. Check the numbers.
-   Your own numbers come from your sheet (change them for this fight if needed).
-3. **Start the fight.** The app rolls initiative and places everyone on the map.
-4. Each round: **Attack** (pick a target, normal/advantage/disadvantage), **Dodge**, or **Something else** (a spell, a trick…).
-   The app rolls your action and every other combatant's, updates HP and conditions, and sends the GM one ⚔️ line
-   with the exact results. The GM only narrates them: one reply per round.
-- Click a token to select it (enemies become your target), then click an empty square to move it (distance in squares and feet).
-- **−/＋** changes HP by hand; select a fighter to toggle conditions (prone, grappled, poisoned…), which change advantage.
-- **Others act** lets everyone else act now; **End fight** stops it. The fight also ends by itself when one side is down.
-- Your HP on the sheet always follows the fight. **Undo/rewind also undo the dice.**
+A card is a world to play: its rules, setting, characters and opening.
+- **Roleplay** cards are simple and fast: characters, relationships, conversation.
+- **Adventure** cards add rules, items, quests, maps and combat.
 
-**Maps and terrain:** in the start form choose **Generate** (open field, forest, dungeon, cave, tavern, river crossing,
-town street, plus extra rocks/trees/bushes/barrels/water/mud, 🎲 reroll), **one of my maps**, or an empty grid.
-✨ Suggest also picks the map type for the scene. **🗺 My maps / editor** lets you paint your own maps (walls, trees,
-rocks, crates, water, mud, bushes, doors), optionally over a picture, and save them in a library.
-- Walls, trees, rocks, crates and deep water block movement. Something solid between attacker and target gives
-  **cover** (+2 AC, or +1 defense die). Standing in bushes also gives cover. Mud and bushes are difficult terrain.
-- Enemies walk around obstacles (6 squares a turn) to reach you; enemies with a **Range** above 1 shoot from afar.
+The AI's role:
+- **Aedo · open world**: invents places and people as you go.
+- **Aedo · preset cast**: runs the characters you define.
+- **One character**: the AI plays a single character; the story is about your relationship.
 
-**What the chat shows:** one ⚔️ card per round, each action as its own block: who attacks whom, then 🎲 the roll,
-then 💥 the damage. The GM then narrates the actions in the same order.
+### Making and editing cards
+- **＋ New game → ✎** on a card opens the editor. **✨ Write with AI** drafts the teaser, world, rules, tone or opening from the rest of the card.
+- **✨ Generate from an idea** drafts a whole card. The [Muse](#5-the-muse) goes further.
+- **Characters**: description, personality, speech style, looks, pictures and moods.
 
-**d20 rules:** attack = d20 + bonus vs AC; natural 20 always hits and doubles the damage dice; natural 1 always misses.
-**Dice pool rules:** each d10 of 6+ is a success, each pair of 10s adds 2; attacks are contested by the defender's
-pool, and damage = margin + weapon bonus.
+### Importing and sharing
+- **Import a card** reads Character Card V2 JSON files (the SillyTavern format), the lorebook included, and **.caliope** files.
+  - Lorebook entries reach the Aedo only when their keywords come up, so 30+ characters don't fill the prompt.
+  - Characters listed in the lorebook become people with portraits.
+- **📦** in the card list saves a **.caliope** file: the card **with all its pictures**, to share without GitHub or the cloud.
+- **⤓** saves a standard JSON card (pictures stay as links).
 
-## 4g. Jukebox (v0.12)
+### Starts (routes)
+A card can be entered in different ways. In the card editor, under *Opening message*, **Starts** can each have:
+- their own opening
+- **how the world is on this route** (the Aedo reads it every turn)
+- **who the story starts with**: everyone else is met in the story
+- **fixed scenes**, played one per reply in order and adapted to what you do (separate them with a line of `---`)
 
-Background music that follows the story. Click **🎵 Music** in the top bar to open the library.
+### Character pictures from a folder
+Card editor > *Characters* → **📂 Pick the pictures folder…** (or paste its address). The layout:
+```
+pictures\
+  Artemis\1.png 2.png 3.png 4.png 5.png 6.png
+  Lilia\1.png
+  Bishop Corvin.png
+```
+- `1` Standard, `2` Happy, `3` Sad, `4` Angry, `5` Disgusted, `6` Blushing (or the card's own mood names).
+- A single `Name.png` is used as the Standard picture.
+- Folder names match characters without caring about capitals, accents or a missing surname.
+- A preview shows what matched; unmatched folders get a list to pick the character by hand. Nothing changes until **Apply**.
+- Missing moods use the closest one (Disgusted → Angry, Blushing → Happy, otherwise Standard).
+- The pictures are copied into Calíope and also update games already using the card. Run it again whenever you finish more pictures.
 
-1. Pick the moods for the songs you are about to add (calm, tavern, exploration, town, forest, dungeon, mystery,
-   tension, combat, boss, victory, sad, romantic, horror, epic), then **Add songs from this PC** (MP3, OGG, WAV,
-   FLAC, M4A, up to 40 MB each), or paste a **direct audio link**. YouTube/Spotify pages cannot be played.
-2. Change a song's moods any time by clicking the chips. **Only for cards** limits a song to some cards; those songs
-   are preferred in that card's games.
-3. In the top bar: ▶/⏸, ⏭ next, the song and the current mood, volume (hover the player) and **Auto**.
+### Private cloud pictures (Cloudflare R2), optional
+1. Settings > *Pictures in the cloud*: R2 account ID, bucket, access key and secret.
+2. Card editor → **☁ Upload this card's pictures**.
 
-With **Auto** on, the tracker names the mood of each scene and the player fades into a matching song. Fights play
-**combat** music (**boss** music when the enemy sounds like a boss), and a won fight plays a **victory** song once.
-When no song has a mood, a close one is used (tavern → town → calm…). Browsers only start sound after your first
-click, so press ▶ once per session. Songs from your PC are copied into `backend/data/music`.
+The bucket stays private: Calíope signs every download with your keys and keeps a copy on this PC. The card only holds `r2:` links that nobody else can open.
 
-## 4h. Scene pictures (v0.13, optional, needs internet)
+---
 
-Settings → **Scene pictures (internet)**. When a new scene starts (the first reply of a game, a new place, a fight),
-the AI writes a short description of the place and the free **Pollinations.ai** service paints it above the reply.
-**🖼** under any GM reply paints that scene; **🎲** on a picture makes another version; **✕** hides it.
+## 5. The Muse
 
+**🪶 The Muse** (left sidebar) is a writer's room with the same model that plays your games.
+- Brainstorm worlds, characters, a new route for a card, a twist for your campaign. Talks are saved, and long talks are summarized as they go.
+- **↶ Undo last** removes her last answer so you can ask differently.
+- **✨ Make it a card** turns the talk into a card. The model is asked for one piece at a time (title, pitch, world, tone, each character's sheet, the opening), so the card always comes out valid. It takes one or two minutes on an RX 580.
+- The preview offers **＋ Add to Calíope** (find it in New game; ✎ to edit) or **⤓ Save file** (a JSON card to import later).
+
+The Muse and your games share the model, so one waits for the other.
+
+---
+
+## 6. Pictures, music and voice
+
+### Character pictures and moods
+People tab or card editor → *🖼 Pictures and moods*: a main picture plus Standard, Happy, Sad, Angry, Disgusted, Blushing, and up to 12 moods of your own. Each comes from your PC (⬆) or a link (🔗).
+- The Aedo shows a character's picture above the part where they speak, and the picture changes with their mood.
+- **Your own picture**: click the circle beside your name on the Sheet.
+
+### Scene pictures and the map bag (optional, needs internet)
+Settings > *Scene pictures*. When a scene starts (a new place, a fight), the Aedo describes the place and a picture is painted above the reply.
+- **Pollinations** (free, no account) is the default. **PixAI** can be used with your own API key and model ID.
 - Only the description of the place leaves your PC: names are removed and your messages are never sent.
-- The free service paints one picture at a time, about one a minute (the app waits its turn), up to 768×432 here,
-  with a small logo in the corner. It may refuse some dark scenes.
-- **Picture style** (in Settings) is added to every description: e.g. *oil painting*, *anime style*, *dark gothic illustration*.
-- Pictures are kept on your PC after the first time; the **Aa → Character pictures: Hidden** option hides them too.
+- **🎒 Map bag** (Map tab): the first picture of each place is kept on its own, and **📌** keeps any other. Each shows the place, in-game date and Canto.
 
-## 4i. Built-in AI engine and the Windows program (v1.0)
+### Jukebox
+**🎵 Music** → add songs from your PC (or direct audio links) and tag them with moods (tavern, forest, dungeon, combat, boss, victory…).
+With **Auto**, the music follows the scene: combat music in fights, boss music for bosses, a victory song when you win.
 
-**Built-in engine (no LM Studio needed).** Settings > Model > AI engine > *Built-in*.
-1. Press **Download engine** once (about 30 MB: llama.cpp's official Vulkan build for Windows, from its GitHub releases page; works on AMD cards like the RX 580).
-2. Pick the **Story model**. The list shows the .gguf files LM Studio already downloaded (nothing is copied), or paste any .gguf path.
-3. Optional: a **Memory search model** (e.g. nomic-embed-text) for search by meaning. It runs as a second small server.
-4. Save. The engine loads the model (10 to 60 s) and from then on starts with the app and stops when you close it.
-- Close LM Studio's model first (or the two will fight over the 8 GB of video memory).
-- If loading fails, open *Engine log*: "out of memory" means lower the **Context window** or set **GPU layers** to a number like 28.
-- The engine uses the Context window setting directly, keeps the whole context for the story (one slot), and reuses the unchanged start of the prompt between turns, like LM Studio.
-- Ports: 8091 (story) and 8092 (memory search). Change `engine_port` if something else uses them.
+### Narration voice
+Settings > *Narration voice*:
+1. Download the voice program (Piper, about 25 MB) and a voice (about 60 MB each): Lessac, Amy, Ryan (English US), Alan (English UK) or **Faber** (Português do Brasil).
+2. Pick it as *Voice for 🔊*.
+3. **🔊** on any reply reads it aloud (⏹ stops), or turn on *Read every new reply aloud*.
 
-**The Windows program.** Run **build-exe.bat** (after Play.bat ran once). It builds the interface, installs PyInstaller the first time, and makes the folder `Caliope\` with **Caliope.exe**.
-- The program keeps its own saves in `Caliope\data` (copied from Play.bat's `backend\data` the first time), the engine in `Caliope\engine`, skills in `Caliope\skills`. Rebuilding replaces only the program files, never these folders.
-- Double-click Caliope.exe: a window shows the status and the app opens in your browser. Close that window to stop everything (the engine stops with it).
-- Copy the whole `Caliope` folder to move it; it needs no Python or Node.js.
-- Coming from v1.x? The first build copies your saves and engine from the old `LocalRPG` folder; delete that folder afterwards.
+It runs on the processor, so the story model keeps the graphics card. Each reply is read once and kept.
 
-**Models window (🧠 Models in the sidebar).** Like LM Studio's model page, inside the app:
-- *My models*: every .gguf on this PC (LM Studio's folder included). **Load** / **Unload** in the built-in engine, **Use for memory** for embedding models, **Deactivate** to hide a model from the lists without deleting it, 🗑 to delete it (asks first; only inside the model folders).
-- *Browse this PC*: use models you already have (LM Studio's, or any folder) without downloading them again. **Browse…** opens Windows' file picker (pick any .gguf; its folder is added), or paste a folder's address. Nothing is copied, and LM Studio doesn't need to be open. A moved LM Studio models folder is found automatically.
-- *Find more*: searches Hugging Face for GGUF models; open a result to see each size (Q4_K_M, Q4_K_S…) with a short note on quality and whether it fits an 8 GB card.
-- *Downloads*: progress and speed; Cancel pauses (Download again resumes), and every file is checked against Hugging Face's published checksum. New models go to LM Studio's folder, so both programs share them.
+### Themes
+Black, violet and orange. The dark theme (☾) leads with violet and the light theme with orange.
 
-## 4j. Your world additions (player lorebook)
+---
 
-On the start screen (and later in Journal > *Your world additions*) you can add lore of your own for this game: a great house your character belongs to, a home village, a secret order.
-- They are **canon**: the GM is told they are true and win where the card's lore disagrees (a card with five great houses now has six), and to weave them into the world's politics and history.
-- One line of each entry is always in the prompt; the full text is added when the entry's name or one of its keywords comes up (like the card's lorebook).
-- **✨ New facts from the story** reads the recent story and suggests facts it established about the entry (new members, events); click *Add* on the ones you want, then Save.
-- Your character's Background now keeps up to 900 characters in the prompt (was 400); put long details in a lore entry instead.
+## 7. How the Aedo remembers
 
-## 4k. World calendar (card editor > Calendar)
+The model can only read a limited amount of text at once (the **context window**, usually 8192 tokens), so Calíope layers memory:
 
-Each card can have its own calendar: week days, months and their lengths, what a month and a year are called, the era, and the date and hour the story starts (presets: our calendar, a fantasy one).
-- **The app keeps the clock, not the AI.** The date and hour are shown at the top of the chat and in Journal. After each turn the tracker only estimates how long the scene took (a talk: minutes, a meal: an hour); the app moves the clock, never more than 12 hours in one turn.
-- **Days pass only when you choose:** `/wait 2 hours`, `/wait 3 days`, `/wait until Sunday`, `/wait until morning`, or in your own words ("I sleep until morning", "we travel for three days"). What your character *says* (in quotes) never skips time. Undo puts the clock back.
-- **Appointments:** "the festival is on Sunday" becomes an appointment on the exact day (counted by the app from the calendar, not by the AI). The GM sees today, the coming week day by day and the appointments, so "in two days" is always right; skipping past an appointment tells you about it. You can add or remove appointments in Journal.
-- Needs the tracker (on by default) to move the clock between skips.
+| Layer | What it holds |
+|---|---|
+| Recent rounds | The last ~10 exchanges, word for word (adjustable) |
+| **Cantos** | A chronicle of every closed chapter |
+| Summary | A rolling summary of older events |
+| Memories | Important facts, found again by keywords or by meaning when they matter |
+| Pinned memory box | Up to 2,000 characters you write; always included |
+| Game state | Sheet, bag, quests, relationships, clock, resources: kept by the app |
+| Lorebooks | The card's and yours, added when their keywords come up |
 
-## 4l. Done by the app, not the AI (v1.5)
+After each reply a short second call (the **tracker**) notes what changed. On quiet turns of pure talk it is skipped and catches up later.
 
-- **Roll buttons:** when the GM asks for a check ("Make a DEX (Stealth) check, DC 13"), a 🎲 button appears under the reply (▲ advantage, ▼ disadvantage). The app adds your sheet's bonus (ability modifier, plus proficiency when the skill or save is on your sheet), rolls, and tells the GM "17 vs DC 13 → ✅ Success".
-- **Quiet turns are faster:** on turns of pure talk the tracker (the second AI call after each reply) is skipped and reads those turns together a little later. Money, items, wounds, travel, quests or a new name make it run at once. Settings > *Skip tracking on quiet turns*.
-- **INFO status block kept by the app** (cards like Lumencia): place, time, items, money, HP, quests and relationships come from the game; the card's own values (Tier, EXP, Crowns...) start from the opening scene and the tracker reports only what changed. The AI no longer writes the block (faster replies, right numbers). Status tab > *Edit the card's values* to correct them. Card editor > Advanced lets a card go back to "Written by the AI".
-- **Weather from the calendar:** with a calendar, the app rolls the day's weather from the season and the card's climate (temperate, cold, warm, tropical, dry, or off). It lasts a day or two and the GM describes it.
-- **Shops and money:** prices in a reply ("a lantern (5 gold)") become 🛒 buttons; buying checks your money, takes it and puts the item in your bag. The Bag tab has a **Pay** box. The tracker never counts those twice. Card editor: *Money is called* (gold, crowns...).
-- **Quests:** the AI can add quests, but only suggests when one is completed or failed; you confirm it in the Bag tab.
-- **Exact prompt size:** the app learns how many characters make one token for your model from the server's real counts, so it keeps as much history as really fits.
+---
 
-## 4m. Resources and powers (Mana, Aura, Stamina...)
+## 8. Rulebooks and skills
 
-Card editor > **Resources and powers**: the card's pools (name, maximum, colour, how they refill: per round, short rest, night, new day; −1 = all of it) and the powers that spend them (attack, heal or effect; cost, damage or healing dice, range). **✨ Suggest from the card** lets the AI propose them for the setting; you change anything.
-- The **Sheet** shows bars, the powers with a **Use** button (refused without enough) and **Short rest / Long rest** (with a calendar they pass 1 or 8 hours; a long rest also heals). A game started before you added them: *Get resources and powers from the card*.
-- **In fights** the powers are buttons in the Combat tab: the app pays the cost, rolls the hit and damage or the healing, and pools that refill per round do so. Enemy casters (*＋ casts spells* in the fight form, or suggested by the AI) spend from their own pool and fall back to weapons when it runs dry.
-- When the story spends a resource without a button ("you pour your aura into the barrier"), the tracker subtracts it. The GM always sees your pools and is told to show a drained character as drained.
+**📚 Rules** → import a PDF or text rulebook, then tick it in a card's *Rulebooks*.
+- When a turn touches a rule (grappling, falling, frenzy…), the Aedo gets the matching section, and **📖 Rules used** shows which.
+- **House rules** win over the book.
+- Scanned books need the free [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki).
+- A good free start: the **D&D System Reference Document 5.2**.
 
-## 4n. Its own window
+**🧩 Skills** are folders with a `SKILL.md` (style guides, genre advice). Install them in the Skills window and attach up to 3 to a card. Skill scripts are never run.
 
-Play.bat and Caliope.exe open the game in a window of its own (Microsoft Edge's app mode, which comes with Windows: no tabs, no address bar), not in a browser tab. The black window is minimized; it still holds the messages and errors. **Closing the game window stops everything.** Settings > *Open in its own window* turns it off (back to a browser tab). If Edge is missing, Chrome or Brave is used, else your normal browser.
+---
 
-## 4o. Starts, characters and pictures (v2.1)
-- **👥 Characters**: on a card in the New game list (and on the "Who are you?" screen) shows every character with picture, name and role. Click a picture to zoom.
-- **Choose your start**: a card can have several starts. The default is the card's opening; imported alternate openings appear too; the card editor (under *Opening message*) adds full starts: their own opening, how the world is on that route (the Aedo reads it every turn), who the story starts with (everyone else is met in the story) and **fixed scenes** the Aedo plays in order, one per reply (separate them with a line of `---`).
-- **Pictures from a folder** (card editor, *Characters*): pick a folder with one subfolder per character holding `1.png`…`6.png` (1 Standard, 2 Happy, 3 Sad, 4 Angry, 5 Disgusted, 6 Blushing), or a single `Name.png`. Names match without caring about capitals, accents or a missing surname; a preview shows what matched and lets you assign the rest by hand. Missing moods use the closest one. The pictures are copied into the app (`data\cardpics`) and also replace them in games already using the card. Run it again whenever you add pictures.
-- **Private cloud (Cloudflare R2)**: Settings > *Pictures in the cloud* takes your R2 account ID, bucket and keys; ☁ in the card editor uploads the card's pictures. The bucket stays private: the app signs every download, keeps a copy on this PC, and the card only holds `r2:` links that nobody else can open.
+## 9. Your data, backups and privacy
 
-## 4p. The Muse (v2.2)
-**🪶 The Muse** (left sidebar) is a writer's room with the same model that plays your games: brainstorm worlds, characters, a new route for a card. Talks are saved; long talks are summarized as they go. **↶ Undo last** removes her last answer to ask differently.
-**✨ Make it a card** turns the talk into a card, asking the model for one piece at a time (title, pitch, world, tone, each character's sheet, the opening) so the card always comes out valid. The preview offers **＋ Add to Calíope** (it appears in New game, ✎ to edit) or **⤓ Save file** (a standard Character Card JSON you can import later). It takes one or two minutes on an RX 580. The Muse and a game share the model, so one waits for the other.
+Everything lives in `backend\data` (with Play.bat) or `Caliope\data` (with the exe):
 
-## 4q. Cantos, recap and the map bag (v2.3)
-- **Cantos** (Journal tab): your story's chapters. *Close this Canto* at a natural break: the Aedo writes a short chronicle, a divider marks the new Canto in the chat, and the chronicles of past Cantos stay in what the Aedo always knows. Rewinding or undoing into a closed Canto opens it again.
-- **📜 Recap** (top of the chat): "Previously, in…", written only when you click it and never added to the story.
-- **🎒 Map bag** (Map tab): scene pictures you keep, with place, in-game date and Canto. The first picture of each place is kept on its own; 📌 on any scene picture keeps it; click to see it big, ✎ to name it. The Map tab appears for any game with scene pictures.
+| Item | Where |
+|---|---|
+| Games, cards, characters, memories, settings | `rpg.db` |
+| Daily backups | `backups\rpg-<date>.db` |
+| Pictures (uploads, downloads, card folders) | `portraits\`, `cardpics\` |
+| Music | `music\` |
+| Voice program, voices and spoken replies | `voice\` |
 
-## 4r. Backups and .caliope card files (v2.4)
-- **Daily backups**: once a day all your games, characters, memories and cards are copied to `data\backups\rpg-<date>.db`; the last 7 are kept (Settings > Backups: turn off, change the number, *Back up now*, *Open folder*). To restore: close Calíope, rename `data\rpg.db` (keep it), copy a backup into `data`, rename it `rpg.db`, start again. Pictures from folders and music are files in `data`, not inside the backup.
-- **📦 .caliope files**: in the New game list, 📦 saves a card with all its pictures in one file. *Import a card* reads `.caliope` files back (pictures included), so you can share a card with a friend without GitHub or the cloud. Pictures that are only public links stay links.
+**Backups:** once a day everything in `rpg.db` is copied to `backups`, and the last 7 days are kept (Settings > Backups: *Back up now*, *Open folder*, how many days).
+To restore:
+1. Close Calíope.
+2. Rename `rpg.db` (keep it).
+3. Copy a backup into `data` and rename it `rpg.db`.
+4. Start Calíope again.
 
-## 4s. Narration voice (v2.5)
-Settings > *Narration voice*: download the voice program (Piper, from its official GitHub, about 25 MB) and a voice (about 60 MB each, from Hugging Face): Lessac, Amy, Ryan (English US), Alan (English UK) or Faber (Português do Brasil). Pick it as *Voice for 🔊*. Then 🔊 on any reply reads it aloud (⏹ stops), or turn on *Read every new reply aloud*. It runs on the processor, so the story model keeps the graphics card; each reply is read once and kept (`data\voice\cache`). Status blocks, portrait tags and markdown marks are skipped.
+**What goes online, and only if you turn it on:**
+- scene picture descriptions (Pollinations or PixAI)
+- R2 uploads and downloads
+- downloads of the engine, models and voices from their official sites
+- an online model, if you set one
 
-## 5. Tests
+Everything else stays on this PC. Calíope only answers on this PC (127.0.0.1) and refuses requests from other websites.
 
-```
-cd backend
-python -m unittest discover -s tests -v
-```
-The tests use a fake model, so they need no GPU or LM Studio.
+---
 
-## 6. Main API (the frontend will use these)
+## 10. The Windows program (Caliope.exe)
 
-- `POST /api/conversations {scenario_id}` start a game; `GET /api/conversations/{id}` load it
-- `POST /api/conversations/{id}/chat {content}` streams events (SSE): `user_message`, `context`, `token`, `assistant_message`, `analysis_start`, `state`, `summary`, `done`, `error`
-- `POST /api/conversations/{id}/regenerate`, `POST /api/conversations/{id}/undo`
-- `GET/PATCH /api/conversations/{id}/state`, `.../npcs`, `.../memories`, `.../memories/search?q=`
-- `GET/POST/PUT/DELETE /api/scenarios`, `POST /api/scenarios/generate`
-- `GET /api/skills`, `POST /api/skills/install`, `PATCH /api/skills/{name} {enabled}`
+Run **`build-exe.bat`** (after Play.bat ran once). It builds the folder `Caliope\` with **Caliope.exe**, which needs no Python or Node.js.
+- Its saves are in `Caliope\data`, the engine in `Caliope\engine`, skills in `Caliope\skills`. Rebuilding replaces only the program files, never these folders.
+- The first build copies your saves from `backend\data` (and from the old `LocalRPG` folder of v1.x; delete that folder afterwards).
+- Copy the whole `Caliope` folder to move it. An installer is planned.
+
+---
+
+## 11. Settings worth knowing
+
+| Setting | What it does |
+|---|---|
+| AI engine | Built-in (llama.cpp) or LM Studio / another server |
+| Context window | How much text the model reads at once; must match the model (8192) |
+| Reply length | Short, medium or long replies |
+| Rounds kept word for word | How many recent exchanges stay complete |
+| Track the sheet automatically | The tracker after each reply (turn off for speed) |
+| Skip tracking on quiet turns | Faster talk scenes |
+| Summarize old messages | The rolling summary |
+| Scene pictures / Painted by | Pictures for new scenes; Pollinations or PixAI |
+| Narration voice | Piper voice, speed, read every reply |
+| Backups | Daily copy, days to keep |
+| Open in its own window | App window or a normal browser tab |
+
+Every setting has a **?** with a short explanation.
+
+---
+
+## 12. Troubleshooting
+
+| Problem | Try |
+|---|---|
+| "Cannot reach the model server" | Built-in engine: 🧠 Models → Load a model. LM Studio: start its server, and check that *Server address* is `http://localhost:1234/v1`. |
+| Engine: out of memory | Lower *Context window* or set *GPU layers* to ~28. Close LM Studio's model. |
+| Replies are slow | *Reply length*: short. Turn on *Skip tracking on quiet turns*. Fewer *rounds kept*. |
+| The interface looks old after an update | Close the game window and run Play.bat again (it rebuilds the interface). |
+| A picture doesn't show | Links can break; use 📂 pictures from a folder or ⬆ from your PC. |
+| Something else | The black window (open it from the taskbar) shows the error; copy it when asking for help. |
+
+---
+
+## 13. For developers
+
+Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vite interface (`frontend`).
+`AGENTS.md` explains the layout and the rules that keep the app working.
+
+- **Development mode** (the interface reloads as you edit): `start-backend.bat` and `start-frontend.bat`, then http://localhost:5173.
+- **Tests**: no GPU, network or LM Studio needed (a fake model is used).
+  ```
+  cd backend
+  python -m unittest discover -s tests -t .
+  ```
+- **API**: http://127.0.0.1:8000/docs lists every endpoint. Turns stream as server-sent events (`user_message`, `token`, `assistant_message`, `state`, `done`, `error`…).
+- Each feature lives on its own branch with tests and a version tag.
+
+---
+
+## 14. Version history
+
+| Version | What came |
+|---|---|
+| 0.2 | Backend and web interface |
+| 0.3 | Edit, rewind, delete and re-send messages |
+| 0.4 | Speed and memory: pinned memory box, rounds window, reply length |
+| 0.5 | Roleplay and Adventure cards, skills as add-ons, character looks |
+| 0.6 | Character card import with lorebook, big portraits, Status tab, Continue |
+| 0.7 | Start screens, writing marks, time and weather, Aa menu, search, export, save points |
+| 0.8 | Pictures beside messages, moods and the mood editor |
+| 0.9 | One-click `Play.bat` |
+| 0.10 | Rulebooks with OCR, search and house rules |
+| 0.11 | Combat with dice by code, battle maps, terrain and cover |
+| 0.12 | Jukebox |
+| 0.13 | Scene pictures |
+| 1.0 | Built-in llama.cpp engine and the Windows program |
+| 1.1 | Models window (Hugging Face search, downloads, load and unload) |
+| 1.2 | Your world additions (player lorebook) |
+| 1.3 | World calendar with real time |
+| 1.4 | Code audit: performance, security and fixes |
+| 1.5 | The app does the counting: checks, shop, INFO block, quiet turns |
+| 1.6 | Resources and powers |
+| 1.7 | Its own window |
+| 1.8 | Story colours |
+| 1.9 | Collapsible sidebars, big pictures, the "met" fix |
+| 1.10 | Audit leftovers: faster memory search, re-send undoes old results, upload limits |
+| 1.11 | The pixel-art icon |
+| 1.12 | Browse this PC for models |
+| **2.0** | **Calíope**: new name, violet and orange themes, API key, PixAI option |
+| 2.1 | Card starts (routes), character preview, pictures from a folder, private R2 |
+| 2.2 | The Muse |
+| 2.3 | Cantos, recap, map bag |
+| 2.4 | Daily backups and .caliope card files |
+| 2.5 | Narration voice |
