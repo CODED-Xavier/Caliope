@@ -9,6 +9,7 @@ import RulebooksModal from "./components/RulebooksModal.jsx";
 import ModelsModal from "./components/ModelsModal.jsx";
 import MuseModal from "./components/MuseModal.jsx";
 import { RecapView } from "./components/Cantos.jsx";
+import Tour from "./components/Tour.jsx";
 import { JukeboxModal, JukeboxPlayer } from "./components/Jukebox.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
 import { KIND_LABELS, MODE_LABELS } from "./utils.js";
@@ -101,7 +102,14 @@ export default function App() {
   const [tracks, setTracks] = useState([]);
   const [scenePictures, setScenePictures] = useState(false);
   const [voice, setVoice] = useState({ name: "", auto: false });
-  const loadSettingsFlags = () => api.settings().then((s) => { setScenePictures(!!s.scene_pictures); setVoice({ name: s.voice_name || "", auto: !!s.voice_auto }); }).catch(() => {});
+  const [tour, setTour] = useState(false);
+  const [modelsInit, setModelsInit] = useState({ tab: "mine", query: "" });
+  const loadSettingsFlags = () => api.settings().then((s) => {
+    setScenePictures(!!s.scene_pictures); setVoice({ name: s.voice_name || "", auto: !!s.voice_auto });
+    if (!s.tutorial_done) setTour(true);
+  }).catch(() => {});
+  const endTour = () => { setTour(false); api.saveSettings({ tutorial_done: true }).catch(() => {}); };
+  const openModels = (query = "") => { setModelsInit(query ? { tab: "find", query } : { tab: "mine", query: "" }); setModal("models"); };
   // The narration voice: one reply at a time; clicking 🔊 on the reply that is playing stops it.
   const audioRef = useRef(null);
   const lastReplyRef = useRef(null);
@@ -411,7 +419,7 @@ export default function App() {
       data-story-colors={view.storyColors === false ? "off" : "on"}>
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => setModal("new")}
-        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onModels={() => setModal("models")} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
+        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         collapsed={view.sideCollapsed} onCollapse={setSideCollapsed}
       />
@@ -470,9 +478,10 @@ export default function App() {
       )}
       {recap && <RecapView text={recap.text} loading={recap.loading} onClose={() => setRecap(null)} onAgain={showRecap} />}
       {modal === "muse" && <MuseModal onClose={() => setModal(null)} />}
-      {modal === "models" && <ModelsModal onClose={() => { setModal(null); refreshHealth(); }} />}
+      {modal === "models" && <ModelsModal initialTab={modelsInit.tab} initialQuery={modelsInit.query} onClose={() => { setModal(null); refreshHealth(); }} />}
+      {tour && !modal && <Tour onDone={endTour} onGetModel={(q) => openModels(q)} />}
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
-      {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} />}
+      {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} onTour={() => { setModal(null); setTour(true); }} />}
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}
       {modal === "rulebooks" && <RulebooksModal onClose={() => setModal(null)} />}
       {modal === "jukebox" && <JukeboxModal onClose={() => setModal(null)} onChanged={setTracks} />}

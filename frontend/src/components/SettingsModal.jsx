@@ -17,7 +17,7 @@ function Row({ label, help, hint, children }) {
   );
 }
 
-export default function SettingsModal({ onClose, onSaved }) {
+export default function SettingsModal({ onClose, onSaved, onTour }) {
   const [s, setS] = useState(null);
   const [models, setModels] = useState([]);
   const [health, setHealth] = useState(null);
@@ -139,6 +139,7 @@ export default function SettingsModal({ onClose, onSaved }) {
       </>)}
       <h3>Narration voice <HelpTip id="voice" /></h3>
       <VoicePanel s={s} set={set} Row={Row} />
+      {onTour && <div className="row gap center" style={{ margin: "6px 0" }}><span className="muted small grow">New here, or showing Calíope to a friend?</span><button className="btn small" onClick={onTour}>▶ Show the tour again</button></div>}
       <h3>Backups</h3>
       <Row label="Back up every day" help="backups">
         <input type="checkbox" checked={s.backups !== false} onChange={(e) => set("backups", e.target.checked)} />

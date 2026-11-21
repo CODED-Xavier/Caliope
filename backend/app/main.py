@@ -31,7 +31,8 @@ from .rulebooks import RulebookError, ocr_available
 from .runtime import ENGINE_KEYS, EngineError
 from .modelhub import download_root, pick_model_file
 from .picker import pick_folder
-from . import backups, cardpics, npcfill, r2
+from . import backups, cardpics, hardware, npcfill, r2
+from . import writing_help
 from .voice import CATALOG as VOICE_CATALOG, VoiceError
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import PixAIError, is_pixai, is_pollinations, pixai_paint, polite_fetch
@@ -531,6 +532,29 @@ async def import_card(body: dict[str, Any] = Body(...)):
     if str(body.get("name", "")).strip():
         data["name"] = str(body["name"]).strip()
     return svc().scenarios.create(data)
+
+
+# ------------------------------------------------------------------ this PC, and writing help
+_HW: dict = {}
+
+
+@app.get("/api/hardware")
+async def hardware_info(refresh: bool = Query(False)):
+    """The graphics card, memory and processor of this PC, and the roleplay model that fits best."""
+    if refresh or not _HW:
+        _HW.clear()
+        _HW.update(await asyncio.to_thread(hardware.scan))
+    return {**_HW, "suggestion": hardware.suggest(_HW)}
+
+
+@app.post("/api/correct")
+async def correct_text(body: dict = Body(...)):
+    """✨ Correct my text: spelling and grammar fixed by the model, keeping the meaning and the writing marks."""
+    text = str(body.get("text", ""))[:4000]
+    if not text.strip():
+        return {"text": text}
+    lang = str(body.get("language") or svc().settings.get("response_language") or "en")
+    return {"text": await writing_help.correct(svc().llm, text, lang)}
 
 
 # ------------------------------------------------------------------ personas

@@ -36,7 +36,7 @@ If you already have them, skip this.
 3. Open the folder and **double-click `Play.bat`**.
    - The first time it installs what it needs. This takes **3 to 8 minutes**, and a black window shows the progress. Let it finish.
    - If Windows shows "Windows protected your PC", click **More info → Run anyway**. The file is just a script from this project.
-4. Calíope opens in **its own window**. The black window stays minimized; **don't close it** while playing.
+4. Calíope opens in **its own window**, with a one-minute **tour** (you can skip it). The black window stays minimized; **don't close it** while playing.
    **Closing the Calíope window stops everything.**
 5. It may offer a desktop shortcut. Say yes, and next time just use the shortcut.
 
@@ -48,7 +48,7 @@ Calíope has its own built-in AI engine; you don't need any other program.
 
 1. In the left sidebar click **🧠 Models**.
 2. At the top, click **Download engine** (about 30 MB). Wait until it says it is ready.
-3. Open the **Find more** tab and search for: `Stheno 8B`.
+3. Open the **Find more** tab. The box at the top, **Your PC**, shows your graphics card and the best model for it; **🔍 Find it** searches it for you. Or search for: `Stheno-v3.2`.
 4. Open **L3-8B-Stheno-v3.2** (a GGUF version) and pick the file that fits your graphics card. The list shows a note on each size.
    - **8 GB card: `Q4_K_M`** (or `Q4_K_S`), about 5 GB. This is the recommended one: great at roleplay and fast.
    - 6 GB card: `Q3_K_M`.
@@ -92,6 +92,7 @@ The sidebar shows **Model server online** when it's ready.
 - The small **‹ ›** bubbles on the edges of the chat hide the side columns for more room.
 - **🪶 The Muse** (left sidebar): brainstorm stories with the AI and turn them into new cards.
 - **☾ / ☀** switches between the dark and light themes.
+- **✨** beside the send button fixes the spelling and grammar of your message.
 
 Every setting and many buttons have a **?** that explains what they do.
 

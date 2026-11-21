@@ -9,8 +9,9 @@ const size = (g) => (g >= 1 ? `${g} GB` : `${Math.max(1, Math.round(g * 1000))} 
 const BIG_GB = 6.5; // above this an 8B-class card cannot hold the whole model
 
 /** LM Studio-like model manager: your models, Hugging Face search and downloads, load/unload, hide, delete. */
-export default function ModelsModal({ onClose }) {
-  const [tab, setTab] = useState("mine");
+export default function ModelsModal({ onClose, initialTab = "mine", initialQuery = "" }) {
+  const [tab, setTab] = useState(initialTab);
+  const [query, setQuery] = useState(initialQuery);
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [confirmDel, setConfirmDel] = useState("");
@@ -94,7 +95,7 @@ export default function ModelsModal({ onClose }) {
 
       {tab === "files" && <FolderPicker data={data} setData={setData} setErr={setErr} onAdded={() => setTab("mine")} />}
 
-      {tab === "find" && <Finder onDownloaded={() => setTab("dl")} setErr={setErr} />}
+      {tab === "find" && <><PcAdvice onSearch={(w) => { setQuery(w); }} /><Finder key={query} initial={query} onDownloaded={() => setTab("dl")} setErr={setErr} /></>}
 
       {tab === "dl" && (
         <div>
@@ -130,8 +131,8 @@ export default function ModelsModal({ onClose }) {
   );
 }
 
-function Finder({ onDownloaded, setErr }) {
-  const [q, setQ] = useState("");
+function Finder({ onDownloaded, setErr, initial = "" }) {
+  const [q, setQ] = useState(initial);
   const [results, setResults] = useState(null);
   const [open, setOpen] = useState("");
   const [files, setFiles] = useState({});
@@ -141,6 +142,7 @@ function Finder({ onDownloaded, setErr }) {
     setQ(text); setBusy(true); setErr(""); setOpen("");
     try { setResults(await api.searchModels(text)); } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
+  useEffect(() => { if (initial) search(initial); }, []); // eslint-disable-line
   const toggle = async (id) => {
     if (open === id) return setOpen("");
     setOpen(id);
@@ -233,6 +235,28 @@ function FolderPicker({ data, setData, setErr, onAdded }) {
         </div>
       ))}
       {data && !(data.folders || []).length && <p className="muted tiny">No model folders yet.</p>}
+    </div>
+  );
+}
+
+
+/** "Your PC": the graphics card and memory, and the roleplay model that fits best. */
+export function PcAdvice({ onSearch, compact }) {
+  const [hw, setHw] = useState(null);
+  useEffect(() => { api.hardware().then(setHw).catch(() => setHw({ gpus: [], failed: true })); }, []);
+  if (!hw) return <div className="muted small"><span className="spinner" /> Looking at your PC…</div>;
+  const s = hw.suggestion;
+  const gpu = (hw.gpus || []).map((g) => `${g.name}${g.vram_gb ? ` (${g.vram_gb} GB)` : ""}`).join(", ");
+  return (
+    <div className="card pc-advice">
+      <div className="small"><b>Your PC:</b> {gpu || "no graphics card found"}{hw.ram_gb ? ` · ${hw.ram_gb} GB RAM` : ""}</div>
+      {s && (
+        <div className="small">
+          <b>Best roleplay model for it:</b> {s.model}, file <code>{s.file}</code>. <span className="muted">{s.why}</span>
+          {onSearch && <button className="btn small primary" style={{ marginLeft: 8 }} onClick={() => onSearch(s.search)}>🔍 Find it</button>}
+        </div>
+      )}
+      {!compact && <div className="muted tiny">Not sure? Ask any AI assistant: "My PC has {gpu || "<your graphics card>"} and {hw.ram_gb || "<your RAM>"} GB of RAM. What is the best GGUF roleplay model for it?"</div>}
     </div>
   );
 }

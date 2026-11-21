@@ -3,6 +3,7 @@ import { Markdown } from "../markdown.jsx";
 import { firstMood, hideStatus, moodUrl, portraitSrc, stripTags } from "../portraits.js";
 import Story from "./Story.jsx";
 import HelpTip from "./HelpTip.jsx";
+import { api } from "../api.js";
 import { cantoStarts } from "./Cantos.jsx";
 
 /** A picture of the scene, painted by Pollinations.ai the first time it is shown (can take up to a minute). */
@@ -213,6 +214,8 @@ const liveText = (t) => hideStatus(t).replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, ""
 
 export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint, onCheck, onBuy, voiceOn, speaking, onSpeak }) {
   const [text, setText] = useState("");
+  const [fixing, setFixing] = useState(false);
+  const [beforeFix, setBeforeFix] = useState(null);
   const [atBottom, setAtBottom] = useState(true);
   const [query, setQuery] = useState("");
   const [hitIdx, setHitIdx] = useState(0);
@@ -391,6 +394,13 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); }
             }}
           />
+          {!busy && beforeFix != null && <button className="icon-btn fix-btn" title="Undo the correction" onClick={() => { setText(beforeFix); setBeforeFix(null); }}>↶</button>}
+          {!busy && <button className="icon-btn fix-btn" disabled={!text.trim() || fixing} title="✨ Correct my text: spelling and grammar, keeping your words and marks"
+            onClick={async () => {
+              setFixing(true);
+              try { const r = await api.correct(text, chatLang(game)); if (r.text !== text) { setBeforeFix(text); setText(r.text); } } catch (e) { /* keep the text */ }
+              setFixing(false);
+            }}>{fixing ? "…" : "✨"}</button>}
           {busy ? (
             <button className="send stop" onClick={onStop} title="Stop">■</button>
           ) : (

@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.8**. The version history is at the end of this file.
+Current version: **v2.9**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -49,6 +49,8 @@ The first run offers a **Caliope** desktop shortcut (or run `Play.bat --shortcut
 
 Options: `Play.bat --no-browser`, `Play.bat --no-lmstudio`.
 
+The first time, a short **tour** shows the main functions (skip it any time; Settings > *Show the tour again*). It ends by offering to get **Stheno 8B**.
+
 Before your first game, give it a model ([section 2](#2-the-ai-model)).
 
 ---
@@ -57,6 +59,8 @@ Before your first game, give it a model ([section 2](#2-the-ai-model)).
 
 Calíope works with a local roleplay model. On an 8 GB graphics card (such as the RX 580), a good choice is
 **L3-8B-Stheno-v3.2** in **Q4_K_M** or **Q4_K_S** (about 5 GB).
+
+**Which model fits your PC?** 🧠 Models > *Find more* shows **Your PC** (graphics card, its memory, RAM) and the roleplay model that fits best, with the file size to pick and a **🔍 Find it** button. If it can't read your PC, ask any AI assistant: "My PC has <graphics card> and <RAM>. What is the best GGUF roleplay model for it?"
 
 ### Option A: the built-in engine (recommended; no LM Studio)
 1. Sidebar → **🧠 Models**.
@@ -105,7 +109,7 @@ Settings > *API key* also works with services that speak the same language (Open
 | `/wait 3 days`, `/wait until morning` | Time passes, only when you choose |
 | no marks | The Aedo decides |
 
-The message box checks your spelling as you type (red underline; right-click for suggestions), in the story's language.
+The message box checks your spelling as you type (red underline; right-click for suggestions), in the story's language. **✨** beside the send button corrects spelling and grammar of your message with the AI, keeping your words and marks (**↶** undoes it).
 
 ### Under the replies
 - **Continue ▸**: keeps writing the same reply. **↻ Regenerate**: writes it again.
@@ -409,3 +413,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.6 | Columns hide fully, no scrollbars, spell check, character notes (yours and the Aedo's), Personas, new characters from a picture folder |
 | 2.7 | Character boxes filled from the card (once), sheet from your first answer, pictures right before speech and on mood changes, Places with fixed pictures |
 | 2.8 | The Muse adds characters to an existing card |
+| 2.9 | First-run tour, PC scan with the best model for it, Stheno offer, ✨ correct my text |

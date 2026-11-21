@@ -118,6 +118,8 @@ export const api = {
     if (!res.ok) throw new Error(await errorMessage(res));
     return res.json();
   },
+  hardware: () => request("GET", "/api/hardware"),
+  correct: (text, language) => request("POST", "/api/correct", { text, language }),
   personas: () => request("GET", "/api/personas"),
   createPersona: (body) => request("POST", "/api/personas", body),
   updatePersona: (id, body) => request("PUT", `/api/personas/${id}`, body),

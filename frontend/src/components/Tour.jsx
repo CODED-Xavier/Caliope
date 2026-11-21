@@ -1,0 +1,126 @@
+import React, { useEffect, useLayoutEffect, useState } from "react";
+import { PcAdvice } from "./ModelsModal.jsx";
+
+/** The first-run tour: a few quick steps over the real interface, skippable at any moment. */
+const STEPS = [
+  {
+    title: "Welcome to Calíope",
+    body: (
+      <>
+        <p>Calíope plays roleplay and tabletop stories with you, entirely on this PC. The game master is <b>the Aedo</b>; you write what your character says and does.</p>
+        <p>This tour takes about a minute. You can skip it now and open it again from Settings.</p>
+      </>
+    ),
+  },
+  {
+    target: '[data-tour="models"]',
+    title: "1 · Give it a brain: the AI model",
+    body: (
+      <>
+        <p>Calíope needs an AI model on your PC. In <b>🧠 Models</b>:</p>
+        <ol>
+          <li><b>Download engine</b> (once, about 30 MB).</li>
+          <li><b>Find more</b> → search a model → open it → pick the file size shown for your card → <b>Download</b>.</li>
+          <li><b>My models</b> → <b>Load</b>. Already have models from LM Studio? <b>Browse this PC</b> uses them without a new download.</li>
+        </ol>
+        <PcAdvice compact />
+      </>
+    ),
+  },
+  {
+    target: '[data-tour="new"]',
+    title: "2 · Start a game",
+    body: (
+      <>
+        <p><b>＋ New game</b> → pick a card (a world to play). <b>👥</b> shows its characters, and some cards let you choose how the story starts.</p>
+        <p>Then create your character, or load one of your <b>🎭 Personas</b>.</p>
+      </>
+    ),
+  },
+  {
+    title: "3 · How to write",
+    body: (
+      <table className="tour-table"><tbody>
+        <tr><td><code>"Hello."</code></td><td>you speak</td></tr>
+        <tr><td><code>*I draw my sword*</code></td><td>you act</td></tr>
+        <tr><td><code>'He is lying.'</code></td><td>you think (only the Aedo knows)</td></tr>
+        <tr><td><code>/how much gold?</code></td><td>a question to the Aedo, outside the story</td></tr>
+        <tr><td><code>/roll 1d20+3</code>, <code>/wait until morning</code></td><td>dice, and letting time pass</td></tr>
+      </tbody></table>
+    ),
+  },
+  {
+    title: "4 · During a game",
+    body: (
+      <>
+        <p>Under each reply: <b>Continue</b>, <b>↻</b> write it again, <b>⏪</b> rewind, <b>🔊</b> read aloud. At the top: <b>↶ Undo</b>, <b>📜 Recap</b>, <b>🎵 Music</b>, <b>Aa</b> for text size and colours.</p>
+        <p>The right panel has your <b>Sheet</b>, <b>Bag</b>, <b>People</b> (relationships and notes) and <b>Journal</b> (Cantos, memories). The small <b>‹ ›</b> bubbles on the chat's edges hide the columns.</p>
+      </>
+    ),
+  },
+  {
+    target: '[data-tour="muse"]',
+    title: "5 · The Muse",
+    body: <p>A writer's room with the same AI: brainstorm stories and characters, then turn the talk into a new card, or add its characters to one of your cards.</p>,
+  },
+  {
+    target: '[data-tour="settings"]',
+    title: "6 · Settings and help",
+    body: <p>Every setting has a <b>?</b> that explains it: reply length, narration voice, scene pictures, backups and more.</p>,
+  },
+  {
+    title: "Ready? Get your first model",
+    final: true,
+    body: (
+      <>
+        <p>We recommend <b>Stheno 8B</b> (L3-8B-Stheno-v3.2): a roleplay model with a great balance between quality and speed. On an 8 GB card pick the <code>Q4_K_M</code> file (about 5 GB).</p>
+        <PcAdvice compact />
+      </>
+    ),
+  },
+];
+
+export default function Tour({ onDone, onGetModel }) {
+  const [i, setI] = useState(0);
+  const [box, setBox] = useState(null);
+  const step = STEPS[i];
+
+  useLayoutEffect(() => {
+    const el = step.target ? document.querySelector(step.target) : null;
+    if (!el) { setBox(null); return undefined; }
+    const place = () => { const r = el.getBoundingClientRect(); setBox({ top: r.top - 6, left: r.left - 6, width: r.width + 12, height: r.height + 12 }); };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [i]); // eslint-disable-line
+
+  useEffect(() => {
+    const key = (e) => { if (e.key === "Escape") onDone(); };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onDone]);
+
+  const cardStyle = box
+    ? { top: Math.min(Math.max(16, box.top), window.innerHeight - 380), left: Math.min(box.left + box.width + 18, window.innerWidth - 440) }
+    : {};
+  return (
+    <div className="tour">
+      {box ? <div className="tour-spot" style={box} /> : <div className="tour-dim" />}
+      <div className={`tour-card ${box ? "" : "center"}`} style={cardStyle}>
+        <div className="row center"><b className="grow">{step.title}</b><span className="muted tiny">{i + 1} / {STEPS.length}</span></div>
+        <div className="tour-body small">{step.body}</div>
+        <div className="row gap center">
+          <button className="btn small ghost" onClick={onDone}>Skip the tour</button>
+          <span className="grow" />
+          {i > 0 && <button className="btn small" onClick={() => setI(i - 1)}>‹ Back</button>}
+          {step.final ? (
+            <>
+              <button className="btn small" onClick={onDone}>Later</button>
+              <button className="btn small primary" onClick={() => { onDone(); onGetModel("Stheno-v3.2"); }}>⬇ Get Stheno 8B</button>
+            </>
+          ) : <button className="btn small primary" onClick={() => setI(i + 1)}>Next ›</button>}
+        </div>
+      </div>
+    </div>
+  );
+}

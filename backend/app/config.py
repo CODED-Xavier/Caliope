@@ -75,6 +75,7 @@ DEFAULT_SETTINGS: dict = {
     "voice_name": "",             # narration voice (Piper), e.g. en_US-lessac-medium; empty = off
     "voice_speed": 1.0,
     "voice_auto": False,          # read every new reply aloud
+    "tutorial_done": False,       # the first-run tour was shown (or skipped)
     "backups": True,              # a copy of all games every day in data/backups
     "backups_keep": 7,
     "auto_keep_pictures": True,   # the first scene picture of each place goes in the map bag

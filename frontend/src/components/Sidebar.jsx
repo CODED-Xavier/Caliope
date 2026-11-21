@@ -13,7 +13,7 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, on
         <button className="icon-btn theme-btn" onClick={onToggleTheme} title="Toggle light/dark">{theme === "dark" ? "☀" : "☾"}</button>
         <button className="icon-btn" onClick={() => onCollapse(true)} title="Hide the games list">«</button>
       </div>
-      <button className="btn primary wide" onClick={onNew}>＋ New game</button>
+      <button data-tour="new" className="btn primary wide" onClick={onNew}>＋ New game</button>
       <div className="side-label">Your games</div>
       {convs.length > 6 && <input className="field side-search" placeholder="Find a game…" value={filter} onChange={(e) => setFilter(e.target.value)} />}
       <div className="conv-list">
@@ -38,11 +38,11 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, on
           {online ? "Model server online" : "Model server offline"}
         </button>
         <div className="side-tools">
-          <button className="btn ghost grow muse-btn" onClick={onMuse} title="Write stories and cards with the Muse">🪶 The Muse</button>
+          <button data-tour="muse" className="btn ghost grow muse-btn" onClick={onMuse} title="Write stories and cards with the Muse">🪶 The Muse</button>
           <button className="btn ghost grow" onClick={onSkills}>🧩 Skills</button>
           <button className="btn ghost grow" onClick={onRulebooks} title="Rulebooks">📚 Rules</button>
-          <button className="btn ghost grow" onClick={onModels} title="Download and manage AI models">🧠 Models</button>
-          <button className="btn ghost grow" onClick={onSettings}>⚙ Settings</button>
+          <button data-tour="models" className="btn ghost grow" onClick={onModels} title="Download and manage AI models">🧠 Models</button>
+          <button data-tour="settings" className="btn ghost grow" onClick={onSettings}>⚙ Settings</button>
         </div>
       </div>
     </aside>
