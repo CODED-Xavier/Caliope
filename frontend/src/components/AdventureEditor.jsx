@@ -83,7 +83,7 @@ function MapEdit({ map, scenes, onChange, onRemove }) {
   const setCols = (v) => { const cols = Math.max(6, Math.min(80, parseInt(v, 10) || 6)); onChange({ ...map, cols, rows: rowsFor(cols) }); };
   const upload = async (k, file) => {
     if (!file) return;
-    try { const r = await api.uploadPicture(file); onChange({ ...map, [k]: r.url, ...(k === "player_picture" || !map.player_picture ? { grid: {} } : {}) }); } catch (e) { ask.alert(e.message); }
+    try { const r = await api.uploadPicture(await shrinkMap(file)); onChange({ ...map, [k]: r.url, ...(k === "player_picture" || !map.player_picture ? { grid: {} } : {}) }); } catch (e) { ask.alert(e.message); }
   };
   const mine = scenes.filter((s) => s.map === map.id);
   const click = (e) => {
@@ -174,6 +174,21 @@ function MapEdit({ map, scenes, onChange, onRemove }) {
       ) : <div className="muted tiny">Add the map picture (the GM version, and the player version if the book has one).</div>}
     </div>
   );
+}
+
+/** Map pictures are often huge PNGs (20+ MB): turned into WebP in the browser, full size when it fits under the 8 MB
+ * limit, a little smaller otherwise. Small pictures go as they are. */
+async function shrinkMap(file, limit = 7.5 * 1024 * 1024) {
+  if (file.size <= limit) return file;
+  const img = await new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = URL.createObjectURL(file); });
+  for (const scale of [1, 0.8, 0.6, 0.45]) {
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise((ok) => c.toBlob(ok, "image/webp", 0.88));
+    if (blob && blob.size <= limit) return blob;
+  }
+  return file;
 }
 
 /** The grid drawn over a map picture, in the picture's own pixels (so it scales with it). */
