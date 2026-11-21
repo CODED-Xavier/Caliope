@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ask } from "../dialogs.jsx";
 import { api, streamPost } from "../api.js";
 import { moodUrl, portraitSrc } from "../portraits.js";
 import HelpTip from "./HelpTip.jsx";
@@ -199,7 +200,7 @@ export function FillCharacters({ cardId, npcs, onFilled }) {
   const LOOK = ["race", "hair", "eyes", "build", "skin", "outfit"];
   const empty = (npcs || []).filter((n) => !n.personality || !n.speech_style || LOOK.some((k) => !(n.appearance || {})[k])).length;
   const run = async () => {
-    if (!window.confirm(`Fill the empty boxes of ${empty} character(s)? What the card says is used; what it doesn't say is invented once to fit each character. You can edit everything afterwards.`)) return;
+    if (!await ask.confirm(`Fill the empty boxes of ${empty} character(s)? What the card says is used; what it doesn't say is invented once to fit each character. You can edit everything afterwards.`)) return;
     setBusy(true); setErr(""); setNote(""); setStep("Starting…");
     try {
       await streamPost(`/api/scenarios/${cardId}/npcs/fill`, {}, (ev) => {
@@ -228,7 +229,7 @@ export function PlacesEditor({ places, onChange }) {
   const setAt = (i, k, v) => onChange(list.map((p, j) => (j === i ? { ...p, [k]: v } : p)));
   const upload = async (i, file) => {
     if (!file) return;
-    try { const r = await api.uploadPicture(file); setAt(i, "picture", r.url); } catch (e) { window.alert(e.message); }
+    try { const r = await api.uploadPicture(file); setAt(i, "picture", r.url); } catch (e) { ask.alert(e.message); }
   };
   return (
     <details className="places-edit" open={list.length > 0 && list.length <= 4}>

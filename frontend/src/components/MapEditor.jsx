@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import Modal from "./Modal.jsx";
 import BattleMap, { TILE_STYLE } from "./BattleMap.jsx";
 import { api } from "../api.js";
@@ -61,7 +62,7 @@ export default function MapEditor({ onClose, onPicked }) {
             <div key={m.id} className={`map-item ${current.id === m.id ? "active" : ""}`}>
               <button className="link-btn grow" onClick={() => setCurrent(m)}>{m.name} <span className="muted tiny">{m.w}×{m.h}</span></button>
               {onPicked && <button className="btn small" title="Use this map for the fight" onClick={() => onPicked(m)}>Use</button>}
-              <button className="icon-btn" title="Delete" onClick={async () => { if (window.confirm(`Delete map "${m.name}"?`)) { await api.deleteMap(m.id).catch((e) => setError(e.message)); if (current.id === m.id) setCurrent({ ...current, id: null }); load(); } }}>🗑</button>
+              <button className="icon-btn" title="Delete" onClick={async () => { if (await ask.confirm(`Delete map "${m.name}"?`)) { await api.deleteMap(m.id).catch((e) => setError(e.message)); if (current.id === m.id) setCurrent({ ...current, id: null }); load(); } }}>🗑</button>
             </div>
           ))}
           <button className="btn small" onClick={() => setCurrent({ id: null, name: "My map", tiles: blank(12, 8), background: "" })}>＋ New map</button>

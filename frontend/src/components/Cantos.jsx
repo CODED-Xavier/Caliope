@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import { api } from "../api.js";
 import { portraitSrc } from "../portraits.js";
 import HelpTip from "./HelpTip.jsx";
@@ -11,13 +12,13 @@ export function CantosBox({ convId, cantos, onCantos, busy }) {
   const list = cantos || [];
   const open = list.find((c) => !c.closed_at);
   const close = async () => {
-    if (!window.confirm("Close this Canto? The Aedo writes its chronicle and the next Canto begins.")) return;
+    if (!await ask.confirm("Close this Canto? The Aedo writes its chronicle and the next Canto begins.")) return;
     setWorking(true); setErr("");
     try { const r = await api.closeCanto(convId, title.trim()); onCantos(r.cantos); setTitle(""); } catch (e) { setErr(e.message); }
     setWorking(false);
   };
   const rename = async (c) => {
-    const t = window.prompt(`New title for ${c.label}:`, c.title || "");
+    const t = await ask.prompt(`New title for ${c.label}:`, c.title || "");
     if (t === null) return;
     try { await api.renameCanto(c.id, t); onCantos(await api.cantos(convId)); } catch (e) { setErr(e.message); }
   };
@@ -52,10 +53,10 @@ export function MapBag({ convId, refreshKey }) {
   const load = () => api.gallery(convId).then(setPics).catch(() => setPics([]));
   useEffect(() => { load(); }, [convId, refreshKey]); // eslint-disable-line
   const rename = async (p) => {
-    const t = window.prompt("Name this picture:", p.title);
+    const t = await ask.prompt("Name this picture:", p.title);
     if (t !== null) { await api.renamePicture(p.id, t); load(); }
   };
-  const remove = async (p) => { if (window.confirm(`Take "${p.title}" out of the map bag?`)) { await api.removePicture(p.id); load(); } };
+  const remove = async (p) => { if (await ask.confirm(`Take "${p.title}" out of the map bag?`)) { await api.removePicture(p.id); load(); } };
   return (
     <>
       <div className="section-title">🎒 Map bag ({pics?.length || 0}) <HelpTip id="map_bag" /></div>

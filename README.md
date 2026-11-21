@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.9**. The version history is at the end of this file.
+Current version: **v2.10**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -42,7 +42,7 @@ Current version: **v2.9**. The version history is at the end of this file.
 1. installs the Python packages the first time (and again only when they change)
 2. builds the interface when it is missing or its code changed
 3. starts the app, plus the AI (the built-in engine, or LM Studio if you use it)
-4. opens Calíope in **its own window**: no browser tabs, no address bar
+4. opens Calíope in **its own window**: a real app window (it uses Windows' built-in WebView2). If that can't start, it uses an Edge window without tabs or address bar instead
 
 The black window is minimized; it holds messages and errors. **Closing the game window stops everything.**
 The first run offers a **Caliope** desktop shortcut (or run `Play.bat --shortcut` any time).
@@ -414,3 +414,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.7 | Character boxes filled from the card (once), sheet from your first answer, pictures right before speech and on mood changes, Places with fixed pictures |
 | 2.8 | The Muse adds characters to an existing card |
 | 2.9 | First-run tour, PC scan with the best model for it, Stheno offer, ✨ correct my text |
+| 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |

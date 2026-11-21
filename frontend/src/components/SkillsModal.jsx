@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import Modal from "./Modal.jsx";
 import { api } from "../api.js";
 
@@ -35,7 +36,7 @@ export default function SkillsModal({ onClose }) {
             <div><strong>{s.name}</strong> <span className="muted tiny">{s.size} chars</span></div>
             <div className="muted small">{s.description || "(no description)"}</div>
           </div>
-          <button className="icon-btn" title="Uninstall" onClick={() => { if (window.confirm(`Uninstall ${s.name}?`)) api.deleteSkill(s.name).then(setSkills).catch((er) => setError(er.message)); }}>🗑</button>
+          <button className="icon-btn" title="Uninstall" onClick={async () => { if (await ask.confirm(`Uninstall ${s.name}?`)) api.deleteSkill(s.name).then(setSkills).catch((er) => setError(er.message)); }}>🗑</button>
         </div>
       ))}
 

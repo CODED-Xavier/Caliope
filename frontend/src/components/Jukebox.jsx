@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import Modal from "./Modal.jsx";
 import HelpTip from "./HelpTip.jsx";
 import { api } from "../api.js";
@@ -205,7 +206,7 @@ export function JukeboxModal({ onClose, onChanged }) {
             <button className="icon-btn" title={preview === t.id ? "Stop" : "Listen"} onClick={() => listen(t)}>{preview === t.id ? "⏹" : "▶"}</button>
             <input className="field grow" defaultValue={t.name} onBlur={(e) => e.target.value.trim() && e.target.value !== t.name && update(t, { name: e.target.value })} />
             <span className="muted tiny">{t.source === "link" ? "link" : "file"}</span>
-            <button className="icon-btn" title="Delete" onClick={async () => { if (window.confirm(`Delete "${t.name}"?`)) { await api.deleteMusic(t.id).catch((e) => setError(e.message)); load(); } }}>🗑</button>
+            <button className="icon-btn" title="Delete" onClick={async () => { if (await ask.confirm(`Delete "${t.name}"?`)) { await api.deleteMusic(t.id).catch((e) => setError(e.message)); load(); } }}>🗑</button>
           </div>
           <div className="conds">
             {moods.map((m) => <button key={m} className={`chip ${t.tags.includes(m) ? "on" : ""}`} onClick={() => update(t, { tags: toggleTag(t.tags, m) })}>{m}</button>)}

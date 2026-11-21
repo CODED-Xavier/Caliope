@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import { api } from "../api.js";
 import { NumberField, TextField } from "./Fields.jsx";
 import HelpTip from "./HelpTip.jsx";
@@ -343,7 +344,7 @@ function NpcCard({ npc, onUpdate, onDelete }) {
           <TextField multiline rows={4} value={npc.notes} placeholder="What you think of them, a promise, a debt… one per line" onCommit={(v) => onUpdate(npc.id, { notes: v })} />
           <div className="row gap">
             <button className="btn small" onClick={() => onUpdate(npc.id, { active: !npc.active })}>{npc.active ? "Hide from scene" : "Bring back"}</button>
-            <button className="btn small danger" onClick={() => { if (window.confirm(`Delete ${npc.name}?`)) onDelete(npc.id); }}>Delete</button>
+            <button className="btn small danger" onClick={async () => { if (await ask.confirm(`Delete ${npc.name}?`)) onDelete(npc.id); }}>Delete</button>
           </div>
         </div>
       )}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ask, DialogHost } from "./dialogs.jsx";
 import { api, streamPost } from "./api.js";
 import Sidebar from "./components/Sidebar.jsx";
 import Chat from "./components/Chat.jsx";
@@ -298,7 +299,7 @@ export default function App() {
   };
   const undo = async () => {
     if (busy || !activeId) return;
-    if (!window.confirm("Remove the last exchange (your message and the reply)? Sheet and relationships go back to how they were.")) return;
+    if (!await ask.confirm("Remove the last exchange (your message and the reply)? Sheet and relationships go back to how they were.")) return;
     try { setGame(await api.undo(activeId)); refreshConvs(); } catch (e) { setError(e.message); }
   };
 
@@ -323,7 +324,7 @@ export default function App() {
     const text = inclusive
       ? "Delete this message and everything after it? The sheet, characters and memories go back to how they were before it."
       : "Delete everything after this message? The sheet, characters and memories go back to how they were at this point.";
-    if (!window.confirm(text)) return;
+    if (!await ask.confirm(text)) return;
     try { setGame(await api.rewind(activeId, messageId, inclusive)); setLastContext(null); setMemoryKey((k) => k + 1); refreshConvs(); } catch (e) { setError(e.message); }
   };
 
@@ -338,7 +339,7 @@ export default function App() {
 
   const forkAt = async (messageId) => {
     if (busy || !activeId) return;
-    if (!window.confirm("Make a save point here? A new game starts from this moment, with the sheet, characters and memories as they were. This game stays as it is.")) return;
+    if (!await ask.confirm("Make a save point here? A new game starts from this moment, with the sheet, characters and memories as they were. This game stays as it is.")) return;
     try {
       const data = await api.fork(activeId, messageId);
       setActiveId(data.conversation.id);
@@ -389,11 +390,11 @@ export default function App() {
   };
 
   const renameConv = async (c) => {
-    const title = window.prompt("Rename this game:", c.title);
+    const title = await ask.prompt("Rename this game:", c.title);
     if (title && title.trim()) { await api.renameConversation(c.id, title.trim()).catch((e) => setError(e.message)); refreshConvs(); if (c.id === activeId) reloadGame(); }
   };
   const deleteConv = async (c) => {
-    if (!window.confirm(`Delete "${c.title}" permanently? Its memories are deleted too.`)) return;
+    if (!await ask.confirm(`Delete "${c.title}" permanently? Its memories are deleted too.`)) return;
     await api.deleteConversation(c.id).catch((e) => setError(e.message));
     if (c.id === activeId) { setActiveId(null); setGame(null); localStorage.removeItem("activeConv"); }
     refreshConvs();
@@ -479,6 +480,7 @@ export default function App() {
       {recap && <RecapView text={recap.text} loading={recap.loading} onClose={() => setRecap(null)} onAgain={showRecap} />}
       {modal === "muse" && <MuseModal onClose={() => setModal(null)} />}
       {modal === "models" && <ModelsModal initialTab={modelsInit.tab} initialQuery={modelsInit.query} onClose={() => { setModal(null); refreshHealth(); }} />}
+      <DialogHost />
       {tour && !modal && <Tour onDone={endTour} onGetModel={(q) => openModels(q)} />}
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} onTour={() => { setModal(null); setTour(true); }} />}

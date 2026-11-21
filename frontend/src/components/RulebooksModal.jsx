@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import Modal from "./Modal.jsx";
 import HelpTip from "./HelpTip.jsx";
 import { api } from "../api.js";
@@ -30,7 +31,7 @@ function BookCard({ book, onChanged, onDelete }) {
           {book.status === "error" && <div className="error-text tiny">{book.message}</div>}
         </div>
         {book.status === "ready" && <button className="btn small" onClick={() => setOpen(!open)}>House rules{book.house_rules ? " ✓" : ""}</button>}
-        <button className="icon-btn" title="Delete this rulebook" onClick={() => { if (window.confirm(`Delete "${book.name}"? Cards that use it simply stop using it.`)) onDelete(book.id); }}>🗑</button>
+        <button className="icon-btn" title="Delete this rulebook" onClick={async () => { if (await ask.confirm(`Delete "${book.name}"? Cards that use it simply stop using it.`)) onDelete(book.id); }}>🗑</button>
       </div>
       {open && (
         <div className="house-rules">

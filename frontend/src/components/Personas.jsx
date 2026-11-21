@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import { api } from "../api.js";
 import HelpTip from "./HelpTip.jsx";
 
@@ -19,7 +20,7 @@ export default function PersonaBar({ player, lore, onLoad }) {
     const name = (player?.name || "").trim();
     if (!name) { setNote("Give your character a name first."); return; }
     const same = list.find((x) => x.name.toLowerCase() === name.toLowerCase());
-    if (same && !window.confirm(`Replace your saved persona "${same.name}"?`)) return;
+    if (same && !await ask.confirm(`Replace your saved persona "${same.name}"?`)) return;
     try {
       const body = { name, player, lore };
       const saved = same ? await api.updatePersona(same.id, body) : await api.createPersona(body);
@@ -29,7 +30,7 @@ export default function PersonaBar({ player, lore, onLoad }) {
   };
   const remove = async () => {
     const found = list.find((x) => String(x.id) === String(pick));
-    if (!found || !window.confirm(`Delete the persona "${found.name}"?`)) return;
+    if (!found || !await ask.confirm(`Delete the persona "${found.name}"?`)) return;
     await api.deletePersona(found.id); setPick(""); load();
   };
 

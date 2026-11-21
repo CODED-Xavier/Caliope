@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import { CharacterPreview, FillCharacters, PicturesFolder, PlacesEditor, StartsEditor } from "./CardExtras.jsx";
 import Modal from "./Modal.jsx";
 import HelpTip from "./HelpTip.jsx";
@@ -515,7 +516,7 @@ export default function ScenarioModal({ onClose, onStart }) {
               <a className="icon-btn" title="Share as a .caliope file (the card with all its pictures)" href={`/api/scenarios/${s.id}/export.caliope`} download onClick={(e) => e.stopPropagation()}>📦</a>
               <a className="icon-btn" title="Export as a character card (JSON)" href={api.exportCardUrl(s.id)} download onClick={(e) => e.stopPropagation()}>⤓</a>
               <button className="icon-btn" title="Edit" onClick={(e) => { e.stopPropagation(); edit(s.id); }}>✎</button>
-              <button className="icon-btn" title="Delete" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete card "${s.name}"? Your saved games stay.`)) api.deleteScenario(s.id).then(() => load()).catch((er) => setError(er.message)); }}>🗑</button>
+              <button className="icon-btn" title="Delete" onClick={async (e) => { e.stopPropagation(); if (await ask.confirm(`Delete card "${s.name}"? Your saved games stay.`)) api.deleteScenario(s.id).then(() => load()).catch((er) => setError(er.message)); }}>🗑</button>
             </div>
             {s.covers?.length > 0 && (
               <div className="scn-covers">

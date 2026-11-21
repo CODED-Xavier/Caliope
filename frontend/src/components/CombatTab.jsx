@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import { api } from "../api.js";
 import HelpTip from "./HelpTip.jsx";
 import BattleMap, { SIDE_COLOR, TILE_STYLE } from "./BattleMap.jsx";
@@ -269,7 +270,7 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities }) {
         </div>
         <div className="row gap">
           <button className="btn small grow" disabled={busy} onClick={() => onAction({ action: "enemies" })} title="Let everyone else act now">Others act</button>
-          <button className="btn small danger" disabled={busy} onClick={() => { if (window.confirm("End the fight now?")) onAction({ action: "end", reason: "the fight was stopped" }); }}>End fight</button>
+          <button className="btn small danger" disabled={busy} onClick={async () => { if (await ask.confirm("End the fight now?")) onAction({ action: "end", reason: "the fight was stopped" }); }}>End fight</button>
         </div>
         <div className="muted tiny">The app rolls everything and the Aedo narrates it. One reply per round: your action, then everyone else.</div>
       </div>

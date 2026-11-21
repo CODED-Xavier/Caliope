@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import Modal from "./Modal.jsx";
 import HelpTip from "./HelpTip.jsx";
 import { api, streamPost } from "../api.js";
@@ -83,7 +84,7 @@ export default function MuseModal({ onClose, onCardAdded }) {
   };
   const undo = async () => { if (!busy && talk) setTalk(await api.museUndo(talk.id)); };
   const remove = async (t) => {
-    if (!window.confirm(`Delete the talk "${t.title}"?`)) return;
+    if (!await ask.confirm(`Delete the talk "${t.title}"?`)) return;
     await api.museDelete(t.id); if (talk?.id === t.id) setTalk(null); loadList();
   };
 

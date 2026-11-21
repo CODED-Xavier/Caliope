@@ -210,8 +210,29 @@ def _browser_for_window() -> str | None:
     return None
 
 
+def _native_window(url: str, profile: Path):
+    """The real app window (pywebview + WebView2). None when it is not installed or did not start."""
+    import importlib.util  # noqa: PLC0415
+
+    if getattr(sys, "frozen", False) or importlib.util.find_spec("webview") is None:
+        return None
+    profile.mkdir(parents=True, exist_ok=True)
+    try:
+        win = subprocess.Popen([sys.executable, str(BACKEND / "window.py"), url, str(profile)], cwd=BACKEND)
+    except OSError:
+        return None
+    try:
+        win.wait(timeout=4)          # it ended at once: it could not start (exit code 3)
+    except subprocess.TimeoutExpired:
+        return win                   # still open: that's the app window
+    return None
+
+
 def open_app_window(url: str, profile: Path):
     """Open the app in a window of its own. Returns the window's process, or None (then the normal browser is used)."""
+    native = _native_window(url, profile.parent / "webview")
+    if native:
+        return native
     exe = _browser_for_window()
     if not exe:
         return None

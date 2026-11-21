@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { ask } from "../dialogs.jsx";
 import { api } from "../api.js";
 import { STANDARD_MOODS, portraitSrc } from "../portraits.js";
 
@@ -22,8 +23,8 @@ export default function MoodEditor({ portraits, onChange, compact, mainOnly }) {
     const moods = url ? [...others, { n, label: (pics.moods.find((m) => m.n === n) || {}).label || label, url }] : others;
     onChange({ ...pics, moods: moods.sort((a, b) => (a.n ?? 99) - (b.n ?? 99)) });
   };
-  const askLink = (n) => {
-    const url = window.prompt("Paste the picture's link (https://…):", urlFor(n));
+  const askLink = async (n) => {
+    const url = await ask.prompt("Paste the picture's link (https://…):", urlFor(n));
     if (url === null) return;
     if (url && !/^https?:\/\//i.test(url.trim())) { setError("The link must start with http:// or https://"); return; }
     setError(""); setSlot(n, url.trim());
@@ -39,9 +40,9 @@ export default function MoodEditor({ portraits, onChange, compact, mainOnly }) {
   const standardNs = STANDARD_MOODS.map(([n]) => n);
   const custom = pics.moods.filter((m) => !standardNs.includes(m.n)).map((m) => [m.n, m.label]);
   const slots = mainOnly ? [[0, "Picture"]] : [[0, "Main"], ...STANDARD_MOODS, ...custom];
-  const addMood = () => {
+  const addMood = async () => {
     if (pics.moods.length >= 12) { setError("At most 12 moods per character."); return; }
-    const label = (window.prompt("Name of the new mood (for example Smug, Crying, Scared):") || "").trim().slice(0, 30);
+    const label = (await ask.prompt("Name of the new mood (for example Smug, Crying, Scared):") || "").trim().slice(0, 30);
     if (!label) return;
     if (pics.moods.some((m) => m.label.toLowerCase() === label.toLowerCase()) || STANDARD_MOODS.some(([, l]) => l.toLowerCase() === label.toLowerCase())) {
       setError("That mood already exists."); return;
