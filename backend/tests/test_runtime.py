@@ -229,3 +229,35 @@ class SettingsAndClientTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MemoryFitTests(Paths):
+    async def test_out_of_memory_tries_lighter_starts(self):
+        d = runtime.ENGINE_DIR / "llama-b1"
+        d.mkdir(parents=True)
+        p = d / "llama-server"
+        # a fake engine that runs out of video memory with two slots and starts fine with one
+        p.write_text('#!/bin/sh\ncase "$*" in *"-np 2"*) echo "ggml_vulkan: ErrorOutOfDeviceMemory"; exit 1;; esac\nsleep 30\n')
+        p.chmod(p.stat().st_mode | stat.S_IEXEC)
+        model = self.tmp / "m.gguf"
+        model.write_bytes(b"0")
+        settings = dict(self.settings, engine_model_path=str(model))
+        healthy = {"n": 0}
+
+        async def get(url):
+            healthy["n"] += 1
+            return 200 if healthy["n"] > 2 else 503
+        rt = EngineManager(lambda: settings, http_get=get)
+        try:
+            st = await rt.start()
+            self.assertEqual(st["state"], "ready")
+            self.assertIn("-np 1", " ".join(rt.chat.args))
+            self.assertEqual(rt._fit[(str(model), 8192, "auto")], (1, "auto"))
+        finally:
+            await rt.stop()
+
+    def test_ladder(self):
+        self.assertEqual(runtime.fit_ladder("auto")[0], (2, "auto"))
+        self.assertEqual(runtime.fit_ladder("28"), [(2, "28"), (1, "28")])
+        self.assertTrue(runtime.out_of_memory("vk::Device::allocateMemory: ErrorOutOfDeviceMemory"))
+        self.assertFalse(runtime.out_of_memory("model loaded"))

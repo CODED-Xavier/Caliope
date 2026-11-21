@@ -71,7 +71,7 @@ Calíope works with a local roleplay model. On an 8 GB graphics card (such as th
 
 The engine starts with the app and stops when you close it; LM Studio is not opened. The built-in engine is the default for new installs.
 
-**Why it answers faster than LM Studio:** the engine keeps two memory slots. One holds only the story, so its long, unchanged beginning (card, world, characters) stays read between turns, and each reply only reads what is new. The other slot runs the helpers: the tracker, summaries, and the Aedo's answers outside the story. In LM Studio the tracker's call pushes the story out of memory, so every reply rereads the whole prompt (about a minute on an RX 580). The two slots use about 1 GB more video memory. If replies get slower after the change, lower the **Context window** to 6144.
+**Why it answers faster than LM Studio:** the engine keeps two memory slots. One holds only the story, so its long, unchanged beginning (card, world, characters) stays read between turns, and each reply only reads what is new. The other slot runs the helpers: the tracker, summaries, and the Aedo's answers outside the story. In LM Studio the tracker's call pushes the story out of memory, so every reply rereads the whole prompt (about a minute on an RX 580). The two slots use about 1 GB more video memory. When a card can't hold that, the engine starts lighter by itself: one slot, then part of the model on the processor. Before loading, Calíope asks LM Studio (if installed) to unload its models, so the two don't fill the card together.
 - If loading fails with "out of memory", lower the **Context window** or set **GPU layers** to about 28 in Settings.
 - Close LM Studio's own model first, so the two don't fight over video memory.
 
@@ -420,5 +420,6 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |
 | 2.11 | The interface in English and Português (Brasil), switched in Settings or in the tour |
 | 2.11.1 | Audit 2 fixes (see AUDIT.md): start names, Places in .caliope files, repeated place pictures, safer imports |
+| 2.12.3 | Engine: unloads LM Studio's models first, and falls back to a lighter start when video memory runs out |
 | 2.12.2 | The black window hides while Calíope's window is open (messages in `backend\data\caliope.log`); the desktop shortcut starts it minimized |
 | 2.12 | Beta feedback: the Aedo answers `/questions` outside the story, two memory slots for much faster replies, Load gets the engine by itself (no LM Studio), interactive tour, Calíope's icon on the window, the Sheet tab on every card, help popups stay on screen |

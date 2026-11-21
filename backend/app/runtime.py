@@ -71,10 +71,36 @@ def find_models(dirs: list[Path] | None = None) -> list[dict]:
 
 
 SLOTS = 2  # see build_command
+
+
+def fit_ladder(layers: str) -> list[tuple[int, str]]:
+    """Starts to try, from the fastest to the lightest on video memory."""
+    if str(layers).strip().lower() in ("auto", ""):
+        return [(SLOTS, "auto"), (1, "auto"), (1, "26"), (1, "18")]
+    return [(SLOTS, layers), (1, layers)]
+
+
+def out_of_memory(log_text: str) -> bool:
+    t = log_text.lower()
+    return any(k in t for k in ("outofdevicememory", "out of memory", "failed to allocate", "unable to allocate"))
+
+
+def free_lmstudio() -> None:
+    """Ask LM Studio (if it is installed) to unload its models, so its copy does not fill the graphics card."""
+    lms = shutil.which("lms") or next((str(p) for p in (Path.home() / ".lmstudio" / "bin" / "lms.exe",
+                                                       Path.home() / ".lmstudio" / "bin" / "lms") if p.is_file()), None)
+    if not lms:
+        return
+    try:
+        flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
+        subprocess.run([lms, "unload", "--all"], capture_output=True, timeout=20, creationflags=flags)
+    except (OSError, subprocess.SubprocessError):
+        pass
 STORY_SLOT, HELPER_SLOT = 0, 1
 
 
-def build_command(binary: Path, model: str, ctx: int, port: int, gpu_layers: str, embedding: bool = False) -> list[str]:
+def build_command(binary: Path, model: str, ctx: int, port: int, gpu_layers: str, embedding: bool = False,
+                  slots: int = SLOTS) -> list[str]:
     cmd = [str(binary), "-m", model, "--host", "127.0.0.1", "--port", str(port), "-ngl", str(gpu_layers or "auto"),
            "--no-webui"]
     if embedding:
@@ -83,7 +109,7 @@ def build_command(binary: Path, model: str, ctx: int, port: int, gpu_layers: str
         # Two slots, each with the full context: slot 0 only ever holds the story, slot 1 the helpers (tracker,
         # summaries, the Aedo's answers outside the story). So the story's long, unchanged beginning stays in memory
         # between turns and only the new part is read: the first word comes in seconds instead of a minute.
-        cmd += ["-c", str(int(ctx) * SLOTS), "-np", str(SLOTS), "--cache-reuse", "256"]
+        cmd += ["-c", str(int(ctx) * slots), "-np", str(slots), "--cache-reuse", "256"]
     return cmd
 
 
@@ -134,6 +160,7 @@ class EngineManager:
         self.progress = 0.0
         self._lock = asyncio.Lock()
         self._http_get = http_get
+        self._fit: dict = {}  # (model, context, layers) -> the start that fit the video memory this session
 
     # ---- status
     def status(self, with_log: bool = True) -> dict:
@@ -199,18 +226,51 @@ class EngineManager:
                 self._set("error", "Choose a model file (.gguf) in Settings > AI engine.")
                 return self.status()
             port = int(s.get("engine_port", 8091))
+            ctx = int(s.get("context_window", 8192))
+            layers = str(s.get("engine_gpu_layers", "auto"))
             self._kill_stale()
             self._rotate_log()
-            self.chat = self._spawn(build_command(binary, model, int(s.get("context_window", 8192)), port,
-                                                  str(s.get("engine_gpu_layers", "auto"))))
+            await asyncio.to_thread(free_lmstudio)  # LM Studio's own copy of a model would take the video memory
             emb = s.get("engine_embedding_path", "")
             if emb and Path(emb).is_file():
                 self.embed = self._spawn(build_command(binary, emb, 2048, port + 1, "all", embedding=True))
-            PID_PATH.write_text(json.dumps([p.pid for p in (self.chat, self.embed) if p]))
+            # What fits the card: two memory slots (fast replies), else one, else part of the model on the processor.
+            key = (model, ctx, layers)
+            tries = fit_ladder(layers)
+            if self._fit.get(key) in tries:
+                tries = tries[tries.index(self._fit[key]):]
             self._set("starting", "Loading the model (the first time can take a minute)…")
-        if wait:
-            await self.wait_ready()
+        if not wait:
+            await self._launch(binary, model, ctx, port, *tries[0])
+            return self.status()
+        for i, (slots, lay) in enumerate(tries):
+            await self._launch(binary, model, ctx, port, slots, lay)
+            if await self.wait_ready():
+                self._fit[key] = (slots, lay)
+                return self.status()
+            if i + 1 < len(tries) and out_of_memory(self._log_tail()):
+                log.info("Not enough video memory with %s slot(s), %s GPU layers: trying a lighter start", slots, lay)
+                self._set("starting", "Not enough video memory: trying a lighter start…")
+                continue
+            break
         return self.status()
+
+    async def _launch(self, binary, model: str, ctx: int, port: int, slots: int, layers: str) -> None:
+        async with self._lock:
+            if self.chat and self.chat.poll() is None:
+                self.chat.terminate()
+                await asyncio.to_thread(self.chat.wait, 10)
+            self.chat = self._spawn(build_command(binary, model, ctx, port, layers, slots=slots))
+            PID_PATH.write_text(json.dumps([p.pid for p in (self.chat, self.embed) if p]))
+
+    def _log_tail(self) -> str:
+        try:
+            with open(LOG_PATH, "rb") as fh:
+                fh.seek(0, 2)
+                fh.seek(max(0, fh.tell() - 6000))
+                return fh.read().decode("utf-8", "replace")
+        except OSError:
+            return ""
 
     async def wait_ready(self, timeout: float = 240.0) -> bool:
         port = int(self._get().get("engine_port", 8091))
