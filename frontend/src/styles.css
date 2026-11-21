@@ -571,3 +571,4 @@ body.resizing { user-select: none; cursor: col-resize; }
 .story-end { margin: 12px 0; display: flex; flex-direction: column; gap: 8px; border-color: var(--accent); }
 .story-frame { margin: 6px 0; }
 .story-frame > summary { cursor: pointer; }
+.sheet-picker { display: flex; flex-direction: column; gap: 6px; }

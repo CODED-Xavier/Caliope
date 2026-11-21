@@ -169,6 +169,7 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "starts": normalize_starts(raw.get("starts")),
         "places": normalize_places(raw.get("places")),
         "fixed_facts": _clip(raw.get("fixed_facts"), 3000),
+        "sheet_template": _clip(raw.get("sheet_template"), 2000),  # a sheet from the library (app/sheets.py), edited freely
         "known_at_start": _clip(raw.get("known_at_start"), 3000),
         "secrets": _clip(raw.get("secrets"), 3000),
         "length": str(raw.get("length") or "open") if str(raw.get("length") or "open") in STORY_LENGTHS else "open",

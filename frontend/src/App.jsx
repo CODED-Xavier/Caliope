@@ -497,7 +497,7 @@ export default function App() {
           onStateLoaded={(st) => setGame((g) => (g ? { ...g, state: st } : g))}
           onLoreSaved={(conv) => setGame((g) => (g ? { ...g, conversation: { ...g.conversation, player_lore: conv.player_lore } } : g))}
           onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit}
-          onCantos={(list) => setGame((g) => (g ? { ...g, cantos: list } : g))} />
+          onCantos={(list) => setGame((g) => (g ? { ...g, cantos: list } : g))} onReload={reloadGame} />
       )}
       {recap && <RecapView text={recap.text} loading={recap.loading} onClose={() => setRecap(null)} onAgain={showRecap} />}
       {modal === "muse" && <MuseModal onClose={() => setModal(null)} />}

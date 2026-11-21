@@ -7,15 +7,40 @@ import MoodEditor from "./MoodEditor.jsx";
 import CombatTab from "./CombatTab.jsx";
 import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
 import { latestStatus, portraitSrc } from "../portraits.js";
+import SheetPicker from "./SheetPicker.jsx";
 import PlayerLore from "./PlayerLore.jsx";
 import { CalendarBox } from "./Calendar.jsx";
 import { CantosBox, MapBag } from "./Cantos.jsx";
 
 /* ----------------------------------------------------------------- Status */
-function StatusTab({ messages, every, byApp, fields, values, onPatch }) {
+function GameSheet({ convId, current, onReload, onDone }) {
+  const [text, setText] = useState(current || "");
+  const [error, setError] = useState("");
+  const save = async (value) => {
+    try { await api.setSheetTemplate(convId, value); setError(""); await onReload?.(); onDone?.(); } catch (e) { setError(e.message); }
+  };
+  return (
+    <div className="status-edit">
+      <div className="small">Choose a sheet for this game. The card itself is not changed.</div>
+      <SheetPicker value={text} onChange={setText} compact />
+      <div className="row gap">
+        <button className="btn small primary" onClick={() => save(text)}>Use this sheet</button>
+        {current && <button className="btn small" onClick={() => save("")}>Remove the sheet</button>}
+        {onDone && <button className="btn small" onClick={onDone}>Cancel</button>}
+      </div>
+      {error && <div className="error-text small">{error}</div>}
+    </div>
+  );
+}
+
+function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, picked, convId, onReload }) {
   const status = latestStatus(messages);
   const [editing, setEditing] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const [draft, setDraft] = useState({});
+  if (choosing || (!status && !byApp && !every)) {
+    return <div className="tab-body"><GameSheet convId={convId} current={picked} onReload={onReload} onDone={status || byApp ? () => setChoosing(false) : null} /></div>;
+  }
   if (!status) {
     return (
       <div className="tab-body">
@@ -43,7 +68,10 @@ function StatusTab({ messages, every, byApp, fields, values, onPatch }) {
       {byApp ? (
         <>
           <div className="muted tiny">Kept by the app: place, time, items and relationships come from the game; the card's own values change when the story changes them (the tracker reports it). Correct them here if needed.</div>
-          {fields?.length > 0 && !editing && <button className="btn small" onClick={() => { setDraft({}); setEditing(true); }}>✎ Edit the card's values</button>}
+          <div className="row gap">
+            {fields?.length > 0 && !editing && <button className="btn small" onClick={() => { setDraft({}); setEditing(true); }}>✎ Edit the values</button>}
+            {!sheetOwn && !editing && <button className="btn small" onClick={() => setChoosing(true)}>🗂 Change the sheet</button>}
+          </div>
           {editing && (
             <div className="status-edit">
               {fields.map((f) => (
@@ -583,14 +611,16 @@ export const TABS = [
   ["journal", "📖", "Journal"],
 ];
 
-export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onPay, onPower, onRest, onCombat, onCombatEdit, onCantos, style }) {
+export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onPay, onPower, onRest, onCombat, onCombatEdit, onCantos, onReload, style }) {
   const { state, npcs, conversation } = game;
   const mode = conversation.scenario?.mode;
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
   const allowed = [...(game.features?.panels || TABS.map(([k]) => k)), ...(state.combat?.active ? ["combat"] : []),
-    "sheet",  // always: your character (name, background, looks…) can be read, copied and edited there
+    "sheet", "status",  // always: your character (name, background, looks…) can be read, copied and edited there
     ...((game.messages || []).some((m) => m.meta?.scene_picture) ? ["map"] : [])];  // the map bag lives on the map tab
-  const tabs = TABS.filter(([k]) => allowed.includes(k));
+  const statusFirst = (game.features?.panels || []).includes("status") || !!game.status_by_app;
+  const tabs = TABS.filter(([k]) => allowed.includes(k) && (statusFirst || k !== "status"))
+    .concat(statusFirst ? [] : TABS.filter(([k]) => k === "status"));  // without a sheet it waits at the end, to pick one
   const active = tabs.some(([k]) => k === tab) ? tab : tabs[0]?.[0];
   return (
     <aside className="side-panel">
@@ -604,7 +634,8 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
       </div>
       <div className="tab-scroll">
         {active === "status" && <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every}
-          byApp={!!game.status_by_app} fields={game.status_fields}
+          byApp={!!game.status_by_app} fields={game.status_fields} sheetOwn={!!game.sheet_own}
+          picked={conversation.scenario?.sheet_template || ""} convId={conversation.id} onReload={onReload}
           values={state.card_status} onPatch={onPatch} />}
         {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} onPower={onPower} onRest={onRest} busy={!canRoll}
           convId={conversation.id} onState={onStateLoaded} />}

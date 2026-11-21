@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ask } from "../dialogs.jsx";
 import { CharacterPreview, FillCharacters, PicturesFolder, PlacesEditor, StartsEditor } from "./CardExtras.jsx";
 import Modal from "./Modal.jsx";
+import SheetPicker from "./SheetPicker.jsx";
 import HelpTip from "./HelpTip.jsx";
 import KindPicker from "./KindPicker.jsx";
 import SetupView from "./SetupView.jsx";
@@ -365,6 +366,12 @@ function Editor({ initial, id, onCancel, onSaved }) {
               placeholder="the poisoner is accused with proof, or the king dies on the seventh night" />
           </div>
         </div>
+      </details>
+      <details className="story-frame" open={!!d.sheet_template}>
+        <summary className="lbl">Character sheet (Status tab) <HelpTip id="sheet_template" /></summary>
+        {/(^|\n)\s*(\*\*|\[)?INFO(\*\*|\])?\s*(\n|$)/.test(d.information?.post_history || "")
+          ? <div className="muted small">This card has its own INFO block in its reminders, and that one is used.</div>
+          : <SheetPicker value={d.sheet_template || ""} onChange={(v) => set("sheet_template", v)} />}
       </details>
       <label className="lbl">Opening message <DraftButton field="opening_message" card={d} onText={(t) => set("opening_message", t)} /></label>
       <textarea className="field" rows={4} value={d.opening_message} onChange={(e) => set("opening_message", e.target.value)} />

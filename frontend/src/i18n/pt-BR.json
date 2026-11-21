@@ -1336,7 +1336,27 @@
 "A few lines in each message.": "Algumas linhas em cada mensagem.",
 "Known from the start: what the player's character already knows (anything else must be found out in play). Fixed facts: what is always true and must never be contradicted (who is alive, who hired the player, how characters look). Secrets: what the player only discovers through play; characters refuse, lie or don't know, and the Aedo never hands them out when asked outside the story. Length and ending: the Aedo moves the story toward the end condition, closes it with THE END, and the chat offers an epilogue.": "Sabido desde o início: o que o personagem do jogador já sabe (o resto precisa ser descoberto jogando). Fatos fixos: o que é sempre verdade e nunca pode ser contradito (quem está vivo, quem contratou o jogador, como os personagens são). Segredos: o que o jogador só descobre jogando; os personagens se recusam, mentem ou não sabem, e o Aedo nunca os entrega quando perguntado fora da história. Tamanho e final: o Aedo leva a história até a condição de fim, fecha com THE END, e o chat oferece um epílogo.",
 "Use them for mysteries and stories with a goal. Leave them empty for open-ended play.": "Use em mistérios e histórias com objetivo. Deixe vazio para jogo aberto.",
-"Read once at the start of the prompt (they don't slow each reply).": "Lidos uma vez no começo do prompt (não deixam cada resposta mais lenta)."
+"Read once at the start of the prompt (they don't slow each reply).": "Lidos uma vez no começo do prompt (não deixam cada resposta mais lenta).",
+"Character sheet (Status tab)": "Ficha do personagem (aba Status)",
+"This card has its own INFO block in its reminders, and that one is used.": "Este card tem seu próprio bloco INFO nos lembretes, e é ele que vale.",
+"No sheet": "Sem ficha",
+"My own…": "A minha…",
+"My own": "A minha",
+"One row per line, cells separated by \" | \". Write each value as [something]. Place, time, HP, level, attributes, items, money, quests and relationships come from the game by themselves; the other fields are kept by the app and changed when the story changes them.": "Uma linha por fileira, células separadas por \" | \". Escreva cada valor como [algo]. Local, hora, PV, nível, atributos, itens, dinheiro, missões e relações vêm do jogo sozinhos; os outros campos o app guarda e muda quando a história muda.",
+"Choose a sheet for this game. The card itself is not changed.": "Escolha uma ficha para este jogo. O card em si não muda.",
+"Use this sheet": "Usar esta ficha",
+"Remove the sheet": "Tirar a ficha",
+"Edit the values": "Editar os valores",
+"Change the sheet": "Trocar a ficha",
+"Character sheet": "Ficha do personagem",
+"A ready sheet for the Status tab in the right column: D&D 5e, Pathfinder 2e, Tormenta20, Vampire V5, Call of Cthulhu, Cyberpunk RED, a magic academy, slice of life, or your own. The app keeps it: place, time, HP, level, attributes, items, money, quests and relationships come straight from the game, and the other fields (Sanity, Hunger, Spell slots…) change when the story changes them. You can edit the text after picking.": "Uma ficha pronta para a aba Status na coluna da direita: D&D 5e, Pathfinder 2e, Tormenta20, Vampiro V5, Chamado de Cthulhu, Cyberpunk RED, academia de magia, slice of life, ou a sua. O app cuida dela: local, hora, PV, nível, atributos, itens, dinheiro, missões e relações vêm direto do jogo, e os outros campos (Sanidade, Fome, Espaços de magia…) mudam quando a história muda. Dá para editar o texto depois de escolher.",
+"Use it on cards that don't already have an INFO block. A game can also pick or change its sheet in the Status tab without changing the card.": "Use em cards que ainda não têm bloco INFO. Um jogo também pode escolher ou trocar a ficha na aba Status sem mudar o card.",
+"The filled sheet (about 100 tokens) is read with each reply, so the model follows its numbers.": "A ficha preenchida (uns 100 tokens) é lida a cada resposta, para o modelo seguir os números.",
+"Simple adventure": "Aventura simples",
+"Magic academy": "Academia de magia",
+"Slice of life / romance": "Slice of life / romance",
+"Vampire: the Masquerade V5": "Vampiro: a Máscara V5",
+"Call of Cthulhu 7e": "Chamado de Cthulhu 7e"
 },
 "patterns": [
 [

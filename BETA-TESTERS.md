@@ -90,6 +90,7 @@ Easier: pick a mode under the text box (**🗣 Speak · ✋ Act · 💭 Think ·
 - Under a reply: **Continue ▸** (keep writing), **↻** (write it again), **⏪** (rewind to there), **⑂** (start a new game from that moment).
 - Top of the chat: **↶ Undo**, **📜 Recap** ("Previously, in…"), **🎵 Music**, **Aa** (text size and colours), **🔍** (search).
 - 🎲 **roll buttons** appear when the Aedo asks for a check, and 🛒 **buy buttons** when something has a price.
+- The **Status** tab in the right panel can show a ready character sheet (D&D 5e, Tormenta20, Vampire, Call of Cthulhu…): open it and pick one. The app keeps the numbers up to date.
 - The **right panel** has your Sheet, Bag, People (relationships from −100 to +100, plus notes about each character: yours and the Aedo's ✒), Journal and more.
 - The small **‹ ›** bubbles on the edges of the chat hide the side columns for more room.
 - **🪶 The Muse** (left sidebar): brainstorm stories with the AI and turn them into new cards.

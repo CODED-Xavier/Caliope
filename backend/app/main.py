@@ -41,7 +41,7 @@ from .playerlore import parse_suggestions, suggest_prompt
 from .checks import roll_line
 from . import shop
 from . import resources
-from . import statusbook
+from . import sheets, statusbook
 from . import worldtime
 from .engine import BusyError
 from .llm import LLMError
@@ -705,6 +705,28 @@ async def recap(conv_id: int):
     return {"text": await svc().cantos.recap(conv_id, conv["title"], conv["summary"], language)}
 
 
+@app.get("/api/sheet-templates")
+async def sheet_templates():
+    """Ready sheets (D&D 5e, Tormenta20, Vampire...) a card or a game can use in the Status tab."""
+    return {"templates": sheets.library()}
+
+
+@app.post("/api/conversations/{conv_id}/sheet-template")
+async def set_sheet_template(conv_id: int, data: dict[str, Any] = Body(...)):
+    """Pick (or clear) this game's sheet. The values already kept stay."""
+    text = str(data.get("text") or "")
+    if text.strip() and not statusbook.PLACEHOLDER.search(text):
+        raise HTTPException(400, "A sheet needs at least one [placeholder], like 'HP: [HP]'.")
+    s = svc()
+    s.conversations.set_sheet_template(conv_id, text)
+    tpl = s.engine._status_template(s.conversations.get(conv_id)["scenario"], s.settings.all())
+    last = s.conversations.last_message(conv_id)
+    if tpl and last and last["role"] == "assistant":  # shown at once, not only after the next reply
+        s.conversations.update_message_meta(last["id"], {"status": statusbook.render(tpl, s.conversations.get_state(conv_id),
+                                                                                      s.conversations.list_npcs(conv_id))})
+    return {"ok": True}
+
+
 @app.post("/api/conversations/{conv_id}/epilogue")
 async def epilogue(conv_id: int):
     """🏁 After the card's ending: the epilogue, kept in the chat (outside the story)."""
@@ -1162,6 +1184,7 @@ def full_conversation(conv_id: int) -> dict:
         "features": resolve_features(s.conversations.get(conv_id)["scenario"], s.settings.all()),
         "status_fields": statusbook.custom_fields(statusbook.template_of(s.conversations.get(conv_id)["scenario"]) or ""),
         "status_by_app": bool(s.engine._status_template(s.conversations.get(conv_id)["scenario"], s.settings.all())),
+        "sheet_own": bool(statusbook.template_of({**s.conversations.get(conv_id)["scenario"], "sheet_template": ""})),
         "card_has_resources": _card_has_resources(conv_id),
         "cantos": s.cantos.list(conv_id),
     }

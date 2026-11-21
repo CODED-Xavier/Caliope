@@ -23,9 +23,16 @@ KNOWN = [
     ("inventory", re.compile(r"^(inventory|items|bag|inventário|inventario|itens|mochila)$", re.I)),
     ("relationships", re.compile(r"^(relationships?|affinity|bonds?|relações|relacoes|relacionamentos?|afinidade)$", re.I)),
     ("hp", re.compile(r"^(hp|health|vida|pv|hit points)$", re.I)),
-    ("quests", re.compile(r"^(quests?|missions?|missões|missoes|objectives?|objetivos?)$", re.I)),
-    ("gold", re.compile(r"^(gold|coins|money|ouro|dinheiro)$", re.I)),
+    ("quests", re.compile(r"^(quests?|missions?|missões|missoes|objectives?|objetivos?|jobs)$", re.I)),
+    ("gold", re.compile(r"^(gold|coins|money|ouro|dinheiro|tibares|t\$|eurobucks|eddies)$", re.I)),
+    ("level", re.compile(r"^(level|lvl|nível|nivel)$", re.I)),
+    ("ac", re.compile(r"^(ac|armou?r class|defesa|ca)$", re.I)),
+    ("class", re.compile(r"^(class|classe)$", re.I)),
+    ("race", re.compile(r"^(race|raça|raca|ancestry|ancestralidade)$", re.I)),
 ]
+# Attribute labels -> the player's stats (Tormenta20's Portuguese ones too).
+STATS = {"STR": "STR", "DEX": "DEX", "CON": "CON", "INT": "INT", "WIS": "WIS", "CHA": "CHA",
+         "FOR": "STR", "DES": "DEX", "SAB": "WIS", "CAR": "CHA"}
 PLACEHOLDER = re.compile(r"\[(?:[^\[\]]|\[[^\[\]]*\])*\]")  # [Grade], [[X]/100], [NPC (Affinity [Score])]
 
 
@@ -54,6 +61,10 @@ def _parse(template: str) -> list:
     for line in template.splitlines():
         segs = [_parse_segment(x) for x in re.split(r"(?<=\S)\s+\|\s+(?=\S)", line)] if PLACEHOLDER.search(line) else []
         if segs and all(segs):
+            if sum(1 for x in segs if str(x["known"]).startswith("stat:")) < 3:  # a lone "INT: [Grade]" is the card's own
+                for x in segs:
+                    if str(x["known"]).startswith("stat:"):
+                        x["known"] = None
             out.append(segs)
         else:
             out.append(line)
@@ -61,8 +72,13 @@ def _parse(template: str) -> list:
 
 
 def template_of(scenario: dict) -> str | None:
+    """The card's own INFO block first; otherwise the sheet picked from the library (app/sheets.py) for the card or game."""
     info = scenario.get("information") or {}
-    return split_template(info.get("post_history") or "")[1]
+    own = split_template(info.get("post_history") or "")[1]
+    if own:
+        return own
+    picked = str(scenario.get("sheet_template") or "").strip()
+    return picked if PLACEHOLDER.search(picked) else None
 
 
 def custom_fields(template: str) -> list[str]:
@@ -76,6 +92,8 @@ def custom_fields(template: str) -> list[str]:
 
 def _known(label: str) -> str | None:
     base = re.sub(r"\s*\(.*?\)", "", label or "").strip()
+    if base.upper() in STATS and base.isupper():
+        return "stat:" + STATS[base.upper()]
     for key, rx in KNOWN:
         if rx.match(base):
             return key
@@ -125,6 +143,11 @@ def _known_value(key: str, state: dict, npcs: list[dict]) -> str:
     if key == "hp":
         hp = state["player"].get("hp") or {}
         return f"{hp.get('current', '?')}/{hp.get('max', '?')}"
+    if key in ("level", "ac", "class", "race"):
+        return str(state["player"].get(key) or "?")
+    if key.startswith("stat:"):
+        stats = state["player"].get("stats") or {}
+        return str(stats.get(key[5:], "?"))
     if key == "quests":
         return "; ".join(q["title"] for q in state.get("quests", []) if q.get("status") == "active") or "none"
     if key == "relationships":

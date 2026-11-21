@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.16**. The version history is at the end of this file.
+Current version: **v2.17**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -129,7 +129,7 @@ Tabs appear when the card uses them. Drag the panel's edge to resize it. The sma
 - **Bag**: items, quests (when a quest seems finished, you confirm it), **Pay** box.
 - **People**: everyone you have met, with relationships from −100 to +100. Characters count as met only when they actually interact with you.
   - **Notes** under each character: yours (what you think of them, a promise, a debt), plus the Aedo's own, marked ✒, which he adds after important moments ("promised to train the player at dawn"). The Aedo keeps them in mind whenever that character is in the scene; edit or delete any line.
-- **Status**: the card's INFO block, kept by the app (cards like Lumencia).
+- **Status**: the character sheet, kept by the app. It is the card's own INFO block (cards like Lumencia), or a ready sheet picked from the library: D&D 5e, Pathfinder 2e, Tormenta20, Vampire V5, Call of Cthulhu 7e, Cyberpunk RED, magic academy, slice of life, or your own. Place, time, HP, level, attributes, items, money, quests and relationships come from the game; the other fields (Sanity, Hunger, Spell slots…) change when the story changes them. Pick it on the card (*Character sheet*) or for one game only (Status → *Change the sheet*).
 - **Map**: places, plus the **🎒 map bag** of kept scene pictures.
 - **⚔ Combat**: fights with a battle map ([below](#combat)).
 - **Dice** and **Journal**: Cantos, the pinned memory box, summary, memories, calendar appointments, your world additions.
@@ -430,10 +430,11 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |
 | 2.11 | The interface in English and Português (Brasil), switched in Settings or in the tour |
 | 2.11.1 | Audit 2 fixes (see AUDIT.md): start names, Places in .caliope files, repeated place pictures, safer imports |
-| 2.16 | Pictures: a new place is described in detail first (architecture, light, air, weather, people there; no more empty white backgrounds), and 🖼 on a reply paints that exact moment with the characters' saved looks and poses |
-| 2.15 | Cards: what the player knows from the start, fixed facts, secrets (never handed out), story length and ending with THE END and an epilogue; ✨ Wishes for the story on the Sheet tab; the Aedo answers only what your character could know; The Hollow Crown rewritten |
-| 2.14 | Group 1 of the playtest notes: never speaking for your character, the story language next to every message, reputation only from your actions, speaking modes under the text box (and `mestre,` questions), a first-model card on the home screen, summaries in the background, roomier card titles; each card has its own Pictures folder with 🔍 Search |
-| 2.13 | Calíope runs its models itself (own models folder, LM Studio's copies moved in, LM Studio never opened), desktop and Start menu shortcuts, faster replies (story read ahead, card reminders read once, window moves in steps), your sheet in the chat fills the card's Status (📋 on any of your messages to read it again) |
-| 2.12.3 | Engine: unloads LM Studio's models first, and falls back to a lighter start when video memory runs out |
-| 2.12.2 | The black window hides while Calíope's window is open (messages in `backend\data\caliope.log`); the desktop shortcut starts it minimized |
 | 2.12 | Beta feedback: the Aedo answers `/questions` outside the story, two memory slots for much faster replies, Load gets the engine by itself (no LM Studio), interactive tour, Calíope's icon on the window, the Sheet tab on every card, help popups stay on screen |
+| 2.12.2 | The black window hides while Calíope's window is open (messages in `backend\data\caliope.log`); the desktop shortcut starts it minimized |
+| 2.12.3 | Engine: unloads LM Studio's models first, and falls back to a lighter start when video memory runs out |
+| 2.13 | Calíope runs its models itself (own models folder, LM Studio's copies moved in, LM Studio never opened), desktop and Start menu shortcuts, faster replies (story read ahead, card reminders read once, window moves in steps), your sheet in the chat fills the card's Status (📋 on any of your messages to read it again) |
+| 2.14 | Group 1 of the playtest notes: never speaking for your character, the story language next to every message, reputation only from your actions, speaking modes under the text box (and `mestre,` questions), a first-model card on the home screen, summaries in the background, roomier card titles; each card has its own Pictures folder with 🔍 Search |
+| 2.15 | Cards: what the player knows from the start, fixed facts, secrets (never handed out), story length and ending with THE END and an epilogue; ✨ Wishes for the story on the Sheet tab; the Aedo answers only what your character could know; The Hollow Crown rewritten |
+| 2.16 | Pictures: a new place is described in detail first (architecture, light, air, weather, people there; no more empty white backgrounds), and 🖼 on a reply paints that exact moment with the characters' saved looks and poses |
+| 2.17 | Sheet library: ready character sheets (D&D 5e, Pathfinder 2e, Tormenta20, Vampire V5, Call of Cthulhu, Cyberpunk RED, academy, slice of life) for the Status tab, per card or per game |

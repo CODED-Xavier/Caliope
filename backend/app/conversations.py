@@ -181,6 +181,13 @@ class ConversationRepository:
         self.db.execute("UPDATE conversations SET pinned_memory = ? WHERE id = ?", (text, conv_id))
         return self.get(conv_id)
 
+    def set_sheet_template(self, conv_id: int, text: str) -> dict:
+        """This game's sheet (Status tab), picked from the library; the card itself is not changed."""
+        conv = self.get(conv_id)
+        scenario = {**conv["scenario"], "sheet_template": str(text or "")[:2000]}
+        self.db.execute("UPDATE conversations SET scenario_snapshot = ? WHERE id = ?", (json.dumps(scenario, ensure_ascii=False), conv_id))
+        return self.get(conv_id)
+
     def set_player_lore(self, conv_id: int, entries) -> dict:
         self.get(conv_id)
         self.db.execute("UPDATE conversations SET player_lore = ? WHERE id = ?",

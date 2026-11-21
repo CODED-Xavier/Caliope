@@ -68,4 +68,6 @@ def resolve_features(scenario: dict, settings: dict | None = None) -> dict:
     if settings is not None and not settings.get("state_tracking", True):
         features["tracker"] = "off"
     features["kind"] = kind
+    if str(scenario.get("sheet_template") or "").strip() and "status" not in features["panels"]:
+        features["panels"] = ["status", *features["panels"]]  # a sheet picked from the library shows in the Status tab
     return features
