@@ -11,6 +11,7 @@ import uuid
 from .appearance import normalize_appearance
 from .portraits import normalize_portraits
 from .util import as_int, clamp, deep_merge, truncate
+from .reputation import EVENTS
 
 
 def normalize_pools(raw):  # imported late: resources imports state
@@ -127,6 +128,9 @@ def _story_part(merged: dict) -> dict:
     script = merged.get("script")
     if isinstance(script, dict):
         out["script"] = {"next": max(0, as_int(script.get("next", 0)))}
+    log = merged.get("rep_log")
+    if isinstance(log, list):
+        out["rep_log"] = [e for e in log if isinstance(e, dict)][-60:]
     adv = merged.get("adventure")
     if isinstance(adv, dict):
         ids = lambda v: [str(x)[:60] for x in v if str(x).strip()][:300] if isinstance(v, list) else []  # noqa: E731
@@ -193,10 +197,12 @@ def normalize_updates(raw) -> dict:
             )
     for rc in _list(raw.get("relationship_changes")):
         if isinstance(rc, dict) and str(rc.get("npc", "")).strip():
+            event = str(rc.get("event") or "").strip().lower().replace(" ", "_")
             delta = as_int(rc.get("delta", 0))
-            if delta:
+            if event in EVENTS or delta:  # an event from the table (the app gives its value), or an old-style number
                 updates["relationship_changes"].append(
-                    {"npc": str(rc["npc"]).strip(), "delta": delta, "reason": truncate(str(rc.get("reason", "")), 120)}
+                    {"npc": str(rc["npc"]).strip(), "event": event if event in EVENTS else "", "delta": delta,
+                     "reason": truncate(str(rc.get("reason", "")), 120)}
                 )
     for cn in _list(raw.get("character_notes"))[:3]:
         if isinstance(cn, dict) and str(cn.get("npc", "")).strip() and len(str(cn.get("note", "")).strip()) >= 6:

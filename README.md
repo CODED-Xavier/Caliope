@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.20**. The version history is at the end of this file.
+Current version: **v2.21**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -135,6 +135,14 @@ Tabs appear when the card uses them. Drag the panel's edge to resize it. The sma
 - **Sheet**: HP, attributes, money, place, time and weather, resource bars (Mana, Aura…), powers with **Use**, short and long rest.
 - **Bag**: items, quests (when a quest seems finished, you confirm it), **Pay** box.
 - **People**: everyone you have met, with relationships from −100 to +100. Characters count as met only when they actually interact with you.
+  **Reputation is a system:** after each reply the tracker only *names* what you did to someone (defended, helped, kept a
+  promise, gift, kind words… or rude, mocked, caught lying, stole, attacked, betrayed); the app gives the value, the same
+  every time (defending someone +12, saving a life +25, betraying −30). Doing the same thing to the same person counts
+  half as much each time (compliments can't be farmed), and every change is capped by *Biggest relationship change per
+  reply*. Each level has fixed effects the characters follow: **mortal enemy** works against you; **hostile** refuses
+  help; **distrustful** helps only for a price; **neutral** is polite; **friendly** does small favours and shares
+  rumours; **close** shares their own secrets and takes risks for you; **deeply bonded** would sacrifice for you. Open a
+  character to see what their level means and the last few reasons it changed.
   - **Notes** under each character: yours (what you think of them, a promise, a debt), plus the Aedo's own, marked ✒, which he adds after important moments ("promised to train the player at dawn"). The Aedo keeps them in mind whenever that character is in the scene; edit or delete any line.
 - **Status**: the character sheet, kept by the app. It is the card's own INFO block (cards like Lumencia), or a ready sheet picked from the library: D&D 5e, Pathfinder 2e, Tormenta20, Vampire V5, Call of Cthulhu 7e, Cyberpunk RED, magic academy, slice of life, or your own. Place, time, HP, level, attributes, items, money, quests and relationships come from the game; the other fields (Sanity, Hunger, Spell slots…) change when the story changes them. Pick it on the card (*Character sheet*) or for one game only (Status → *Change the sheet*).
 - **Map**: places, plus the **🎒 map bag** of kept scene pictures.
@@ -484,3 +492,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.18 | Adventures: import a published adventure (PDF or text) as scenes with read-aloud text, GM notes, checks with DC, enemies, treasure, XP and maps; the 📕 Adventure tab; fights on the adventure's map; dark route for Lumencia |
 | 2.19 | The Muse researches a work on its fan wiki (📚 Research a work); 🔁 loop a song in the music controls; adventure Parts list |
 | 2.20 | Main menu with all your cards; loading screen and no black window (Caliope.vbs); 🔍 Find the grid on adventure maps (Foundry/Roll20-style), fights on the map's own squares, fog of war |
+| 2.21 | Reputation as a system: the tracker names the event, the app gives fixed values (repeats count less, capped per reply); defined effects for each relationship level; the reasons in the People tab |

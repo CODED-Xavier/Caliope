@@ -12,6 +12,17 @@ export function relationshipLabel(v) {
   return "deeply bonded";
 }
 
+// What each level means for how a character treats the player (same table as backend/app/reputation.py).
+export function relationshipEffect(v) {
+  if (v <= -80) return "Wants you gone; works against you, never helps, never tells the truth.";
+  if (v <= -50) return "Refuses help and favours, insults or threatens, shares nothing, may sabotage you.";
+  if (v <= -20) return "Guarded and curt; helps only for a clear price or benefit, shares only what anyone knows.";
+  if (v < 20) return "Polite and ordinary; normal prices and small help, keeps personal matters private.";
+  if (v < 50) return "Warm; small favours, rumours and advice, a little discount, hears you out.";
+  if (v < 80) return "Trusts you: shares personal worries and secrets when asked, takes risks for you.";
+  return "Fiercely loyal: would sacrifice for you, reveals their deepest secrets, defends you anywhere.";
+}
+
 export function relationshipColor(v) {
   if (v <= -20) return "var(--bad)";
   if (v >= 20) return "var(--good)";

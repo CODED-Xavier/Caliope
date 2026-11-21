@@ -272,3 +272,38 @@ class MapGridTests(unittest.TestCase):
         self.assertEqual(grid["geom"]["size"], 40.0)
         self.assertEqual(len(grid["fog"]), 1)
         self.assertEqual((grid["w"], grid["h"]), (50, 30))
+
+
+class ReputationTests(unittest.IsolatedAsyncioTestCase):
+    def test_events_have_fixed_values_and_repeats_count_less(self):
+        from app import reputation as R
+        log = []
+        self.assertEqual(R.delta_for("defended", "Lilia", log), 12)
+        values = []
+        for _ in range(4):
+            d = R.delta_for("kind_words", "Lilia", log)
+            values.append(d)
+            R.remember({"rep_log": log}, "Lilia", "kind_words", d, "praised her")
+        self.assertEqual(values, [4, 2, 1, 0])                              # compliments can't be farmed
+        self.assertEqual(R.delta_for("kind_words", "Sera", log), 4)         # someone else: full value
+        self.assertEqual(R.delta_for("nonsense", "Lilia", log), 0)
+        self.assertEqual(R.level(-90)[0], "mortal enemy")
+        self.assertEqual(R.level(55)[0], "close")
+        self.assertIn("secrets", R.level(55)[1])
+        self.assertIn("deeply bonded", R.scale_text())
+
+    async def test_the_tracker_names_the_event_and_the_app_counts_it(self):
+        from tests.test_core import FakeLLM, collect, new_game
+        llm = FakeLLM()
+        llm.analysis = {"relationship_changes": [{"npc": "Doran", "event": "defended", "reason": "stood up for Doran"}]}
+        s = make_services(llm)
+        cid = new_game(s, "gm_cast")
+        events = await collect(s.engine.send(cid, "I stand between Doran and the thugs."))
+        self.assertEqual(s.conversations.find_npc(cid, "Doran")["relationship"], 12)
+        changes = " ".join(" ".join(e.get("changes") or []) for e in events if e["type"] == "state")
+        self.assertIn("defended them", changes)
+        await collect(s.engine.send(cid, "I stand up for Doran again."))
+        self.assertEqual(s.conversations.find_npc(cid, "Doran")["relationship"], 18)   # 12 + 6 (a repeat)
+        self.assertEqual(len(s.conversations.get_state(cid)["rep_log"]), 2)
+        prompt = llm.stream_calls[-1][0]["content"]
+        self.assertIn("Characters act by their level", prompt)

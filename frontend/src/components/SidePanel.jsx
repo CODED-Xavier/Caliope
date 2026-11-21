@@ -5,7 +5,7 @@ import { NumberField, TextField } from "./Fields.jsx";
 import HelpTip from "./HelpTip.jsx";
 import MoodEditor from "./MoodEditor.jsx";
 import CombatTab from "./CombatTab.jsx";
-import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
+import { abilityMod, clamp, fmtMod, relationshipColor, relationshipEffect, relationshipLabel } from "../utils.js";
 import { latestStatus, portraitSrc } from "../portraits.js";
 import SheetPicker from "./SheetPicker.jsx";
 import { GridOverlay } from "./AdventureEditor.jsx";
@@ -324,7 +324,7 @@ function RelBar({ value }) {
 const LOOKS = [["race", "Race / species"], ["hair", "Hair"], ["eyes", "Eyes"], ["build", "Build"], ["skin", "Skin"], ["outfit", "Style / outfit"], ["extra", "Other details"]];
 const looksSummary = (app) => ["race", "hair", "eyes"].map((k) => (app || {})[k]).filter(Boolean).join(" · ");
 
-function NpcCard({ npc, onUpdate, onDelete }) {
+function NpcCard({ npc, onUpdate, onDelete, log = [] }) {
   const [open, setOpen] = useState(false);
   const pics = npc.portraits || { default: "", moods: [] };
   const thumb = pics.moods?.[0]?.url || pics.default;
@@ -334,7 +334,7 @@ function NpcCard({ npc, onUpdate, onDelete }) {
         {thumb && <img className="npc-thumb" src={portraitSrc(thumb)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
         <div className="grow">
           <div className="npc-name">{npc.name}{npc.is_main && <span className="tag">main</span>}</div>
-          <div className="small" style={{ color: relationshipColor(npc.relationship) }}>
+          <div className="small" style={{ color: relationshipColor(npc.relationship) }} title={relationshipEffect(npc.relationship)}>
             {relationshipLabel(npc.relationship)} ({npc.relationship > 0 ? "+" : ""}{npc.relationship})
           </div>
           {looksSummary(npc.appearance) && <div className="muted tiny">{looksSummary(npc.appearance)}</div>}
@@ -353,6 +353,14 @@ function NpcCard({ npc, onUpdate, onDelete }) {
       )}
       {open && (
         <div className="npc-detail">
+          <div className="small rel-effect">{relationshipEffect(npc.relationship)}</div>
+          {log.length > 0 && (
+            <ul className="rep-log tiny">
+              {log.slice(-5).reverse().map((e, i) => (
+                <li key={i}><b className={e.delta > 0 ? "good" : "bad"}>{e.delta > 0 ? `+${e.delta}` : e.delta}</b> {e.reason}</li>
+              ))}
+            </ul>
+          )}
           <label className="lbl">Description</label>
           <TextField multiline value={npc.description} onCommit={(v) => onUpdate(npc.id, { description: v })} />
           <label className="lbl">Looks <HelpTip id="appearance" /></label>
@@ -384,7 +392,8 @@ function NpcCard({ npc, onUpdate, onDelete }) {
   );
 }
 
-function PeopleTab({ npcs, onUpdate, onDelete, onAdd }) {
+function PeopleTab({ npcs, onUpdate, onDelete, onAdd, repLog = [] }) {
+  const logOf = (n) => repLog.filter((e) => (e.npc || "").toLowerCase() === n.name.toLowerCase());
   const [name, setName] = useState("");
   const met = npcs.filter((n) => n.met !== false);
   const unmet = npcs.filter((n) => n.met === false);
@@ -392,7 +401,7 @@ function PeopleTab({ npcs, onUpdate, onDelete, onAdd }) {
     <div className="tab-body">
       <div className="section-title">Characters ({met.length})</div>
       {met.length === 0 && <div className="muted small">No characters met yet. They appear here as the story introduces them.</div>}
-      {met.map((n) => <NpcCard key={n.id} npc={n} onUpdate={onUpdate} onDelete={onDelete} />)}
+      {met.map((n) => <NpcCard key={n.id} npc={n} onUpdate={onUpdate} onDelete={onDelete} log={logOf(n)} />)}
       {unmet.length > 0 && (
         <details className="unmet">
           <summary className="section-title">Not met yet ({unmet.length})</summary>
@@ -730,7 +739,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} onPower={onPower} onRest={onRest} busy={!canRoll}
           convId={conversation.id} onState={onStateLoaded} />}
         {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}
-        {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} />}
+        {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} repLog={state.rep_log || []} />}
         {active === "map" && <MapTab state={state} convId={conversation.id} refreshKey={game.messages?.length} />}
         {active === "combat" && <CombatTab game={game} busy={!canRoll} onCombat={onCombat} onCombatEdit={onCombatEdit} />}
         {active === "dice" && <DiceTab onRollToChat={onRollToChat} canRoll={canRoll} />}

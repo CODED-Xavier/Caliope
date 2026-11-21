@@ -1444,7 +1444,14 @@
 "Edit the card": "Editar o card",
 "No cards yet: make one, import one, or ask the Muse.": "Ainda sem cards: crie um, importe um, ou peça à Musa.",
 "All your cards": "Todos os seus cards",
-"Main menu": "Menu principal"
+"Main menu": "Menu principal",
+"Wants you gone; works against you, never helps, never tells the truth.": "Quer você longe; age contra você, nunca ajuda, nunca diz a verdade.",
+"Refuses help and favours, insults or threatens, shares nothing, may sabotage you.": "Recusa ajuda e favores, insulta ou ameaça, não conta nada, pode sabotar você.",
+"Guarded and curt; helps only for a clear price or benefit, shares only what anyone knows.": "Desconfiado e seco; só ajuda por um preço ou vantagem clara, só conta o que todo mundo sabe.",
+"Polite and ordinary; normal prices and small help, keeps personal matters private.": "Educado e comum; preços normais e pequenas ajudas, guarda os assuntos pessoais.",
+"Warm; small favours, rumours and advice, a little discount, hears you out.": "Caloroso; pequenos favores, boatos e conselhos, um descontinho, ouve você.",
+"Trusts you: shares personal worries and secrets when asked, takes risks for you.": "Confia em você: conta preocupações e segredos pessoais quando perguntado, se arrisca por você.",
+"Fiercely loyal: would sacrifice for you, reveals their deepest secrets, defends you anywhere.": "Leal até o fim: se sacrificaria por você, revela os segredos mais profundos, defende você em qualquer lugar."
 },
 "patterns": [
 [

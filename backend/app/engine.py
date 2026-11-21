@@ -17,7 +17,7 @@ from typing import AsyncIterator
 
 from .appearance import appearance_line, appearance_seed
 from .checks import find_checks
-from . import adventure, aedo_desk, resources, routes, sheetchat
+from . import adventure, aedo_desk, reputation, resources, routes, sheetchat
 from .places import find_place, place_picture
 from .shop import find_offers, is_trade
 from . import statusbook
@@ -1045,18 +1045,29 @@ class ChatEngine:
 
         max_step = int(settings["relationship_max_step"])
         main = next((n for n in self.repo.list_npcs(conv_id) if n["is_main"]), None)
+        rep_log = new_state.setdefault("rep_log", [])
         for rc in updates["relationship_changes"]:
             npc = self.repo.find_npc(conv_id, rc["npc"])
             if mode == "character" and main:
                 npc = main
             if not npc:
                 continue
-            delta = int(clamp(rc["delta"], -max_step, max_step))
+            if rc.get("event"):  # the model named what happened; the app's table says how much it counts
+                delta = reputation.delta_for(rc["event"], npc["name"], rep_log)
+            else:                # a number (a model that ignored the event list): capped below like any change
+                delta = int(rc["delta"])
+            delta = int(clamp(delta, -max_step, max_step))
             value = int(clamp(npc["relationship"] + delta, -100, 100))
             if value != npc["relationship"]:
                 self.repo.update_npc(npc["id"], relationship=value)
-                why = f" ({rc['reason']})" if rc["reason"] else ""
-                changes.append(f"{npc['name']}: relationship {value - npc['relationship']:+d} \u2192 {value}{why}")
+                reputation.remember(new_state, npc["name"], rc.get("event", ""), value - npc["relationship"], rc["reason"])
+                what = reputation.event_label(rc["event"]) if rc.get("event") else ""
+                why = f" ({what}: {rc['reason']})" if what and rc["reason"] else f" ({what or rc['reason']})" if (what or rc["reason"]) else ""
+                before, after = reputation.level(npc["relationship"])[0], reputation.level(value)[0]
+                now = f", now {after}" if after != before else ""
+                changes.append(f"{npc['name']}: relationship {value - npc['relationship']:+d} \u2192 {value}{why}{now}")
+        if updates["relationship_changes"]:
+            self.repo.save_state(conv_id, new_state)  # the reputation log (repeats count less)
 
         for cn in updates.get("character_notes", []):  # the Aedo's own notes (marked ✒), beside the player's
             npc = self.repo.find_npc(conv_id, cn["npc"])

@@ -17,6 +17,8 @@ from .resources import RESOURCE_RULES
 from .resources import gm_notes as resource_notes
 from .routes import planned_scene, route_section
 from .places import places_section
+from . import reputation
+from .reputation import level, scale_text
 from .adventure import adventure_background, scene_section
 
 LANGUAGE_DIRECTIVES = {
@@ -116,26 +118,11 @@ def reply_token_limit(settings: dict) -> int:
     return int(min(int(settings.get("max_tokens", 800)), LENGTH_TOKENS.get(settings.get("reply_length", "medium"), 450)))
 
 
-RELATIONSHIP_SCALE = (
-    "Relationship scale: -100 = mortal enemy, -50 = hostile, 0 = neutral, +50 = close friend or ally, +100 = deepest bond. "
-    "NPCs must act according to their current value."
-)
+RELATIONSHIP_SCALE = scale_text()
 
 
 def relationship_label(value: int) -> str:
-    if value <= -80:
-        return "mortal enemy"
-    if value <= -50:
-        return "hostile"
-    if value <= -20:
-        return "distrustful"
-    if value < 20:
-        return "neutral"
-    if value < 50:
-        return "friendly"
-    if value < 80:
-        return "close"
-    return "deeply bonded"
+    return level(value)[0]
 
 
 _LINKS = [re.compile(r"Base URL:\s*\S+(?:\s*\([^)]*\))?", re.I),           # "Base URL: https://… (1=Standard, …)"
@@ -237,6 +224,7 @@ def describe_npcs(npcs: list[dict], limit_chars: int = 3200, with_relationship: 
 
 
 def describe_relationships(npcs: list[dict]) -> str:
+    """Each present character's level (what each level means is in the stable part: RELATIONSHIP_SCALE)."""
     return "\n".join(
         f"- {n['name']}: {n['relationship']:+d} ({relationship_label(n['relationship'])})" for n in npcs if n["active"]
     )
@@ -606,11 +594,7 @@ class PromptBuilder:
         if full:
             lines += ["- new_locations: newly mentioned places (name, description, connects_to: names of existing places)."]
         lines += [
-            "- relationship_changes: how an NPC's feelings toward the player changed (npc, delta between -20 and 20, reason). "
-            "ONLY for a character who was present in the scene AND talked with the player or saw what the player did. "
-            "reason = the PLAYER's own action or words that caused it (\"the player defended her\", \"the player mocked "
-            "him\"). Never for: characters only mentioned by others, the player's thoughts in single quotes, plans or "
-            "suggestions, or a character simply being friendly (their own behaviour is not a reason). No player action: no change.",
+            reputation.tracker_line(),
             "- new_npcs: named characters appearing for the first time (name, description, personality, appearance). "
             "appearance has race, hair, eyes, build, skin, outfit, extra: copy ONLY what the text says about their looks, use \"\" when it does not say.",
             "- character_notes: 0-2 lasting things about ONE character that matter for how they treat the player: a promise made, "
@@ -670,7 +654,7 @@ ANALYSIS_SCHEMA = {
         "weather": {"type": "string"},
         "scene_mood": {"type": "string", "enum": list(MOODS)},
         "new_locations": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "connects_to": {"type": "array", "items": {"type": "string"}}}, "required": ["name", "description", "connects_to"]}},
-        "relationship_changes": {"type": "array", "items": {"type": "object", "properties": {"npc": {"type": "string"}, "delta": {"type": "integer"}, "reason": {"type": "string"}}, "required": ["npc", "delta", "reason"]}},
+        "relationship_changes": {"type": "array", "items": {"type": "object", "properties": {"npc": {"type": "string"}, "event": {"type": "string", "enum": list(reputation.EVENTS)}, "reason": {"type": "string"}}, "required": ["npc", "event", "reason"]}},
         "new_npcs": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "personality": {"type": "string"}, "appearance": _APPEARANCE_SCHEMA}, "required": ["name", "description", "personality", "appearance"]}},
         "memories": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "importance": {"type": "integer"}, "characters": {"type": "array", "items": {"type": "string"}}}, "required": ["text", "importance", "characters"]}},
         "character_notes": {"type": "array", "items": {"type": "object", "properties": {"npc": {"type": "string"}, "note": {"type": "string"}}, "required": ["npc", "note"]}},
