@@ -510,8 +510,8 @@ export default function ScenarioModal({ onClose, onStart }) {
       <div className="scn-grid">
         {list.map((s) => (
           <div key={s.id} className={`scn ${s.id === selected ? "active" : ""}`} onClick={() => setSelected(s.id)}>
-            <div className="row gap center">
-              <div className="scn-name grow">{s.name}</div>
+            <div className="scn-name">{s.name}</div>
+            <div className="row scn-actions">
               <button className="icon-btn" title="Characters" onClick={(e) => { e.stopPropagation(); api.scenario(s.id).then((full) => { setCast({ name: s.name, npcs: full.data.npcs }); setView("cast"); }).catch((er) => setError(er.message)); }}>👥</button>
               <a className="icon-btn" title="Share as a .caliope file (the card with all its pictures)" href={`/api/scenarios/${s.id}/export.caliope`} download onClick={(e) => e.stopPropagation()}>📦</a>
               <a className="icon-btn" title="Export as a character card (JSON)" href={api.exportCardUrl(s.id)} download onClick={(e) => e.stopPropagation()}>⤓</a>

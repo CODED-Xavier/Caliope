@@ -84,6 +84,8 @@ The sidebar shows **Model server online** when it's ready.
 | `/roll 1d20+3` | Rolls dice |
 | `/wait 2 hours`, `/wait until morning` | Time passes (it only passes when you choose) |
 
+Easier: pick a mode under the text box (**🗣 Speak · ✋ Act · 💭 Think · 🗨 Ask the Aedo**) and just type; each mode says who hears it. Starting a message with `mestre,` also asks the Aedo.
+
 ### Useful buttons
 - Under a reply: **Continue ▸** (keep writing), **↻** (write it again), **⏪** (rewind to there), **⑂** (start a new game from that moment).
 - Top of the chat: **↶ Undo**, **📜 Recap** ("Previously, in…"), **🎵 Music**, **Aa** (text size and colours), **🔍** (search).

@@ -141,3 +141,44 @@ def apply(scan_result: dict, labels_of: dict[str, dict[int, str]], dest: Path, u
 def remove_card_pictures(dest: Path) -> None:
     if dest.is_dir():
         shutil.rmtree(dest, ignore_errors=True)
+
+
+def card_folder(root: Path, card_name: str, existing: str = "") -> Path:
+    """Calíope's own folder for a card's pictures: <Calíope>/Pictures/<card name>/ (kept if the card is renamed)."""
+    clean = re.sub(r"\s+", " ", re.sub(r'[<>:"/\\|?*\x00-\x1f]+', " ", str(card_name or "Card"))).strip(" .")
+    name = existing or clean[:60] or "Card"
+    folder = root / name
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def import_folder(src: str, dest: Path) -> dict:
+    """Copy a folder of character pictures from anywhere on the PC into the card's Calíope folder.
+
+    Same layout as `scan` (a folder per character with numbered moods, or Name.png). Files with the same name are
+    replaced, so finishing more pictures and importing again just updates them. Returns how much was copied."""
+    root = Path(str(src or "").strip().strip('"')).expanduser()
+    if not root.is_dir():
+        raise ValueError(f"Folder not found: {src}")
+    if root.resolve() == dest.resolve() or dest.resolve() in root.resolve().parents:
+        return {"characters": 0, "pictures": 0}  # it already is the card's folder
+    chars = pics = 0
+    for item in sorted(root.iterdir(), key=lambda p: p.name.lower()):
+        if item.is_dir():
+            files = [f for f in item.iterdir() if f.is_file() and f.suffix.lower() in PICTURE_EXT
+                     and _number(f.stem) is not None and f.stat().st_size <= MAX_IMAGE_BYTES]
+            if not files:
+                continue
+            (dest / item.name).mkdir(parents=True, exist_ok=True)
+            for f in files:
+                for old in (dest / item.name).glob(f"{f.stem}.*"):  # 2.jpg replaces an older 2.png
+                    old.unlink()
+                shutil.copyfile(f, dest / item.name / f.name)
+                pics += 1
+            chars += 1
+        elif item.is_file() and item.suffix.lower() in PICTURE_EXT and item.stat().st_size <= MAX_IMAGE_BYTES:
+            shutil.copyfile(item, dest / item.name)
+            pics += 1
+            chars += 1
+    return {"characters": chars, "pictures": pics}
+

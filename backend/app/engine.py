@@ -123,6 +123,23 @@ class BusyError(Exception):
     """The conversation is generating a reply right now."""
 
 
+def involved_changes(changes: list[dict], exchanges: list[tuple[str, str]]) -> list[dict]:
+    """Relationship changes only for characters who are in the exchange (named in the reply or in what the player
+    said or did, not only in the player's 'thoughts') and only with a reason. Anything else is dropped."""
+    # where the character can be: the story's reply, or the player's own words and actions (not their 'thoughts')
+    seen = " ".join(re.sub(r"(?<!\w)'[^'\n]+'(?!\w)", " ", u) + " " + r for u, r in exchanges).lower()
+    out = []
+    for rc in changes:
+        name = str(rc.get("npc") or "").strip()
+        parts = [p for p in re.split(r"\W+", name.lower()) if len(p) > 2]
+        if not str(rc.get("reason") or "").strip() or not parts:
+            continue
+        if not any(re.search(rf"\b{re.escape(p)}\b", seen) for p in parts):
+            continue  # not in the scene: only talked about elsewhere, or only in the player's thoughts
+        out.append(rc)
+    return out
+
+
 class ChatEngine:
     def __init__(self, repo: ConversationRepository, settings: SettingsStore, llm, memory: MemoryManager,
                  skills: SkillManager, dice: DiceRoller, rulebooks=None):
@@ -199,15 +216,34 @@ class ChatEngine:
 
     _tasks: set = set()
 
-    def _warm_later(self, conv_id: int) -> None:
-        if self.settings.get("ai_engine") != "builtin":
-            return
+    _summarizing: set = set()
+
+    def _background(self, coro) -> None:
         try:
-            task = asyncio.get_running_loop().create_task(self.warm(conv_id))
+            task = asyncio.get_running_loop().create_task(coro)
         except RuntimeError:
+            coro.close()
             return
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+
+    def _warm_later(self, conv_id: int) -> None:
+        if self.settings.get("ai_engine") != "builtin" or conv_id in self._summarizing:
+            return  # a summary in progress warms the story itself when it is done
+        self._background(self.warm(conv_id))
+
+    async def _summarize_then_warm(self, conv_id: int, settings: dict) -> None:
+        if conv_id in self._summarizing:
+            return
+        self._summarizing.add(conv_id)
+        try:
+            await self._maybe_summarize(conv_id, settings)
+        except Exception as exc:  # the summary is tried again after the next reply
+            log.warning("Summary failed: %s", exc)
+        finally:
+            self._summarizing.discard(conv_id)
+        if settings.get("ai_engine") == "builtin":
+            await self.warm(conv_id)
 
     async def _aedo_answer(self, conv_id: int, user_msg: dict) -> AsyncIterator[dict]:
         """A short answer out of character, from its own small prompt (the story's memory slot is not touched)."""
@@ -771,11 +807,9 @@ class ChatEngine:
             yield {"type": "message_updated", "message": self.repo.get_message(assistant_msg["id"])}
 
         if settings["auto_summary"]:
-            t0 = time.perf_counter()
-            summary = await self._maybe_summarize(conv_id, settings)
-            if summary is not None:
-                timing["summary_s"] = round(time.perf_counter() - t0, 1)
-                yield {"type": "summary", "summary": summary}
+            # Folding old rounds into the summary runs after the reply, in the background: you can read and send
+            # meanwhile (it waits for its turn on the engine like any helper call).
+            self._background(self._summarize_then_warm(conv_id, settings))
         if settings.get("show_timing", True):
             timing["total_s"] = round(time.perf_counter() - t_start, 1)
             self.repo.update_message_meta(assistant_msg["id"], {"timing": timing})
@@ -952,6 +986,8 @@ class ChatEngine:
         if any(is_trade(u) for u, _ in exchanges):  # the app already moved the money and the items
             updates["gold_change"] = 0
             updates["inventory_add"] = updates["inventory_remove"] = []
+        if mode != "character":
+            updates["relationship_changes"] = involved_changes(updates["relationship_changes"], exchanges)
 
         if cal_on:
             updates["time"] = ""  # the app's clock decides the time of day

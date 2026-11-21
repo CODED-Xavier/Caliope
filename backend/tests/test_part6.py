@@ -203,3 +203,53 @@ class AdoptTests(unittest.TestCase):
             self.assertIsNone(modelhub.adopt_model(str(new)))               # already Calíope's
         finally:
             modelhub.download_root = old
+
+
+class CardFolderTests(unittest.TestCase):
+    def test_import_a_pictures_folder_into_the_cards_own(self):
+        import tempfile
+        from pathlib import Path
+        from app import cardpics
+        from tests.test_cards2 import PNG
+        tmp = Path(tempfile.mkdtemp())
+        src = tmp / "Downloads" / "lumencia art"
+        (src / "Lyra Moonwhisper").mkdir(parents=True)
+        (src / "Lyra Moonwhisper" / "1.png").write_bytes(PNG)
+        (src / "Lyra Moonwhisper" / "notes.txt").write_text("not a picture")
+        (src / "Elara.png").write_bytes(PNG)
+        home = cardpics.card_folder(tmp / "Pictures", 'Lumencia: "Academy"')
+        self.assertEqual(home.name, "Lumencia Academy")
+        self.assertEqual(cardpics.card_folder(tmp / "Pictures", "Renamed", home.name), home)   # renaming keeps it
+        got = cardpics.import_folder(str(src), home)
+        self.assertEqual(got, {"characters": 2, "pictures": 2})
+        self.assertTrue((home / "Lyra Moonwhisper" / "1.png").is_file())
+        self.assertFalse((home / "Lyra Moonwhisper" / "notes.txt").exists())
+        found = cardpics.scan(str(home), ["Lyra Moonwhisper", "Elara"])
+        self.assertEqual(sorted(c["character"] for c in found["characters"]), ["Elara", "Lyra Moonwhisper"])
+        self.assertEqual(cardpics.import_folder(str(home), home), {"characters": 0, "pictures": 0})  # itself
+
+
+class InvolvementTests(unittest.TestCase):
+    def test_only_characters_in_the_exchange_with_a_reason(self):
+        from app.engine import involved_changes
+        ex = [("\"Thank you,\" I tell Mira. 'Maybe Doran can help me later.'", "Mira smiles. \"Of course.\" Somewhere, Seren is mentioned.")]
+        got = involved_changes([
+            {"npc": "Mira Valen", "delta": 5, "reason": "the player thanked her"},
+            {"npc": "Doran Hale", "delta": 3, "reason": "the player thought of him"},   # only in a thought
+            {"npc": "Kael", "delta": -5, "reason": "talked about"},                   # not in the exchange
+            {"npc": "Mira", "delta": 2, "reason": ""},                                  # no reason
+        ], ex)
+        self.assertEqual([c["npc"] for c in got], ["Mira Valen"])
+
+
+class GmPrefixTests(unittest.TestCase):
+    def test_mestre_prefix_is_a_question_to_the_aedo(self):
+        from app.writing import gm_question, is_gm_message
+        self.assertTrue(is_gm_message("mestre, qual a árvore genealógica do capitão?"))
+        self.assertTrue(is_gm_message("GM: who are these three?"))
+        self.assertTrue(is_gm_message("/how much gold?"))
+        self.assertFalse(is_gm_message("/roll 1d20"))
+        self.assertFalse(is_gm_message('"Mestre Doran, bom dia," eu digo.'))   # speech to a character called master
+        self.assertFalse(is_gm_message("O mestre da guilda chega."))
+        self.assertEqual(gm_question("mestre, e sua família?"), "e sua família?")
+        self.assertEqual(gm_question("/what time is it?"), "what time is it?")

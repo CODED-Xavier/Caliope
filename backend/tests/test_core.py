@@ -1,6 +1,7 @@
 """Run from the backend folder:  python -m unittest discover -s tests -v"""
 import io
 import json
+import asyncio
 import random
 import tempfile
 import unittest
@@ -113,7 +114,15 @@ def new_game(s, mode="gm_world", attach=None, features=None, kind=None, **extra)
 
 
 async def collect(agen):
-    return [e async for e in agen]
+    out = [e async for e in agen]
+    # the engine folds the summary (and reads the story ahead) in the background after a reply: let that finish
+    me = asyncio.current_task()
+    for _ in range(3):
+        pending = [t for t in asyncio.all_tasks() if t is not me and not t.done()]
+        if not pending:
+            break
+        await asyncio.gather(*pending, return_exceptions=True)
+    return out
 
 
 class DiceTests(unittest.TestCase):
@@ -413,7 +422,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
             })
         s.conversations.delete(cid)
         cid = new_game(s, "gm_cast", attach=["combat-encounters"])
-        events = await collect(s.engine.send(cid, "I attack the guard captain"))
+        events = await collect(s.engine.send(cid, "I attack the guard captain, Doran"))
         types = [e["type"] for e in events]
         self.assertEqual(types[0], "user_message")
         self.assertIn("context", types)
@@ -501,11 +510,8 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
     async def test_auto_summary_triggers(self):
         s, llm, cid = await self.start()
         s.settings.update({"state_tracking": False, "recent_rounds": 3, "fold_block_rounds": 1})
-        summarized = False
         for i in range(8):
-            events = await collect(s.engine.send(cid, f"Action {i} " + "detail " * 10))
-            summarized = summarized or any(e["type"] == "summary" for e in events)
-        self.assertTrue(summarized)
+            await collect(s.engine.send(cid, f"Action {i} " + "detail " * 10))  # the summary is folded in the background
         conv = s.conversations.get(cid)
         self.assertEqual(conv["summary"], llm.summary)
         self.assertGreater(conv["summary_upto"], 0)

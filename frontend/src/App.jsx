@@ -8,7 +8,7 @@ import SidePanel from "./components/SidePanel.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import SkillsModal from "./components/SkillsModal.jsx";
 import RulebooksModal from "./components/RulebooksModal.jsx";
-import ModelsModal from "./components/ModelsModal.jsx";
+import ModelsModal, { FirstModel } from "./components/ModelsModal.jsx";
 import MuseModal from "./components/MuseModal.jsx";
 import { RecapView } from "./components/Cantos.jsx";
 import Tour from "./components/Tour.jsx";
@@ -477,7 +477,7 @@ export default function App() {
             <h1 className="brand-name">Calíope</h1>
             <p className="muted">Roleplay and tabletop adventures that run entirely on your PC.<br />No tokens, no limits, and it remembers everything.</p>
             <button className="btn primary big" onClick={() => setModal("new")}>＋ Start a new game</button>
-            {!online && <p className="error-text small">No AI model is running yet. Open <a href="#" onClick={(e) => { e.preventDefault(); openModels(); }}>🧠 Models</a> and press Load on a model.</p>}
+            {!online && <FirstModel onOpen={(init) => { setModelsInit({ tab: init.tab, query: init.query || "" }); setModal("models"); }} />}
             {error && <p className="error-text small">{error}</p>}
           </div>
         )}

@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 
 from .cardio import export_card, parse_card
 from .cards import resolve_features
-from .config import DB_PATH, FRONTEND_DIST
+from .config import APP_HOME, DB_PATH, FRONTEND_DIST
 from .conversations import NotFound
 from .drafts import draft_card_field, draft_player
 from .exporting import export_markdown
@@ -835,6 +835,7 @@ async def card_to_file(body: dict = Body(...)):
 
 # ------------------------------------------------------------------ a card's pictures from a folder on this PC
 CARDPIC_DIR = Path(DB_PATH).parent / "cardpics"
+PICTURES_DIR = APP_HOME / "Pictures"  # one folder per card, easy to find next to Play.bat: drop pictures straight in
 NEW_CHARACTER = "__new__"
 
 
@@ -853,6 +854,52 @@ async def card_pictures_browse(scenario_id: int):
     async with _PICKER:
         folder = await asyncio.to_thread(pick_folder, "Pick the folder with the character pictures")
     return {"folder": folder}
+
+
+def _card_home(sc: dict) -> Path:
+    """The card's folder in Calíope (Pictures/<card name>); its name is saved in the card, so renaming keeps it."""
+    existing = str(sc["data"].get("pictures_folder") or "")
+    folder = cardpics.card_folder(PICTURES_DIR, sc["name"], existing)
+    if folder.name != existing:
+        svc().scenarios.update(sc["id"], {**sc["data"], "name": sc["name"], "pictures_folder": folder.name})
+    return folder
+
+
+@app.get("/api/scenarios/{scenario_id}/pictures/home")
+async def card_pictures_home(scenario_id: int):
+    """Calíope's folder for this card's pictures (made if missing) and what it holds right now."""
+    sc, names = _card_names(scenario_id)
+    folder = _card_home(sc)
+    return {"folder": str(folder), "scan": await asyncio.to_thread(cardpics.scan, str(folder), names)}
+
+
+@app.post("/api/scenarios/{scenario_id}/pictures/open")
+async def card_pictures_open(scenario_id: int):
+    """Open the card's pictures folder in Windows Explorer, to drop pictures straight into it."""
+    sc, _ = _card_names(scenario_id)
+    folder = _card_home(sc)
+    if os.name == "nt":
+        os.startfile(str(folder))  # type: ignore[attr-defined]  # noqa: S606 (our own folder)
+        return {"folder": str(folder)}
+    raise HTTPException(400, f"Open this folder yourself: {folder}")
+
+
+@app.post("/api/scenarios/{scenario_id}/pictures/import")
+async def card_pictures_import(scenario_id: int, body: dict = Body(default={})):
+    """🔍 Search: pick a folder anywhere on the PC (or paste its address); its pictures are copied into the card's
+    Calíope folder, then shown like a scan (nothing changes in the card until Apply)."""
+    sc, names = _card_names(scenario_id)
+    src = str(body.get("folder") or "")
+    if not src:
+        if _PICKER.locked():
+            raise HTTPException(409, "The folder picker is already open (it may be behind this window).")
+        async with _PICKER:
+            src = await asyncio.to_thread(pick_folder, "Pick the folder with the character pictures")
+        if not src:
+            return {"cancelled": True}
+    folder = _card_home(sc)
+    copied = await asyncio.to_thread(cardpics.import_folder, src, folder)
+    return {"folder": str(folder), "copied": copied, "scan": await asyncio.to_thread(cardpics.scan, str(folder), names)}
 
 
 @app.post("/api/scenarios/{scenario_id}/pictures/scan")

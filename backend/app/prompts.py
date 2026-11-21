@@ -24,6 +24,23 @@ LANGUAGE_DIRECTIVES = {
     "auto": "Reply in the same language the player writes in.",
 }
 
+LANGUAGE_REMINDERS = {
+    "en": "Write in English: the narration AND every character's spoken lines.",
+    "pt-BR": "Escreva em português do Brasil: a narração E todas as falas dos personagens, mesmo que mensagens anteriores "
+             "estejam em inglês. (Write in Brazilian Portuguese: narration and every character's dialogue.)",
+    "auto": "Write in the language of the player's last message: the narration AND every character's spoken lines.",
+}
+
+
+def closing_rules(player: str, language: str) -> str:
+    """Sent with every message, last: never act for the player, and the story's language for every voice."""
+    return ("## Always\n"
+            f"- {player} belongs to the player. Never write {player}'s words, actions, thoughts, feelings or decisions, not "
+            "even small ones (a nod, a smile, an answer). The narrator and every character react only to what the player "
+            "wrote, then stop and wait.\n"
+            f"- {LANGUAGE_REMINDERS.get(language, LANGUAGE_REMINDERS['en'])}")
+
+
 GM_INTRO = (
     "You are the Game Master (GM) of a single-player, text-based roleplaying game. You narrate the world, "
     "voice every non-player character (NPC), apply the game rules fairly and keep the story moving. "
@@ -360,6 +377,9 @@ class PromptBuilder:
             else:
                 messages.append({"role": msg["role"], "content": msg["content"]})
 
+        # The two rules small models forget most, repeated right next to the player's message (where they look most).
+        volatile = (volatile + "\n\n" if volatile else "") + closing_rules(player_name or "the player's character", language)
+
         # Attach the volatile notes to the newest player message (so older turns keep their exact text).
         if volatile:
             for m in reversed(messages):
@@ -548,7 +568,11 @@ class PromptBuilder:
         if full:
             lines += ["- new_locations: newly mentioned places (name, description, connects_to: names of existing places)."]
         lines += [
-            "- relationship_changes: how an NPC's feelings toward the player changed (npc, delta between -20 and 20, reason). Only NPCs involved.",
+            "- relationship_changes: how an NPC's feelings toward the player changed (npc, delta between -20 and 20, reason). "
+            "ONLY for a character who was present in the scene AND talked with the player or saw what the player did. "
+            "reason = the PLAYER's own action or words that caused it (\"the player defended her\", \"the player mocked "
+            "him\"). Never for: characters only mentioned by others, the player's thoughts in single quotes, plans or "
+            "suggestions, or a character simply being friendly (their own behaviour is not a reason). No player action: no change.",
             "- new_npcs: named characters appearing for the first time (name, description, personality, appearance). "
             "appearance has race, hair, eyes, build, skin, outfit, extra: copy ONLY what the text says about their looks, use \"\" when it does not say.",
             "- character_notes: 0-2 lasting things about ONE character that matter for how they treat the player: a promise made, "

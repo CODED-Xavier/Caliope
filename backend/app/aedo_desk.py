@@ -8,7 +8,7 @@ These exchanges are kept in the chat but left out of the story the model reads l
 from __future__ import annotations
 
 from .util import truncate
-from .writing import is_gm_message
+from .writing import gm_question, is_gm_message
 
 LANGS = {"pt-BR": "Answer in Brazilian Portuguese.", "en": "Answer in English.",
          "auto": "Answer in the language of the player's question."}
@@ -81,5 +81,5 @@ def build_messages(*, scenario: dict, state: dict, npcs: list[dict], summary: st
         parts.append("## The last moments of the story\n" + "\n\n".join(
             f"{'Player' if m['role'] == 'user' else 'Story'}: {truncate(m['content'], 700)}" for m in story))
     system = SYSTEM.format(lang=LANGS.get(language, LANGS["en"])) + "\n\n" + "\n\n".join(parts)
-    q = question.lstrip()[1:].strip() or question
+    q = gm_question(question) or question
     return [{"role": "system", "content": system}, {"role": "user", "content": q}]

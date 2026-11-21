@@ -8,6 +8,8 @@ character: the AI plays ONE character; the story centres on your relationship wi
 """
 from __future__ import annotations
 
+import re
+
 import json
 from pathlib import Path
 
@@ -162,6 +164,7 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "opening_message": str(raw.get("opening_message", "")),
         "starts": normalize_starts(raw.get("starts")),
         "places": normalize_places(raw.get("places")),
+        "pictures_folder": truncate(re.sub(r'[<>:"/\\|?*]+', "", str(raw.get("pictures_folder") or "")).strip(" ."), 60),
         "player": raw.get("player") if isinstance(raw.get("player"), dict) else {},
         "npcs": npcs,
         "skills": {"attached": attached},

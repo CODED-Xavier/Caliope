@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.13**. The version history is at the end of this file.
+Current version: **v2.14**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -102,6 +102,10 @@ Settings > *API key* also works with services that speak the same language (Open
 | `/wait 3 days`, `/wait until morning` | Time passes, only when you choose |
 | no marks | The Aedo decides |
 
+Under the text box, **✍ Free · 🗣 Speak · ✋ Act · 💭 Think · 🗨 Ask the Aedo** pick how the whole message is sent (Free = the marks above, as you type them). Each mode says who hears it. A message that starts with `mestre,`, `GM,` or `Aedo,` is also a question to the Aedo.
+
+Every card follows one rule from the app: the narrator and the characters never speak, act, think or decide for your character. The story's language is repeated next to every message, so the characters answer in it too.
+
 The message box checks your spelling as you type (red underline; right-click for suggestions), in the story's language. **✨** beside the send button corrects spelling and grammar of your message with the AI, keeping your words and marks (**↶** undoes it).
 
 ### Under the replies
@@ -186,7 +190,12 @@ A card can be entered in different ways. In the card editor, under *Opening mess
 - **fixed scenes**, played one per reply in order and adapted to what you do (separate them with a line of `---`)
 
 ### Character pictures from a folder
-Card editor > *Characters* → **📂 Pick the pictures folder…** (or paste its address). The layout:
+Every card has its own folder in Calíope: `Pictures\<card name>\`, next to Play.bat (made the first time you open the card's *Characters* section). In the card editor > *Characters*:
+- **🔍 Search my PC for the pictures folder…** picks your folder anywhere on the PC (or paste its address and press **Copy in**). Its pictures are copied into the card's Calíope folder, then shown for a check before **Apply**.
+- **Open** shows the card's folder in Windows, to drop pictures straight in; **↻ Read it** reads what it holds now.
+- Finished more pictures? Search again or drop them in: files with the same name are replaced.
+
+The layout:
 ```
 pictures\
   Artemis\1.png 2.png 3.png 4.png 5.png 6.png
@@ -412,6 +421,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |
 | 2.11 | The interface in English and Português (Brasil), switched in Settings or in the tour |
 | 2.11.1 | Audit 2 fixes (see AUDIT.md): start names, Places in .caliope files, repeated place pictures, safer imports |
+| 2.14 | Group 1 of the playtest notes: never speaking for your character, the story language next to every message, reputation only from your actions, speaking modes under the text box (and `mestre,` questions), a first-model card on the home screen, summaries in the background, roomier card titles; each card has its own Pictures folder with 🔍 Search |
 | 2.13 | Calíope runs its models itself (own models folder, LM Studio's copies moved in, LM Studio never opened), desktop and Start menu shortcuts, faster replies (story read ahead, card reminders read once, window moves in steps), your sheet in the chat fills the card's Status (📋 on any of your messages to read it again) |
 | 2.12.3 | Engine: unloads LM Studio's models first, and falls back to a lighter start when video memory runs out |
 | 2.12.2 | The black window hides while Calíope's window is open (messages in `backend\data\caliope.log`); the desktop shortcut starts it minimized |

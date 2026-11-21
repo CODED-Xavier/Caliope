@@ -1278,7 +1278,37 @@
 "Already have a .gguf model?": "Já tem um modelo .gguf?",
 "uses it without a new download.": "usa sem baixar de novo.",
 "Models are kept in Calíope's folder:": "Os modelos ficam na pasta do Calíope:",
-"Deactivated models stay on disk but leave the model lists.": "Modelos desativados continuam no disco, mas saem das listas de modelos."
+"Deactivated models stay on disk but leave the model lists.": "Modelos desativados continuam no disco, mas saem das listas de modelos.",
+"🔍 Search my PC for the pictures folder…": "🔍 Procurar a pasta de imagens no meu PC…",
+"Copy in": "Copiar para cá",
+"📁 Calíope's folder for this card:": "📁 Pasta do Calíope para este card:",
+"Open": "Abrir",
+"↻ Read it": "↻ Ler a pasta",
+"Open it in Windows to drop pictures straight in": "Abre no Windows para você soltar as imagens direto nela",
+"Read what the folder holds now": "Lê o que a pasta tem agora",
+"One folder per character with 1.png … 6.png (1 Standard, 2 Happy, 3 Sad, 4 Angry, 5 Disgusted, 6 Blushing), or a single Name.png. Missing moods use the closest one. Finished more pictures? Drop them in Calíope's folder (Open) and press ↻ Read it, or Search again: files with the same name are replaced.": "Uma pasta por personagem com 1.png … 6.png (1 Padrão, 2 Feliz, 3 Triste, 4 Com raiva, 5 Com nojo, 6 Corada), ou um único Nome.png. Humores que faltam usam o mais próximo. Terminou mais imagens? Solte-as na pasta do Calíope (Abrir) e aperte ↻ Ler a pasta, ou Procure de novo: arquivos com o mesmo nome são substituídos.",
+"✍ Free": "✍ Livre",
+"🗣 Speak": "🗣 Falar",
+"✋ Act": "✋ Agir",
+"💭 Think": "💭 Pensar",
+"🗨 Ask the Aedo": "🗨 Perguntar ao Aedo",
+"What do you say?": "O que você diz?",
+"What do you think?": "O que você pensa?",
+"Ask the Aedo (outside the story)…": "Pergunte ao Aedo (fora da história)…",
+"Mix as you like: \"speech\", *action*, 'thought', /question to the Aedo.": "Misture como quiser: \"fala\", *ação*, 'pensamento', /pergunta ao Aedo.",
+"Your character says it aloud: everyone in the scene hears it.": "Seu personagem diz em voz alta: todos na cena ouvem.",
+"Your character does it: everyone in the scene can see it.": "Seu personagem faz: todos na cena podem ver.",
+"Only the Aedo knows it; characters never hear thoughts.": "Só o Aedo sabe; os personagens nunca ouvem pensamentos.",
+"Out of the story: the Aedo answers you plainly, the characters don't hear it.": "Fora da história: o Aedo responde direto, os personagens não ouvem.",
+"What do you do?   \"speech\"   *action*   'thought'   /to the Aedo": "O que você faz?   \"fala\"   *ação*   'pensamento'   /para o Aedo",
+"Calíope needs an AI model to tell stories": "O Calíope precisa de um modelo de IA para contar histórias",
+"It runs on this PC: download one once (a few GB) and it works offline. We recommend": "Ele roda neste PC: baixe um uma vez (alguns GB) e funciona offline. Recomendamos o",
+", a roleplay model with a great balance between quality and speed.": ", um modelo de roleplay com ótimo equilíbrio entre qualidade e velocidade.",
+"⬇ Get Stheno 8B (recommended)": "⬇ Baixar o Stheno 8B (recomendado)",
+"I already have a .gguf model": "Já tenho um modelo .gguf",
+"No AI model is running yet": "Nenhum modelo de IA está rodando ainda",
+"🧠 Choose another": "🧠 Escolher outro",
+"Loading the model (the first time can take a minute)…": "Carregando o modelo (na primeira vez pode levar um minuto)…"
 },
 "patterns": [
 [
@@ -1568,6 +1598,14 @@
 [
 "Your sheet: {0}",
 "Sua ficha: {0}"
+],
+[
+"Copied {0} pictures ({1} characters) into Calíope's folder for this card. Check below, then Apply.",
+"{0} imagens ({1} personagens) copiadas para a pasta do Calíope deste card. Confira abaixo e depois Aplique."
+],
+[
+"▶ Load {0}",
+"▶ Carregar {0}"
 ]
 ]
 }

@@ -40,9 +40,21 @@ def _outside_speech(text: str, fn) -> str:
     return "".join(out)
 
 
+# "mestre, …", "GM: …", "Aedo, …": a question to the game master, same as "/…" (players write it naturally)
+GM_PREFIX = re.compile(r"^\s*(?:mestre|gm|aedo|narrador|narrator|dm)\s*[,:]\s*", re.I)
+
+
 def is_gm_message(text: str) -> bool:
     t = (text or "").lstrip()
-    return t.startswith("/") and not t.lower().startswith("/roll")
+    return (t.startswith("/") and not t.lower().startswith("/roll")) or bool(GM_PREFIX.match(t))
+
+
+def gm_question(text: str) -> str:
+    """The question itself, without the "/" or the "mestre," in front."""
+    t = (text or "").strip()
+    if t.startswith("/"):
+        return t[1:].strip()
+    return GM_PREFIX.sub("", t, count=1).strip()
 
 
 def strip_thoughts(text: str) -> str:
@@ -63,5 +75,5 @@ def for_model(text: str) -> str:
     """The player's message as the model sees it: thoughts and GM messages become explicit tags."""
     t = text or ""
     if is_gm_message(t):
-        return f"[message to the GM: {t.lstrip()[1:].strip()}]"
+        return f"[message to the GM: {gm_question(t)}]"
     return _outside_speech(t, lambda part: THOUGHT.sub(lambda m: f"[thought: {m.group(1).strip()}]", part))

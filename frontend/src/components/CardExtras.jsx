@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ask } from "../dialogs.jsx";
 import { api, streamPost } from "../api.js";
 import { moodUrl, portraitSrc } from "../portraits.js";
@@ -115,6 +115,7 @@ export function StartsEditor({ starts, npcs, onChange }) {
 /** Card editor: take every character's pictures from a folder on this PC (Character/1.png … 6.png). */
 export function PicturesFolder({ cardId, npcs, onApplied }) {
   const [folder, setFolder] = useState("");
+  const [addr, setAddr] = useState("");
   const [scan, setScan] = useState(null);
   const [picks, setPicks] = useState({});
   const [busy, setBusy] = useState(false);
@@ -122,13 +123,21 @@ export function PicturesFolder({ cardId, npcs, onApplied }) {
   const [err, setErr] = useState("");
   const run = async (fn) => { setBusy(true); setErr(""); setNote(""); try { await fn(); } catch (e) { setErr(e.message); } finally { setBusy(false); } };
 
-  const look = (f) => run(async () => { setScan(await api.cardPicturesScan(cardId, f)); setPicks({}); });
-  const browse = () => run(async () => {
-    const r = await api.cardPicturesBrowse(cardId);
-    if (r.folder) { setFolder(r.folder); setScan(await api.cardPicturesScan(cardId, r.folder)); setPicks({}); }
+  const [home, setHome] = useState("");
+  useEffect(() => { if (cardId) api.cardPicturesHome(cardId).then((r) => setHome(r.folder)).catch(() => {}); }, [cardId]);
+  const show = (r) => { if (r.folder) setFolder(r.folder); setScan(r.scan); setPicks({}); };
+  // 🔍 Search: pick a folder anywhere on this PC; its pictures are copied into the card's Calíope folder
+  const search = () => run(async () => {
+    const r = await api.cardPicturesImport(cardId);
+    if (r.cancelled) return;
+    show(r);
+    setNote(`Copied ${r.copied.pictures} pictures (${r.copied.characters} characters) into Calíope's folder for this card. Check below, then Apply.`);
   });
+  const fromAddress = (f) => run(async () => { const r = await api.cardPicturesImport(cardId, f); show(r); });
+  const readHome = () => run(async () => { const r = await api.cardPicturesHome(cardId); show(r); });
+  const openHome = () => run(async () => { await api.cardPicturesOpen(cardId); });
   const apply = () => run(async () => {
-    const r = await api.cardPicturesApply(cardId, folder, picks);
+    const r = await api.cardPicturesApply(cardId, folder || home, picks);
     setNote(`Pictures set for ${r.characters} characters${r.new?.length ? ` (new: ${r.new.join(", ")})` : ""}${r.games ? `, also in ${r.games} game(s) using this card` : ""}.`);
     setScan(null);
     onApplied(r.card);
@@ -142,13 +151,20 @@ export function PicturesFolder({ cardId, npcs, onApplied }) {
   if (!cardId) return <div className="muted tiny">Save the card once to take its pictures from a folder.</div>;
   return (
     <div className="pics-folder">
-      <div className="row gap center">
-        <button className="btn small primary" disabled={busy} onClick={browse}>📂 Pick the pictures folder…</button>
-        <input className="field grow" value={folder} placeholder="or paste its address, e.g. D:\Lumencia\pictures" onChange={(e) => setFolder(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && folder.trim() && look(folder)} />
-        <button className="btn small" disabled={busy || !folder.trim()} onClick={() => look(folder)}>Look</button>
+      <div className="row gap center wrap">
+        <button className="btn small primary" disabled={busy} onClick={search}>🔍 Search my PC for the pictures folder…</button>
+        <input className="field grow" style={{ minWidth: 180 }} value={addr} placeholder="or paste its address, e.g. D:\Lumencia\pictures"
+          onChange={(e) => setAddr(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addr.trim() && fromAddress(addr)} />
+        <button className="btn small" disabled={busy || !addr.trim()} onClick={() => fromAddress(addr)}>Copy in</button>
       </div>
-      <div className="muted tiny">One folder per character with 1.png … 6.png (1 Standard, 2 Happy, 3 Sad, 4 Angry, 5 Disgusted, 6 Blushing), or a single Name.png. Missing moods use the closest one. Run it again whenever you finish more pictures.</div>
+      {home && (
+        <div className="row gap center wrap">
+          <span className="muted tiny grow">📁 Calíope's folder for this card: <code className="no-tr">{home}</code></span>
+          <button className="btn small" disabled={busy} onClick={openHome} title="Open it in Windows to drop pictures straight in">Open</button>
+          <button className="btn small" disabled={busy} onClick={readHome} title="Read what the folder holds now">↻ Read it</button>
+        </div>
+      )}
+      <div className="muted tiny">One folder per character with 1.png … 6.png (1 Standard, 2 Happy, 3 Sad, 4 Angry, 5 Disgusted, 6 Blushing), or a single Name.png. Missing moods use the closest one. Finished more pictures? Drop them in Calíope's folder (Open) and press ↻ Read it, or Search again: files with the same name are replaced.</div>
       {busy && <div className="muted small"><span className="spinner" /> Working…</div>}
       {scan && (
         <div className="card">

@@ -261,3 +261,48 @@ export function PcAdvice({ onSearch, compact }) {
     </div>
   );
 }
+
+/** Home screen when no model runs: the recommended model one click away, or your own model loaded right here. */
+export function FirstModel({ onOpen }) {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const refresh = () => api.modelLibrary().then(setData).catch(() => setData({ models: [], engine: null }));
+  useEffect(() => { refresh(); const t = setInterval(refresh, 3000); return () => clearInterval(t); }, []);
+  if (!data) return null;
+  const eng = data.engine || {};
+  const models = (data.models || []).filter((m) => !m.disabled && !m.embedding);
+  const load = async (m) => { setBusy(true); setErr(""); try { await api.loadModel(m.path, "story"); refresh(); } catch (e) { setErr(e.message); } setBusy(false); };
+  if (["starting", "downloading"].includes(eng.state)) {
+    return (
+      <div className="card first-model">
+        <div><span className="spinner" /> {eng.state === "downloading" ? "Downloading the engine (about 30 MB). The model loads right after." : "Loading the model (the first time can take a minute)…"}</div>
+      </div>
+    );
+  }
+  if (!models.length) {
+    return (
+      <div className="card first-model">
+        <b>Calíope needs an AI model to tell stories</b>
+        <p className="small">It runs on this PC: download one once (a few GB) and it works offline. We recommend <b>Stheno 8B</b>, a roleplay model with a great balance between quality and speed.</p>
+        <PcAdvice compact />
+        <div className="row gap wrap">
+          <button className="btn primary" onClick={() => onOpen({ tab: "find", query: "Stheno-v3.2" })}>⬇ Get Stheno 8B (recommended)</button>
+          <button className="btn" onClick={() => onOpen({ tab: "files" })}>I already have a .gguf model</button>
+        </div>
+      </div>
+    );
+  }
+  const chosen = models.find((m) => m.selected === "story" || m.path === eng.model) || models[0];
+  return (
+    <div className="card first-model">
+      <b>No AI model is running yet</b>
+      {eng.state === "error" && eng.message && <div className="error-text small">{eng.message}</div>}
+      <div className="row gap wrap center">
+        <button className="btn primary" disabled={busy} onClick={() => load(chosen)}>▶ Load {chosen.name}</button>
+        <button className="btn" onClick={() => onOpen({ tab: "mine" })}>🧠 Choose another</button>
+      </div>
+      {err && <div className="error-text small">{err}</div>}
+    </div>
+  );
+}

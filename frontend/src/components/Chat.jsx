@@ -225,6 +225,25 @@ const showThoughts = (t) => (t.trimStart().startsWith("/") && !/^\s*\/roll/i.tes
 // While a reply is being written: hide the status block and any half-written portrait tag at the end.
 const liveText = (t) => hideStatus(t).replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, "");
 
+/** How a message is sent: free text (marks as you type them), or one mode for the whole message. */
+const MODES = [
+  { id: "free", label: "✍ Free", hint: `What do you do?   "speech"   *action*   'thought'   /to the Aedo`,
+    who: "Mix as you like: \"speech\", *action*, 'thought', /question to the Aedo." },
+  { id: "say", label: "🗣 Speak", hint: "What do you say?", who: "Your character says it aloud: everyone in the scene hears it." },
+  { id: "act", label: "✋ Act", hint: "What do you do?", who: "Your character does it: everyone in the scene can see it." },
+  { id: "think", label: "💭 Think", hint: "What do you think?", who: "Only the Aedo knows it; characters never hear thoughts." },
+  { id: "ask", label: "🗨 Ask the Aedo", hint: "Ask the Aedo (outside the story)…", who: "Out of the story: the Aedo answers you plainly, the characters don't hear it." },
+];
+
+function withMode(t, mode) {
+  if (!t || mode === "free" || t.startsWith("/")) return t;
+  if (mode === "say") return /^["“]/.test(t) ? t : `"${t}"`;
+  if (mode === "act") return t.startsWith("*") ? t : `*${t}*`;
+  if (mode === "think") return t.startsWith("'") ? t : `'${t}'`;
+  if (mode === "ask") return `/${t}`;
+  return t;
+}
+
 export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, onSheet, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint, onCheck, onBuy, voiceOn, speaking, onSpeak }) {
   const [text, setText] = useState("");
   const [fixing, setFixing] = useState(false);
@@ -319,8 +338,10 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
       onEdit: call("onEdit"), onResend: call("onResend"), onRewind: call("onRewind"), check: call("check"), buy: call("buy"), speak: call("onSpeak") };
   }, []);
 
+  const [sendMode, setSendMode] = useState(() => { try { return localStorage.getItem("caliope.mode") || "free"; } catch { return "free"; } });
+  const pickMode = (m) => { setSendMode(m); try { localStorage.setItem("caliope.mode", m); } catch { /* ignore */ } taRef.current?.focus(); };
   const submit = () => {
-    const t = text.trim();
+    const t = withMode(text.trim(), sendMode);
     if (!t || busy) return;
     setText("");
     nearBottom.current = true;
@@ -401,7 +422,7 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
             rows={1}
             spellCheck lang={chatLang(game)}
             value={text}
-            placeholder={`What do you do?   "speech"   *action*   'thought'   /to the Aedo`}
+            placeholder={MODES.find((x) => x.id === sendMode)?.hint}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); }
@@ -421,8 +442,13 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
           )}
         </div>
         <div className="composer-hint muted small">
-          <span className="mark">"speech"</span> <span className="mark">*action*</span> <span className="mark">'thought' (only the Aedo knows)</span>{" "}
-          <span className="mark">/message to the Aedo</span> <span className="mark">/roll 1d20</span> <HelpTip id="writing" /> · Shift+Enter: new line
+          <span className="modes">
+            {MODES.map((x) => (
+              <button key={x.id} className={`mode-chip ${sendMode === x.id ? "on" : ""}`} title={x.who} onClick={() => pickMode(x.id)}>{x.label}</button>
+            ))}
+          </span>
+          <span className="mode-who">{MODES.find((x) => x.id === sendMode)?.who}</span>
+          <HelpTip id="writing" /> · <span className="mark">/roll 1d20</span> · Shift+Enter: new line
         </div>
       </div>
     </div>

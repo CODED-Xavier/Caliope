@@ -113,6 +113,9 @@ export const api = {
   cardFile: (card) => request("POST", "/api/cards/export", { card }),
   cardPicturesBrowse: (id) => request("POST", `/api/scenarios/${id}/pictures/browse`),
   cardPicturesScan: (id, folder) => request("POST", `/api/scenarios/${id}/pictures/scan`, { folder }),
+  cardPicturesHome: (id) => request("GET", `/api/scenarios/${id}/pictures/home`),
+  cardPicturesOpen: (id) => request("POST", `/api/scenarios/${id}/pictures/open`),
+  cardPicturesImport: (id, folder = "") => request("POST", `/api/scenarios/${id}/pictures/import`, { folder }),
   cardPicturesApply: (id, folder, overrides) => request("POST", `/api/scenarios/${id}/pictures/apply`, { folder, overrides, update_games: true }),
   cardPicturesToR2: (id) => request("POST", `/api/scenarios/${id}/pictures/r2`),
   async importCaliope(file) {
