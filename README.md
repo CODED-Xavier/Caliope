@@ -505,3 +505,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.22.1 | Big map pictures (20+ MB PNGs) are turned into WebP when uploaded |
 | 2.22.2 | Fix: the app window froze at start (the F11 helper exposed the whole window to the page) |
 | 2.22.3 | Fix: the Status tab blanked the screen before the first reply; an error in one part of the screen no longer blanks the whole app |
+| 2.22.4 | The top bar no longer moves when the mouse is over the music controls; the game's title stays on one line (full name on hover) |

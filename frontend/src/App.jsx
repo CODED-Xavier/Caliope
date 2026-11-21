@@ -471,8 +471,8 @@ export default function App() {
           <>
             <div className="topbar">
               <div className="grow">
-                <div className="top-title">{game.conversation.title}</div>
-                <div className="muted small">{scenario?.name} · {MODE_LABELS[scenario?.mode] || ""}
+                <div className="top-title" title={game.conversation.title}>{game.conversation.title}</div>
+                <div className="muted small top-sub" title={`${scenario?.name || ""} · ${MODE_LABELS[scenario?.mode] || ""}`}>{scenario?.name} · {MODE_LABELS[scenario?.mode] || ""}
                   {game.features?.kind && <span className={`tag kind-${game.features.kind} kind-badge`}>{KIND_LABELS[game.features.kind]}</span>}
                   {game.state?.date_label && <span className="tag date-badge" title="In-story date and time (kept by the app)">📅 {game.state.date_label}</span>}
                 </div>
