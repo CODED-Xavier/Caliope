@@ -1,5 +1,4 @@
 """Step 2: card starts (routes), the picture folder, R2 signing."""
-import asyncio
 import datetime as dt
 import tempfile
 import unittest
@@ -30,6 +29,9 @@ class StartTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ids, ["default", "alt-1", "cult-member"])
         with self.assertRaises(ValueError):
             routes.resolve(sc["data"], "nope")
+        # names that look like the app's own ids are renamed instead of looping forever
+        got = [x["id"] for x in routes.normalize_starts([{"name": "Alt ending"}, {"name": "Default"}, {"name": "Alt ending"}])]
+        self.assertEqual(got, ["start-alt-ending", "start-default", "start-alt-ending-x"])
 
     async def test_cult_route_game(self):
         llm = FakeLLM()

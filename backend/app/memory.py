@@ -16,7 +16,7 @@ from collections import defaultdict
 from typing import Callable
 
 from .db import Database
-from .util import now, stem, tokenize
+from .util import now, tokenize
 from .config import embedding_key
 
 try:  # numpy makes semantic search fast; everything still works without it

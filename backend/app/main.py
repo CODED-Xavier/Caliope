@@ -42,7 +42,6 @@ from . import shop
 from . import resources
 from . import statusbook
 from . import worldtime
-from .dice import DiceError
 from .engine import BusyError
 from .llm import LLMError
 from .scenarios import generate_scenario, normalize_scenario
@@ -659,10 +658,11 @@ async def import_caliope(request: Request):
     try:
         name, data = await asyncio.to_thread(backups.unpack_card, raw, CARDPIC_DIR / str(created["id"]) / "imported",
                                              f"/api/cardpics/{created['id']}/imported")
-    except Exception:
+        return svc().scenarios.update(created["id"], {**data, "name": name})
+    except Exception:  # nothing half-imported stays behind
         svc().scenarios.delete(created["id"])
+        cardpics.remove_card_pictures(CARDPIC_DIR / str(created["id"]))
         raise
-    return svc().scenarios.update(created["id"], {**data, "name": name})
 
 
 # ------------------------------------------------------------------ Cantos, recap and the map bag
@@ -856,7 +856,8 @@ async def card_pictures_apply(scenario_id: int, body: dict = Body(...)):
     """Copy the pictures into the app and use them for the card (and, if asked, for games already using it)."""
     sc, names = _card_names(scenario_id)
     found = await asyncio.to_thread(cardpics.scan, str(body.get("folder", "")), names)
-    raw_over = {str(k): str(v) for k, v in (body.get("overrides") or {}).items()}
+    loose = {u["folder"] for u in found["unmatched"]}  # only folders the scan listed can be assigned by hand
+    raw_over = {str(k): str(v) for k, v in (body.get("overrides") or {}).items() if str(k) in loose}
     new_names = []  # "＋ Add as a new character": the folder's name becomes a character of the card
     for folder, who in raw_over.items():
         if who == NEW_CHARACTER:
@@ -948,7 +949,10 @@ async def card_pictures_to_r2(scenario_id: int):
         if not url.startswith(prefix):
             return url
         if url not in moved:
-            path = CARDPIC_DIR / str(scenario_id) / url[len(prefix):]
+            base = (CARDPIC_DIR / str(scenario_id)).resolve()
+            path = (base / url[len(prefix):]).resolve()
+            if base not in path.parents or not path.is_file():
+                return url  # a picture that is missing (or a link that points elsewhere) stays as it is
             data = path.read_bytes()
             ctype = {".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}.get(path.suffix, "")
             moved[url] = await r2.upload(settings, f"cards/{slug}/{url[len(prefix):]}", data, ctype)

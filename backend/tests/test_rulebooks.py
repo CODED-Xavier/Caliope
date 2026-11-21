@@ -1,5 +1,4 @@
 """Tests for v0.10.0: rulebook import and rules in play."""
-import asyncio
 import io
 import unittest
 

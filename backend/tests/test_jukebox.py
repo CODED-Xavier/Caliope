@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from app.jukebox import MusicError, MusicLibrary, clean_tags, guess_mood, sniff_audio
+from app.jukebox import MusicError, clean_tags, guess_mood, sniff_audio
 from tests.test_core import FakeLLM, collect, make_services, new_game
 
 MP3 = b"ID3\x03\x00\x00\x00" + b"\x00" * 64

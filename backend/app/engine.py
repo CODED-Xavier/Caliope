@@ -626,8 +626,11 @@ class ChatEngine:
                     yield {"type": "state", "state": st_now, "npcs": self.repo.list_npcs(conv_id), "changes": ["Your sheet: " + "; ".join(got)]}
 
         place_now = self.repo.get_state(conv_id).get("location", "")
-        fixed = place_picture(find_place(scenario.get("places") or [], place_now)) \
-            if place_now and (place_now != place_before or not self.repo.has_meta(conv_id, "scene_picture")) else None
+        card_places = scenario.get("places") or []
+        here = find_place(card_places, place_now) if place_now else None
+        # a new place of the card (not just new words for the same one, "Grand Hall" -> "Grand Hall, by the fire")
+        arrived = here and (here is not find_place(card_places, place_before) or not self.repo.has_meta(conv_id, "scene_picture"))
+        fixed = place_picture(here) if arrived else None
         if fixed and not is_gm_message(user_msg["content"]):  # a place the card has a picture for: shown at once
             self.repo.update_message_meta(assistant_msg["id"], {"scene_picture": fixed})
             if self.cantos and settings.get("auto_keep_pictures", True):

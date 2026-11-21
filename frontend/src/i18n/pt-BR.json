@@ -1459,6 +1459,86 @@
 [
 "{0}'s turn",
 "vez de {0}"
+],
+[
+"{0} · a {1} has {2} days",
+"{0} · um(a) {1} tem {2} dias"
+],
+[
+"Month {0}",
+"Mês {0}"
+],
+[
+"(new: {0})",
+"(novos: {0})"
+],
+[
+"({0} squares, {1} ft)",
+"({0} quadrados, {1} pés)"
+],
+[
+"Help: {0}",
+"Ajuda: {0}"
+],
+[
+"Delete \"{0}\"?",
+"Apagar \"{0}\"?"
+],
+[
+"Loaded: {0}",
+"Carregado: {0}"
+],
+[
+"Downloads{0}",
+"Downloads{0}"
+],
+[
+"({0} parts)",
+"({0} partes)"
+],
+[
+"Added {0}",
+"Adicionado: {0}"
+],
+[
+"· {0} GB RAM",
+"· {0} GB de RAM"
+],
+[
+"Mood {0}",
+"Humor {0}"
+],
+[
+"Loaded {0}.",
+"{0} carregado(a)."
+],
+[
+"Every {0} replies",
+"A cada {0} respostas"
+],
+[
+"Characters · {0}",
+"Personagens · {0}"
+],
+[
+"Creativity: {0}",
+"Criatividade: {0}"
+],
+[
+"Speed {0}×",
+"Velocidade {0}×"
+],
+[
+"Delete {0}?",
+"Apagar {0}?"
+],
+[
+"Uninstall {0}?",
+"Desinstalar {0}?"
+],
+[
+"Installed: {0}",
+"Instalada: {0}"
 ]
 ]
 }

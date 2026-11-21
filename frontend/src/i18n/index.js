@@ -22,7 +22,8 @@ const textOrig = new WeakMap();   // text node -> { en, shown }
 const attrOrig = new WeakMap();   // element -> { attr: { en, shown } }
 
 const exact = new Map(Object.entries(PT.exact || {}));
-const patterns = (PT.patterns || []).map(([en, pt]) => {
+// The most specific first: "Not enough {0}: you have {1}." must win over "Not enough {0}".
+const patterns = [...(PT.patterns || [])].sort((a, b) => b[0].replace(/\{\d\}/g, "").length - a[0].replace(/\{\d\}/g, "").length).map(([en, pt]) => {
   const parts = en.split(/(\{\d\})/);
   const order = [];
   const src = parts.map((p) => {

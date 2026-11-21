@@ -39,6 +39,11 @@ class CorrectTests(unittest.IsolatedAsyncioTestCase):
         llm.chat = chatty
         self.assertEqual(await writing_help.correct(llm, "*i bow*", "en"), "*i bow*")   # not a correction: kept
 
+        async def quoted(messages, json_schema=None, **kw):
+            return '"I walk to the door."'
+        llm.chat = quoted
+        self.assertEqual(await writing_help.correct(llm, "i walk to the dor.", "en"), "I walk to the door.")  # not speech
+
 
 if __name__ == "__main__":
     unittest.main()

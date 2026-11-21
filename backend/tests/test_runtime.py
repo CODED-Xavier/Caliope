@@ -1,5 +1,4 @@
 """Tests for the built-in AI engine manager (no real llama.cpp needed)."""
-import asyncio
 import io
 import os
 import stat

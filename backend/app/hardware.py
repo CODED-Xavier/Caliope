@@ -13,7 +13,7 @@ import re
 import subprocess
 import sys
 
-GPU_CLASS = r"SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+GPU_CLASS = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
 
 
 def _windows_gpus() -> list[dict]:

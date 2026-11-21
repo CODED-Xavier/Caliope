@@ -21,6 +21,7 @@ from .images import MAX_IMAGE_BYTES, find_cached, sniff_type
 BACKUP_RE = re.compile(r"^rpg-(\d{4}-\d{2}-\d{2})\.db$")
 CALIOPE_VERSION = 1
 MAX_FILES = 600
+MAX_CARD_JSON = 20 * 2**20  # the card text itself (a zip can pack a huge file into a small one)
 
 
 # ------------------------------------------------------------------ backups
@@ -97,6 +98,8 @@ def pack_card(data: dict, name: str, roots: dict[str, Path], cache_dir: Path) ->
             pt["default"] = pack(pt.get("default") or "")
             for m in pt.get("moods") or []:
                 m["url"] = pack(m.get("url") or "")
+        for place in data.get("places") or []:
+            place["picture"] = pack(place.get("picture") or "")
         z.writestr("card.json", json.dumps({"caliope": CALIOPE_VERSION, "name": name, "data": data}, ensure_ascii=False, indent=1))
     return buf.getvalue()
 
@@ -111,6 +114,8 @@ def unpack_card(raw: bytes, dest: Path, url_base: str) -> tuple[str, dict]:
         names = z.namelist()
         if "card.json" not in names or len(names) > MAX_FILES:
             raise ValueError("This is not a .caliope card file.")
+        if z.getinfo("card.json").file_size > MAX_CARD_JSON:
+            raise ValueError("The card inside the file is damaged.")
         meta = json.loads(z.read("card.json").decode("utf-8"))
         if not isinstance(meta, dict) or not isinstance(meta.get("data"), dict):
             raise ValueError("The card inside the file is damaged.")
@@ -146,4 +151,7 @@ def unpack_card(raw: bytes, dest: Path, url_base: str) -> tuple[str, dict]:
             for m in pt.get("moods") or []:
                 if isinstance(m, dict):
                     m["url"] = unpack(m.get("url") or "")
+        for place in data.get("places") if isinstance(data.get("places"), list) else []:
+            if isinstance(place, dict):
+                place["picture"] = unpack(place.get("picture") or "")
         return str(meta.get("name") or data.get("name") or "Imported card"), data

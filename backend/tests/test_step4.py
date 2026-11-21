@@ -1,5 +1,4 @@
 """Tests for v0.7.0: writing rules, player emphasis, weather, start screens, drafts, save points."""
-import json
 import unittest
 
 from app.writing import for_model, is_gm_message, strip_thoughts, thoughts

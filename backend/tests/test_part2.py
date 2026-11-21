@@ -116,6 +116,9 @@ class PlaceTests(unittest.IsolatedAsyncioTestCase):
         pic = next(e["picture"] for e in events if e["type"] == "scene_picture")
         self.assertEqual(pic["url"], "/api/uploads/hall.png")
         self.assertEqual(s.cantos.gallery(cid)[0]["url"], "/api/uploads/hall.png")   # in the map bag
+        llm.analysis = {"location": "Grand Hall, by the fireplace"}               # same place, other words
+        events = await collect(s.engine.send(cid, "I sit by the fire."))
+        self.assertFalse(any(e["type"] == "scene_picture" for e in events))
 
 
 if __name__ == "__main__":

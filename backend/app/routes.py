@@ -25,7 +25,9 @@ def normalize_starts(raw) -> list[dict]:
         if not isinstance(s, dict) or not str(s.get("name", "")).strip():
             continue
         sid = _slug(s.get("id") or s.get("name")) or f"start-{len(out) + 1}"
-        while sid in seen or sid in ("default",) or sid.startswith("alt-"):
+        if sid == "default" or sid.startswith("alt-"):  # names the app uses for the card's own openings
+            sid = f"start-{sid}"
+        while sid in seen:
             sid += "-x"
         seen.add(sid)
         out.append({

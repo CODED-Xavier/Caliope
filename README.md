@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.11**. The version history is at the end of this file.
+Current version: **v2.11.1**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -354,6 +354,7 @@ Every setting has a **?** with a short explanation.
 | "Cannot reach the model server" | Built-in engine: 🧠 Models → Load a model. LM Studio: start its server, and check that *Server address* is `http://localhost:1234/v1`. |
 | Engine: out of memory | Lower *Context window* or set *GPU layers* to ~28. Close LM Studio's model. |
 | Replies are slow | *Reply length*: short. Turn on *Skip tracking on quiet turns*. Fewer *rounds kept*. |
+| The game opens in an Edge window, not the app window | The app-window package could not be installed. Delete `backend\.venv\window-tried` and run Play.bat again (needs internet). Edge works the same. |
 | The interface looks old after an update | Close the game window and run Play.bat again (it rebuilds the interface). |
 | A picture doesn't show | Links can break; use 📂 pictures from a folder or ⬆ from your PC. |
 | Something else | The black window (open it from the taskbar) shows the error; copy it when asking for help. |
@@ -417,3 +418,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.9 | First-run tour, PC scan with the best model for it, Stheno offer, ✨ correct my text |
 | 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |
 | 2.11 | The interface in English and Português (Brasil), switched in Settings or in the tour |
+| 2.11.1 | Audit 2 fixes (see AUDIT.md): start names, Places in .caliope files, repeated place pictures, safer imports |

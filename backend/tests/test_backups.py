@@ -56,6 +56,18 @@ class CaliopeFileTests(unittest.TestCase):
         self.assertEqual(back["starts"][0]["name"], "Cult member")
         self.assertTrue((root / "out" / "1.png").is_file())
 
+    def test_place_pictures_travel_too(self):
+        root = Path(tempfile.mkdtemp())
+        (root / "uploads").mkdir()
+        (root / "uploads" / "hall.png").write_bytes(PNG)
+        data = {"npcs": [], "places": [{"name": "Grand Hall", "picture": "/api/uploads/hall.png"},
+                                       {"name": "Gate", "picture": "https://example.com/gate.png"}]}
+        raw = backups.pack_card(data, "C", {"/api/uploads/": root / "uploads"}, root / "cache")
+        _, back = backups.unpack_card(raw, root / "out", "/api/cardpics/4/imported")
+        self.assertEqual(back["places"][0]["picture"], "/api/cardpics/4/imported/1.png")
+        self.assertEqual(back["places"][1]["picture"], "https://example.com/gate.png")
+        self.assertTrue((root / "out" / "1.png").is_file())
+
     def test_bad_files(self):
         root = Path(tempfile.mkdtemp())
         with self.assertRaises(ValueError):

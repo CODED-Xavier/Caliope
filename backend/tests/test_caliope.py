@@ -1,5 +1,4 @@
 """v2.0 Calíope: PixAI scene pictures and the picture service setting."""
-import asyncio
 import unittest
 
 from app import scenes

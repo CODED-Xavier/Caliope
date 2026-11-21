@@ -1,3 +1,44 @@
+# Audit 2: v2.0 to v2.11 (November 2026)
+
+Scope: everything added since v2.0. On the backend that covers cards with starts and routes, picture folders, R2, .caliope
+files, the Muse, Cantos, backups, voice, Personas, filling the character boxes, the sheet from chat, Places, the PC scan,
+✨ correct, the app window and the dialogs. On the frontend it covers every screen, the in-app dialogs and the new
+English / PT-BR layer. The review used three methods:
+- reading the code;
+- static checks (ruff with the pyflakes, bugbear and async rules);
+- a browser sweep of every screen in PT-BR against a stand-in server.
+
+Each fix below has a regression test. The full suite passes: 245 tests here, plus the PC's own run.
+
+## Fixed
+
+| # | Area | Problem | Fix |
+|---|------|---------|-----|
+| 1 | Bug (high) | A card start whose name began with "Alt" (for example "Alt ending") or was "Default" put the server in an endless loop. Saving or importing such a card froze the app. The loop kept adding "-x" to an id that still started with `alt-`. | Such ids get a `start-` prefix instead (`start-alt-ending`). Only real duplicates get "-x". |
+| 2 | Bug (medium) | .caliope files did not carry **Places** pictures (Places came after the file format). A friend opening a shared card saw broken place pictures, because they pointed at the sender's PC. | Place pictures are packed and unpacked like character pictures. Public links stay links. |
+| 3 | Bug (medium) | A place picture was shown again every time the tracker reworded the location ("Grand Hall" → "Grand Hall, by the fire"). The chat and the map bag filled with copies. | The picture appears only when the story reaches a *different* place of the card, or when the game has no scene picture yet. |
+| 4 | Bug (medium) | A .caliope import that failed after unpacking left a card named "Importing…" behind, with its pictures. | The half-made card and its picture folder are removed. The error is shown. |
+| 5 | Robustness (medium) | A .caliope file could hide a huge `card.json` (a zip bomb). Only pictures had a size check. | `card.json` is limited to 20 MB before it is read. |
+| 6 | Security (low) | "Upload this card's pictures to R2" built file paths from the card's picture links without checking them. A crafted card (`/api/cardpics/5/../../x`) could make it read a file outside the card's folder and upload it to your bucket. A missing picture crashed the upload. | Paths are resolved and must stay inside the card's folder. Missing pictures are skipped. |
+| 7 | Security (low) | The picture-folder import accepted any folder name in its "pick who they are" list, including `../` paths outside the chosen folder. | Only folders the scan listed can be assigned. |
+| 8 | Bug (low) | ✨ Correct my text: models often wrap their answer in quotes. That turned a plain action into *speech* ("I walk to the door" → "\"I walk to the door.\""). | Wrapping quotes are removed when your text had none. |
+| 9 | Bug (low) | The PC scan read graphics cards from `ControlSet001`. On some PCs that is not the active configuration, so the card or its memory could be missed. | Reads `CurrentControlSet`. |
+| 10 | Translation | About 30 messages built from names and numbers ("Delete \"Lyra\"?", "Uninstall X?", "3 min ago", "Every 3 replies"…), plus lowercase labels (relationship levels, conditions, music moods), stayed in English in PT-BR. | Added. Patterns are now tried from the most specific to the least. Before, "Not enough {0}" could swallow "Not enough gold: you have 3." and give a wrong sentence. |
+| 11 | App window | Play.bat retried installing the window package on every start when it could not be installed (for example on a Python version without a ready package). That added seconds and a network call to each start. | Tried once. Delete `backend\.venv\window-tried` to try again. Without it the Edge window is used, as before. |
+| 12 | Code health | 13 unused imports and a duplicated word in the shop's skip list. | Removed. |
+
+## Checked, no change needed
+- Every browser popup (`confirm`, `prompt`, `alert`) is replaced by Calíope's own dialogs. None of the 23 places reads the event after waiting for an answer (that would have broken "stop the click here").
+- The translation layer never touches story text, chat bubbles, what you type, or values sent to the AI. Option values, card data and the language of the story stay as they are; only what is displayed changes.
+- Starts, Cantos (closing, undo and rewind into a closed Canto), Personas (size limit, missing persona), the Muse's character merge, and the sheet-from-chat guards (setup "card" only, once, first 4 turns).
+
+## Not tested on real hardware yet (needs the PC or a tester)
+- The pywebview window on Windows: downloads ("Save file", exports) inside the window, and the file pickers.
+- The PC scan's numbers on real Windows machines with AMD, NVIDIA and Intel graphics.
+- PixAI, R2 with a real bucket, Piper voice downloads.
+
+---
+
 # Auditoria: code review (v1.0, November 2026)
 
 Scope: the whole backend (FastAPI, SQLite, prompts, engine, memory, rulebooks, images, built-in engine, model downloads,

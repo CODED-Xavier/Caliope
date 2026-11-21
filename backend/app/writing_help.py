@@ -22,6 +22,11 @@ async def correct(llm, text: str, language: str) -> str:
     out = re.sub(r"^(corrected text|texto corrigido)\s*:\s*", "", out, flags=re.I).strip()
     if out.startswith("```"):
         out = out.strip("`").strip()
+    t = text.strip()
+    for q in ('"', "“", "'"):  # models like to wrap the whole answer in quotes, which would turn it into speech
+        close = "”" if q == "“" else q
+        if out.startswith(q) and out.endswith(close) and not t.startswith(q) and len(out) > 2:
+            out = out[1:-1].strip()
     # a reply that is wildly different in length is not a correction: keep the player's text
     if not out or len(out) > len(text) * 1.6 + 40 or len(out) < len(text) * 0.5:
         return text

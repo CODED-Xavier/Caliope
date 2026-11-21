@@ -1,5 +1,4 @@
 """Step 7: the narration voice (Piper), with the program and downloads faked."""
-import asyncio
 import io
 import tempfile
 import unittest

@@ -16,7 +16,7 @@ BUY_MARK, PAY_MARK = "\U0001F6D2", "\U0001F4B0"
 MAX_OFFERS = 6
 _CURRENCY = r"(?:gold(?: pieces?| coins?)?|gp|gc|coins?|crowns?|marks?|ouro|pe[çc]as de ouro|moedas(?: de ouro)?|coroas?{extra})"
 _SKIP = {"it", "that", "this", "those", "these", "them", "everything", "all", "total", "price", "cost", "you", "he", "she", "they",
-         "isso", "isto", "tudo", "total", "preço"}
+         "isso", "isto", "tudo", "preço"}
 _LEAD = {"and", "or", "plus", "also", "a", "an", "the", "some", "buy", "sell", "sells", "offer", "offers", "has", "have", "got",
          "shows", "e", "ou", "um", "uma", "o", "os", "as", "uns", "umas", "compra", "vende", "oferece", "mostra", "tem"}
 

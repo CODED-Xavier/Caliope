@@ -1,7 +1,5 @@
 """Regression tests for the problems found in the code review (Auditoria)."""
-import asyncio
 import json
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path

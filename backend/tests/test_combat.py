@@ -1,5 +1,4 @@
 """Tests for v0.11.0: combat tracked by code."""
-import asyncio
 import random
 import unittest
 

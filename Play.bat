@@ -32,8 +32,10 @@ if errorlevel 1 (
 )
 
 REM --- The app's own window (pywebview). Optional: without it the game opens in an Edge app window.
-if not exist .venv\window-ok (
-    .venv\Scripts\python.exe -m pip install --disable-pip-version-check -q "pywebview>=5" >nul 2>nul && echo ok> .venv\window-ok
+REM Tried once (the result is kept in .venv\window-tried; delete that file to try again).
+if not exist .venv\window-tried (
+    .venv\Scripts\python.exe -m pip install --disable-pip-version-check -q "pywebview>=5" >nul 2>nul
+    echo tried> .venv\window-tried
 )
 
 REM --- Build the interface if needed, start LM Studio and the app, open the browser.
