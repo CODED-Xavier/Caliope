@@ -36,7 +36,7 @@ If you already have them, skip this.
 3. Open the folder and **double-click `Play.bat`**.
    - The first time it installs what it needs. This takes **3 to 8 minutes**, and a black window shows the progress. Let it finish.
    - If Windows shows "Windows protected your PC", click **More info → Run anyway**. The file is just a script from this project.
-4. Calíope opens in **its own window**, with a one-minute **tour** (you can skip it). On its first step pick **English** or **Português (Brasil)**: menus and stories switch to that language (Settings can change each one later). The black window stays minimized; **don't close it** while playing.
+4. Calíope opens in **its own window**, with a one-minute **tour** (you can skip it). On its first step pick **English** or **Português (Brasil)**: menus and stories switch to that language (Settings can change each one later). The black window hides itself while Calíope is open. To stop, just close the Calíope window.
    **Closing the Calíope window stops everything.**
 5. It may offer a desktop shortcut. Say yes, and next time just use the shortcut.
 
@@ -111,7 +111,7 @@ Every setting and many buttons have a **?** that explains what they do.
 | Replies are very slow | Settings → *Reply length*: Short, and tick *Skip tracking on quiet turns*. A smaller model also helps. |
 | `Play.bat` closes immediately | Python or Node.js is missing or wasn't added to PATH. Reinstall Python and tick *Add python.exe to PATH*. |
 | The window doesn't open | Open <http://127.0.0.1:8000> in your browser while the black window is running. |
-| Anything else | Restore the black window from the taskbar; the error is written there. |
+| Anything else | Open `backend\data\caliope.log` in the Calíope folder; the errors are written there. |
 
 Your games are saved automatically, and a backup is made every day (Settings → Backups).
 
@@ -123,7 +123,7 @@ This is a test, so bugs are expected and every report helps. When something brea
 
 1. **What you did** (the steps), and **what you expected** vs **what happened**.
 2. A **screenshot** of the Calíope window.
-3. If there was an error: the **last lines of the black window** (restore it from the taskbar, select the text, right-click to copy, or take a screenshot).
+3. If there was an error: the **last lines of `backend\data\caliope.log`** (in the Calíope folder; open it with Notepad). If the app did not start at all, a screenshot of the black window.
 4. Your **graphics card** and **model** (e.g. "RX 580 8 GB, Stheno Q4_K_M").
 
 Things that are especially useful to test:

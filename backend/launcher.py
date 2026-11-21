@@ -166,15 +166,18 @@ def prepare_lmstudio(settings: dict) -> None:
 
 
 # ------------------------------------------------------------------ desktop shortcut
-def create_shortcut() -> bool:
+def create_shortcut(only_if_there: bool = False) -> bool:
+    """The desktop shortcut: Calíope's icon, and the black window starts minimized (WindowStyle 7)."""
     if os.name != "nt":
         return False
     target = ROOT / "Play.bat"
     icon = ROOT / "assets" / "icon.ico"
     icon_loc = str(icon) if icon.is_file() else "%SystemRoot%\\System32\\imageres.dll,76"
     script = (
-        "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\Caliope.lnk');"
-        f"$s.TargetPath='{target}';$s.WorkingDirectory='{ROOT}';$s.IconLocation='{icon_loc}';$s.Save()"
+        "$p=[Environment]::GetFolderPath('Desktop')+'\\Caliope.lnk';"
+        + ("if(-not (Test-Path $p)){exit 0};" if only_if_there else "")
+        + "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($p);"
+        f"$s.TargetPath='{target}';$s.WorkingDirectory='{ROOT}';$s.IconLocation='{icon_loc}';$s.WindowStyle=7;$s.Save()"
     )
     return subprocess.call(["powershell", "-NoProfile", "-Command", script]) == 0
 
@@ -185,13 +188,18 @@ def first_run_questions() -> None:
         state = json.loads(flag.read_text("utf-8")) if flag.is_file() else {}
     except ValueError:
         state = {}
+    if os.name == "nt" and state.get("asked_shortcut") and not state.get("shortcut_v2"):
+        create_shortcut(only_if_there=True)  # older shortcuts opened the black window in front: start it minimized
+        DATA.mkdir(parents=True, exist_ok=True)
+        state["shortcut_v2"] = True
+        flag.write_text(json.dumps(state), "utf-8")
     if state.get("asked_shortcut") or os.name != "nt" or not sys.stdin.isatty():
         return
     answer = input("  Create a 'Caliope' shortcut on your desktop? (y/n) ").strip().lower()
     if answer.startswith(("y", "s")):
         say("  Shortcut created." if create_shortcut() else "  ! Could not create the shortcut.")
     DATA.mkdir(parents=True, exist_ok=True)
-    flag.write_text(json.dumps({**state, "asked_shortcut": True}), "utf-8")
+    flag.write_text(json.dumps({**state, "asked_shortcut": True, "shortcut_v2": True}), "utf-8")
 
 
 # ------------------------------------------------------------------ main
@@ -244,13 +252,26 @@ def open_app_window(url: str, profile: Path):
         return None
 
 
-def minimize_console() -> None:
+def minimize_console(hide: bool = False) -> None:
+    """Minimize the black window, or hide it completely (while the app's own window is open; it shows again when
+    that window closes, and the app's messages are in backend/data/caliope.log)."""
     if os.name == "nt":
         try:
             import ctypes
             hwnd = ctypes.windll.kernel32.GetConsoleWindow()
             if hwnd:
-                ctypes.windll.user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE: errors are still there if you open it
+                ctypes.windll.user32.ShowWindow(hwnd, 0 if hide else 6)  # SW_HIDE / SW_MINIMIZE
+        except Exception:
+            pass
+
+
+def show_console() -> None:
+    if os.name == "nt":
+        try:
+            import ctypes
+            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
         except Exception:
             pass
 
@@ -296,10 +317,20 @@ def main() -> int:
         return 1
 
     say("  Starting the app...")
-    server = subprocess.Popen([sys.executable, "run.py"], cwd=BACKEND)
+    DATA.mkdir(parents=True, exist_ok=True)
+    log_path = DATA / "caliope.log"
+    if log_path.is_file() and log_path.stat().st_size > 2_000_000:
+        log_path.replace(DATA / "caliope.log.1")
+    log = open(log_path, "a", encoding="utf-8", errors="replace")  # noqa: SIM115 (open while the app runs)
+    log.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} =====\n")
+    log.flush()
+    server = subprocess.Popen([sys.executable, "run.py"], cwd=BACKEND, stdout=log, stderr=subprocess.STDOUT)
     try:
-        if not wait_for(lambda: get_json(APP_URL + "/api/health"), 60):
-            say("  ! The app did not start. Read the messages above for the reason.")
+        if not wait_for(lambda: get_json(APP_URL + "/api/health") or server.poll() is not None, 60) \
+                or server.poll() is not None:
+            say("  ! The app did not start. The reason (last lines of backend\\data\\caliope.log):\n")
+            log.flush()
+            say("\n".join(log_path.read_text("utf-8", errors="replace").splitlines()[-25:]))
             server.terminate()
             return 1
         settings = get_json(APP_URL + "/api/settings") or {}
@@ -311,9 +342,12 @@ def main() -> int:
         win = None if args.no_browser else show_app(settings)
         if win:
             say("  The game opened in its own window. Closing that window stops everything.")
-            say("  (This black window holds the messages and errors; it is minimized.)\n")
-            minimize_console()
-            if wait_window(win):
+            say("  (The app's messages and errors go to backend\\data\\caliope.log.)\n")
+            minimize_console(hide=True)  # only Calíope's window stays on the taskbar
+            handed_over = not wait_window(win)
+            if handed_over:
+                show_console()  # the window joined one already open: this window must stay to stop the app
+            else:
                 say("  Window closed: stopping...")
                 server.terminate()
                 try:

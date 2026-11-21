@@ -44,7 +44,7 @@ Current version: **v2.12**. The version history is at the end of this file.
 3. starts the app, plus the AI (the built-in engine, or LM Studio if you use it)
 4. opens Calíope in **its own window**: a real app window (it uses Windows' built-in WebView2). If that can't start, it uses an Edge window without tabs or address bar instead
 
-The black window is minimized; it holds messages and errors. **Closing the game window stops everything.**
+While Calíope's window is open, the black window is hidden (the app's messages and errors go to `backend\data\caliope.log`). **Closing the game window stops everything.** The desktop shortcut starts the black window minimized, so you only see it during the first setup.
 The first run offers a **Caliope** desktop shortcut (or run `Play.bat --shortcut` any time).
 
 Options: `Play.bat --no-browser`, `Play.bat --no-lmstudio`.
@@ -358,7 +358,7 @@ Every setting has a **?** with a short explanation.
 | The game opens in an Edge window, not the app window | The app-window package could not be installed. Delete `backend\.venv\window-tried` and run Play.bat again (needs internet). Edge works the same. |
 | The interface looks old after an update | Close the game window and run Play.bat again (it rebuilds the interface). |
 | A picture doesn't show | Links can break; use 📂 pictures from a folder or ⬆ from your PC. |
-| Something else | The black window (open it from the taskbar) shows the error; copy it when asking for help. |
+| Something else | Open `backend\data\caliope.log` (the app's messages and errors) and copy its last lines when asking for help. If the app does not start at all, the black window shows the reason. |
 
 ---
 
@@ -420,4 +420,5 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |
 | 2.11 | The interface in English and Português (Brasil), switched in Settings or in the tour |
 | 2.11.1 | Audit 2 fixes (see AUDIT.md): start names, Places in .caliope files, repeated place pictures, safer imports |
+| 2.12.2 | The black window hides while Calíope's window is open (messages in `backend\data\caliope.log`); the desktop shortcut starts it minimized |
 | 2.12 | Beta feedback: the Aedo answers `/questions` outside the story, two memory slots for much faster replies, Load gets the engine by itself (no LM Studio), interactive tour, Calíope's icon on the window, the Sheet tab on every card, help popups stay on screen |
