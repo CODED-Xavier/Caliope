@@ -28,3 +28,9 @@ Single user, localhost only, no login. The owner does not program: changes must 
 - Keep `local_only` (Host/Origin check) in `main.py`. Uploads have size limits (`UPLOAD_LIMITS`).
 - New settings: add to `DEFAULT_SETTINGS` in `config.py` (validate in `_coerce`), a help text, and a Settings row.
 - Each feature: its own branch, tests, a README section, then a version tag (`v2.x.0`).
+- Interface text is written in English in the components. Every new visible text (labels, buttons, tooltips,
+  placeholders, help texts, backend error messages) also gets its Português (Brasil) line in
+  `frontend/src/i18n/pt-BR.json` ("exact", or "patterns" with {0}, {1}… for names and numbers). The watcher in
+  `i18n/index.js` swaps them on screen; story text (`.bubble`) and anything typed are never translated. Mark other
+  user content with the `no-tr` class.
+- `frontend/src/dialogs.jsx`: use `await ask.confirm/prompt/alert`, never the browser's `window.confirm/prompt/alert`.

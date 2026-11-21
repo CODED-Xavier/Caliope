@@ -36,7 +36,7 @@ If you already have them, skip this.
 3. Open the folder and **double-click `Play.bat`**.
    - The first time it installs what it needs. This takes **3 to 8 minutes**, and a black window shows the progress. Let it finish.
    - If Windows shows "Windows protected your PC", click **More info → Run anyway**. The file is just a script from this project.
-4. Calíope opens in **its own window**, with a one-minute **tour** (you can skip it). The black window stays minimized; **don't close it** while playing.
+4. Calíope opens in **its own window**, with a one-minute **tour** (you can skip it). On its first step pick **English** or **Português (Brasil)**: menus and stories switch to that language (Settings can change each one later). The black window stays minimized; **don't close it** while playing.
    **Closing the Calíope window stops everything.**
 5. It may offer a desktop shortcut. Say yes, and next time just use the shortcut.
 

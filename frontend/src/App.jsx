@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ask, DialogHost } from "./dialogs.jsx";
+import { getUiLanguage, setUiLanguage } from "./i18n/index.js";
 import { api, streamPost } from "./api.js";
 import Sidebar from "./components/Sidebar.jsx";
 import Chat from "./components/Chat.jsx";
@@ -107,6 +108,7 @@ export default function App() {
   const [modelsInit, setModelsInit] = useState({ tab: "mine", query: "" });
   const loadSettingsFlags = () => api.settings().then((s) => {
     setScenePictures(!!s.scene_pictures); setVoice({ name: s.voice_name || "", auto: !!s.voice_auto });
+    if (s.ui_language && s.ui_language !== getUiLanguage()) setUiLanguage(s.ui_language);
     if (!s.tutorial_done) setTour(true);
   }).catch(() => {});
   const endTour = () => { setTour(false); api.saveSettings({ tutorial_done: true }).catch(() => {}); };

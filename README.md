@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.10**. The version history is at the end of this file.
+Current version: **v2.11**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -49,7 +49,7 @@ The first run offers a **Caliope** desktop shortcut (or run `Play.bat --shortcut
 
 Options: `Play.bat --no-browser`, `Play.bat --no-lmstudio`.
 
-The first time, a short **tour** shows the main functions (skip it any time; Settings > *Show the tour again*). It ends by offering to get **Stheno 8B**.
+The first time, a short **tour** shows the main functions (skip it any time; Settings > *Show the tour again*). Its first step lets you pick the language: **English** or **Português (Brasil)**, for the menus and the stories. It ends by offering to get **Stheno 8B**.
 
 Before your first game, give it a model ([section 2](#2-the-ai-model)).
 
@@ -341,6 +341,7 @@ Run **`build-exe.bat`** (after Play.bat ran once). It builds the folder `Caliope
 | Narration voice | Piper voice, speed, read every reply |
 | Backups | Daily copy, days to keep |
 | Open in its own window | App window or a normal browser tab |
+| Interface language | English or Português (Brasil) for menus, buttons and help; changes at once. The story's language is set apart (*Language of the story*) |
 
 Every setting has a **?** with a short explanation.
 
@@ -415,3 +416,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.8 | The Muse adds characters to an existing card |
 | 2.9 | First-run tour, PC scan with the best model for it, Stheno offer, ✨ correct my text |
 | 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |
+| 2.11 | The interface in English and Português (Brasil), switched in Settings or in the tour |

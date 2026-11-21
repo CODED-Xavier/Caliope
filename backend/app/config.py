@@ -49,6 +49,7 @@ DEFAULT_SETTINGS: dict = {
     "engine_gpu_layers": "auto",  # auto | all | a number (lower it when video memory runs out)
     # --- Behaviour ---
     "response_language": "en",     # "en", "pt-BR" or "auto"
+    "ui_language": "en",           # the interface: "en" or "pt-BR"
     "extra_instructions": "",      # appended to every system prompt
     "state_tracking": True,        # extra model call after each turn to update HP/gold/relationships/memories
     "tracker_skip": True,          # skip that call on quiet turns (pure talk); it reads them later
@@ -146,6 +147,8 @@ class SettingsStore:
         default = DEFAULT_SETTINGS[key]
         if key == "picture_service" and value not in ("pollinations", "pixai"):
             raise ValueError("picture_service must be 'pollinations' or 'pixai'")
+        if key == "ui_language" and value not in ("en", "pt-BR"):
+            raise ValueError("ui_language must be 'en' or 'pt-BR'")
         if key == "ai_engine" and value not in ("lmstudio", "builtin"):
             raise ValueError("ai_engine must be 'lmstudio' or 'builtin'")
         if key == "engine_gpu_layers":

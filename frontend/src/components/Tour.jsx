@@ -1,5 +1,24 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { PcAdvice } from "./ModelsModal.jsx";
+import { api } from "../api.js";
+import { UI_LANGUAGES, getUiLanguage, setUiLanguage } from "../i18n/index.js";
+
+/** Pick the interface language right in the first step (also in Settings). */
+function LangPick() {
+  const [cur, setCur] = useState(getUiLanguage());
+  // In the tour the story's language follows too (most people play in the language they read); Settings keeps them apart.
+  const pick = (id) => { setUiLanguage(id); setCur(id); api.saveSettings({ ui_language: id, response_language: id }).catch(() => {}); };
+  return (
+    <>
+      <div className="row gap no-tr">
+        {UI_LANGUAGES.map((l) => (
+          <button key={l.id} className={`btn small ${cur === l.id ? "primary" : ""}`} onClick={() => pick(l.id)}>{l.label}</button>
+        ))}
+      </div>
+      <p className="muted tiny">The stories are written in this language too. Settings can set them apart.</p>
+    </>
+  );
+}
 
 /** The first-run tour: a few quick steps over the real interface, skippable at any moment. */
 const STEPS = [
@@ -9,6 +28,7 @@ const STEPS = [
       <>
         <p>Calíope plays roleplay and tabletop stories with you, entirely on this PC. The game master is <b>the Aedo</b>; you write what your character says and does.</p>
         <p>This tour takes about a minute. You can skip it now and open it again from Settings.</p>
+        <LangPick />
       </>
     ),
   },

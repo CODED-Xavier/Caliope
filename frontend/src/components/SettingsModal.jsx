@@ -4,6 +4,7 @@ import HelpTip from "./HelpTip.jsx";
 import KindPicker from "./KindPicker.jsx";
 import EnginePanel from "./EnginePanel.jsx";
 import { api } from "../api.js";
+import { UI_LANGUAGES, setUiLanguage } from "../i18n/index.js";
 
 function Row({ label, help, hint, children }) {
   return (
@@ -54,6 +55,14 @@ export default function SettingsModal({ onClose, onSaved, onTour }) {
         {health?.llm?.ok ? `Connected to ${health.llm.base_url}` : (health?.llm?.error || "Checking connection…")}
         <button className="btn small" onClick={loadModels}>Refresh</button>
       </div>
+
+      <Row label="Interface language" help="ui_language">
+        <select className="field" value={s.ui_language || "en"} onChange={(e) => {
+          const v = e.target.value; set("ui_language", v); setUiLanguage(v); api.saveSettings({ ui_language: v }).catch(() => {});
+        }}>
+          {UI_LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+        </select>
+      </Row>
 
       <h3>Play style <HelpTip id="default_card_kind" /></h3>
       <KindPicker value={s.default_card_kind} onChange={(k) => set("default_card_kind", k)} />

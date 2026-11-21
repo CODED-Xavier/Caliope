@@ -81,6 +81,14 @@ class SettingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             s.settings.update({"picture_service": "midjourney"})
 
+    def test_interface_language(self):
+        s = make_services()
+        self.assertEqual(s.settings.get("ui_language"), "en")
+        s.settings.update({"ui_language": "pt-BR"})
+        self.assertEqual(s.settings.get("ui_language"), "pt-BR")
+        with self.assertRaises(ValueError):
+            s.settings.update({"ui_language": "fr"})
+
 
 if __name__ == "__main__":
     unittest.main()
