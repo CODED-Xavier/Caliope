@@ -21,7 +21,7 @@ const FIELDS = {
 };
 
 /* ---------------------------------------------------------------- start form */
-function StartForm({ convId, kind, busy, onStart }) {
+function StartForm({ convId, kind, busy, onStart, sceneFight }) {
   const [system, setSystem] = useState("d20");
   const [enemies, setEnemies] = useState([{ ...BLANK.d20, name: "Bandit", count: 2 }]);
   const [me, setMe] = useState({});
@@ -35,6 +35,7 @@ function StartForm({ convId, kind, busy, onStart }) {
   const [editor, setEditor] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [error, setError] = useState("");
+  const [battle, setBattle] = useState(null);             // the adventure scene's map: {background, name, w, h, near}
 
   useEffect(() => { api.combatDefaults(convId, system).then(setMe).catch(() => setMe({})); }, [convId, system]);
   const loadSaved = () => api.maps().then((r) => setSaved(r.maps)).catch(() => {});
@@ -49,6 +50,10 @@ function StartForm({ convId, kind, busy, onStart }) {
     if (m) { setSavedId(String(m.id)); setPreview({ tiles: m.tiles, background: m.background, name: m.name }); } else setPreview(null);
   }, [mapMode, savedId, saved]);
   useEffect(() => { if (mapMode === "empty") setPreview(null); }, [mapMode]);
+  useEffect(() => {
+    if (mapMode === "scene" && battle) { setGrid({ w: battle.w, h: battle.h }); setPreview({ tiles: [], background: battle.background, name: battle.name }); }
+  }, [mapMode, battle]);
+  useEffect(() => { if (sceneFight) suggest(); }, [sceneFight]); // eslint-disable-line
   const switchSystem = (s) => { setSystem(s); setEnemies(enemies.map((e) => ({ ...BLANK[s], name: e.name, count: e.count }))); };
   const setEnemy = (i, k, v) => setEnemies(enemies.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
   const suggest = async () => {
@@ -56,13 +61,15 @@ function StartForm({ convId, kind, busy, onStart }) {
     try {
       const r = await api.combatSuggest(convId, system);
       setEnemies(r.enemies);
-      if (r.map) { setMapMode("gen"); setMapType(r.map.type); setFeatures(r.map.features || []); }
+      if (r.battle) { setBattle(r.battle); setMapMode("scene"); }
+      else if (r.map) { setMapMode("gen"); setMapType(r.map.type); setFeatures(r.map.features || []); }
     } catch (e) { setError(e.message); } finally { setSuggesting(false); }
   };
   const start = () => {
     const list = enemies.filter((e) => String(e.name).trim());
     if (!list.length) { setError("Add at least one enemy."); return; }
-    onStart({ action: "start", system, enemies: list, player: me, grid, map: preview || undefined });
+    onStart({ action: "start", system, enemies: list, player: me, grid, map: preview || undefined,
+      near: mapMode === "scene" && battle?.near ? battle.near : undefined });
   };
   const myFields = system === "pool" ? [["pool", "Attack dice"], ["defense", "Defense dice"], ["damage", "Dmg +"]] : [["attack_bonus", "Attack +"], ["damage", "Damage"], ["ac", "AC"], ["init_bonus", "Init +"]];
 
@@ -123,6 +130,7 @@ function StartForm({ convId, kind, busy, onStart }) {
           <option value="gen">Generate</option>
           <option value="saved" disabled={!saved.length}>One of my maps{saved.length ? "" : " (none yet)"}</option>
           <option value="empty">Empty grid</option>
+          {battle && <option value="scene">{`The adventure's map (${battle.name})`}</option>}
           {mapMode === "gen-custom" && <option value="gen-custom">From the editor (not saved)</option>}
         </select>
         {mapMode === "gen" && (
@@ -144,7 +152,7 @@ function StartForm({ convId, kind, busy, onStart }) {
           <button className="chip" onClick={() => reroll()} title="Another map of this type">🎲 reroll</button>
         </div>
       )}
-      {mapMode !== "saved" && (
+      {mapMode !== "saved" && mapMode !== "scene" && (
         <div className="row gap center">
           <span className="small grow">Size</span>
           <input className="field num" style={{ width: 44 }} value={grid.w} onChange={(e) => setGrid({ ...grid, w: Math.max(6, Math.min(24, parseInt(e.target.value, 10) || 6)) })} />
@@ -153,7 +161,8 @@ function StartForm({ convId, kind, busy, onStart }) {
           <span className="muted tiny">squares (5 ft)</span>
         </div>
       )}
-      {preview && <BattleMap w={preview.tiles[0].length} h={preview.tiles.length} tiles={preview.tiles} background={preview.background} cell={20} className="preview" />}
+      {preview && <BattleMap w={preview.tiles[0]?.length || grid.w} h={preview.tiles.length || grid.h} tiles={preview.tiles} background={preview.background}
+        cell={mapMode === "scene" ? Math.max(8, Math.floor(360 / grid.w)) : 20} className="preview" />}
       {editor && <MapEditor onClose={() => { setEditor(false); loadSaved(); }}
         onPicked={(m) => { setEditor(false); loadSaved(); setPreview({ tiles: m.tiles, background: m.background, name: m.name }); setMapMode(m.id ? "saved" : "gen-custom"); if (m.id) setSavedId(String(m.id)); }} />}
       {error && <div className="error-text small">{error}</div>}
@@ -278,6 +287,12 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities }) {
   );
 }
 
+function sceneHasFoes(game) {
+  const adv = game.conversation.scenario?.adventure;
+  const id = game.state.adventure?.scene;
+  return !!(adv?.scenes || []).find((s) => s.id === id && s.enemies?.length);
+}
+
 export default function CombatTab({ game, busy, onCombat, onCombatEdit }) {
   const combat = game.state.combat;
   if (combat?.active) return <FightView combat={combat} busy={busy} onAction={onCombat} onEdit={onCombatEdit} pools={game.state.resources} abilities={game.state.abilities} />;
@@ -286,7 +301,8 @@ export default function CombatTab({ game, busy, onCombat, onCombatEdit }) {
       {combat && !combat.active && combat.log?.length > 0 && (
         <div className="tab-body"><div className="muted tiny">Last fight: {combat.log.slice(-3).join(" ")}</div></div>
       )}
-      <StartForm convId={game.conversation.id} kind={game.features?.kind} busy={busy} onStart={onCombat} />
+      <StartForm convId={game.conversation.id} kind={game.features?.kind} busy={busy} onStart={onCombat}
+        sceneFight={sceneHasFoes(game)} />
     </>
   );
 }

@@ -19,6 +19,7 @@ from .db import Database
 from .portraits import _url, normalize_portraits  # noqa: F401  (kept here for older imports)
 from .routes import normalize_starts
 from .places import normalize_places
+from .adventure import normalize_adventure
 from .status import split_template
 from .util import extract_json, now, slugify, truncate
 from .worldtime import normalize_calendar
@@ -169,7 +170,8 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "starts": normalize_starts(raw.get("starts")),
         "places": normalize_places(raw.get("places")),
         "fixed_facts": _clip(raw.get("fixed_facts"), 3000),
-        "sheet_template": _clip(raw.get("sheet_template"), 2000),  # a sheet from the library (app/sheets.py), edited freely
+        "sheet_template": _clip(raw.get("sheet_template"), 2000),
+        "adventure": normalize_adventure(raw.get("adventure")),  # a published adventure split into scenes (app/adventure.py)  # a sheet from the library (app/sheets.py), edited freely
         "known_at_start": _clip(raw.get("known_at_start"), 3000),
         "secrets": _clip(raw.get("secrets"), 3000),
         "length": str(raw.get("length") or "open") if str(raw.get("length") or "open") in STORY_LENGTHS else "open",
@@ -284,7 +286,7 @@ class ScenarioRepository:
                     continue
                 full = self.get(sc["id"])
                 if str(full["data"].get("opening_message") or "").strip() in old:
-                    keep = {k: v for k, v in full["data"].items() if k in ("npcs", "places", "starts", "pictures_folder", "rulebooks")
+                    keep = {k: v for k, v in full["data"].items() if k in ("npcs", "places", "starts", "pictures_folder", "rulebooks", "adventure")
                             and v}  # pictures and additions made here stay
                     self.update(sc["id"], {**full["data"], **{k: v for k, v in seed.items() if k != "upgrade_from"}, **keep,
                                            "name": full["name"]})

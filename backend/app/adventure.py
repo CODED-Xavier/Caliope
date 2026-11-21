@@ -1,0 +1,594 @@
+"""Adventures for rules RPG cards: a published adventure (a PDF or pasted text) split into scenes the Aedo runs.
+
+An adventure is part of a card (`data["adventure"]`):
+- parts ("Goblin Arrows", "Phandalin"...), each with its scenes in order;
+- scenes: the place or encounter ("Goblin Ambush", "Cragmaw Hideout · 3. Kennel") with the read-aloud text the Aedo
+  narrates close to word for word on the first visit, hidden GM notes (who is there, what they do, developments),
+  the checks and traps with their DC (rolled by the app's dice, not decided by the model), enemies with numbers for the
+  battle grid, treasure, an XP award and the areas it leads to;
+- maps: a picture of a location (the GM version and, optionally, the player version) with one marker per scene.
+
+The book itself never leaves the PC and nothing of it ships with the app: the text is split by code here (numbered
+areas, headings, "you" paragraphs for read-aloud text, "DC 15 Wisdom (Perception)" for checks), then corrected by
+hand in the card editor.
+
+In a game, `state["adventure"]` says where the player is: {"scene": id, "visited": [ids], "xp_given": [ids]}.
+"""
+from __future__ import annotations
+
+import re
+import unicodedata
+
+from .portraits import _url
+from .util import truncate
+
+MAX_SCENES = 200
+MAX_MAPS = 30
+TEXT_LIMIT = 6000
+
+# A few common monsters with their SRD 5.1 numbers (Creative Commons BY 4.0, Wizards of the Coast), so a fight can start
+# with real values. Anything else: the numbers are filled by hand or by "Suggest from the scene".
+#           name             ac  hp   atk  damage    init
+MONSTERS = {
+    "goblin": (15, 7, 4, "1d6+2", 2), "hobgoblin": (18, 11, 3, "1d8+1", 1), "bugbear": (16, 27, 4, "2d8+2", 2),
+    "kobold": (12, 5, 4, "1d4+2", 2), "orc": (13, 15, 5, "1d12+3", 1), "ogre": (11, 59, 6, "2d8+4", -1),
+    "wolf": (13, 11, 4, "2d4+2", 2), "dire wolf": (14, 37, 5, "2d6+3", 2), "giant rat": (12, 7, 4, "1d4+2", 2),
+    "rat": (10, 1, 0, "1", 0), "giant spider": (14, 26, 5, "1d8+3", 3), "stirge": (14, 2, 5, "1d4+3", 3),
+    "skeleton": (13, 13, 4, "1d6+2", 2), "zombie": (8, 22, 3, "1d6+1", -2), "ghoul": (12, 22, 4, "2d6+2", 2),
+    "specter": (12, 22, 4, "3d6", 2), "bandit": (12, 11, 3, "1d6+1", 1), "bandit captain": (15, 65, 5, "1d6+3", 3),
+    "thug": (11, 32, 4, "1d6+2", 0), "cultist": (12, 9, 3, "1d6+1", 1), "guard": (16, 11, 3, "1d6+1", 1),
+    "veteran": (17, 58, 5, "1d8+3", 1), "mage": (12, 40, 5, "1d4+2", 2), "owlbear": (13, 59, 7, "2d8+5", 1),
+    "twig blight": (13, 4, 3, "1d4+1", 1), "nothic": (15, 45, 4, "1d6+3", 3), "doppelganger": (14, 52, 6, "1d6+4", 4),
+    "ochre jelly": (8, 45, 4, "2d6+2", -2), "drow": (15, 13, 4, "1d6+2", 2), "giant bat": (13, 22, 4, "1d6+2", 3),
+    "bat": (12, 1, 0, "1", 2), "boar": (11, 11, 3, "1d6+1", 0), "brown bear": (11, 34, 6, "2d6+4", 0),
+    "ankheg": (14, 39, 5, "2d6+3", 0), "gnoll": (15, 22, 4, "1d8+2", 1), "lizardfolk": (15, 22, 4, "1d6+2", 0),
+    "troll": (15, 84, 7, "2d6+4", 1), "wight": (14, 45, 4, "1d8+2", 1), "flameskull": (13, 40, 5, "3d6", 3),
+    "young green dragon": (18, 136, 7, "2d10+4", 1), "wyvern": (13, 110, 7, "2d6+4", 0), "harpy": (11, 38, 3, "2d4+1", 1),
+}
+NUMBERS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+           "ten": 10, "eleven": 11, "twelve": 12, "a pair of": 2, "pair of": 2}
+SUBSECTION = re.compile(r"^(developments?|treasure|rests?|awarding experience points|what'?s next\??|general features|"
+                        r"roleplaying\b.*|what the .* knows?|driving the .*|npc party members|adventure maps|"
+                        r"read-?aloud.*|xp awards?|experience points|tactics|sidebar.*)$", re.I)
+SKIP_HEADINGS = re.compile(r"^(introduction|running the adventure|the dungeon master|rules to game by|improvising ability checks|"
+                           r"glossary|magic items and monsters|abbreviations|roleplaying and inspiration|player version|"
+                           r"dm version|contents|credits|table of contents|the forgotten realms)$", re.I)
+BACKGROUND_HEADINGS = re.compile(r"^(background|overview|adventure hooks?|.*\bhook\b.*|meet me in .*)$", re.I)
+PART = re.compile(r"^(?:part|chapter|capítulo|parte)\s+(\d+|[ivx]+)\s*[:.\-–—]?\s*(.*)$", re.I)
+AREA = re.compile(r"^([A-Z]?\d{1,2}[a-z]?)\.\s+([A-Z][^.!?]{1,60})$")
+CHECK = re.compile(r"DC\s*(\d{1,2})\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)"
+                   r"(?:\s*\(([A-Za-z ]+)\))?\s+(check|saving throw|save)", re.I)
+XP = re.compile(r"(?:award|awarded|earns?|gains?)\s+(?:each character\s+|the party\s+)?([\d,]+)\s*XP", re.I)
+READ_CUE = re.compile(r"boxed text|read-?aloud|read aloud|read the following|(?:^|\s)add:\s*$", re.I)
+DM_WORDS = re.compile(r"\b(DC|the characters?|the party|players?|stat block|appendix|hit points|saving throw|ability check|"
+                      r"initiative|XP|the adventurers|creatures?|rulebook|award)\b", re.I)
+PRESENCE = re.compile(r"\b(are|is|stand|stands|guard|guards|inhabit|inhabits|lurk|lurks|hide|hiding|hidden|wait|waits|"
+                      r"share|shares|confined|stationed|rest|rests|tend|tends|dwell|dwells|live|lives|keep watch|patrol|sleep|sleeps|sit|sits|here)\b", re.I)
+JUNK_LINE = re.compile(r"^(p\d{1,3}|\d{1,3}|player version|dm version)$", re.I)
+
+
+# ------------------------------------------------------------------ normalizing (what a card may store)
+def _slug(text: str) -> str:
+    t = unicodedata.normalize("NFKD", str(text or "")).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "-", t).strip("-")[:48]
+
+
+def _int(v, default=0, lo=-10_000, hi=1_000_000) -> int:
+    try:
+        return max(lo, min(hi, int(float(v))))
+    except (TypeError, ValueError):
+        return default
+
+
+def _enemy(raw) -> dict | None:
+    if not isinstance(raw, dict) or not str(raw.get("name", "")).strip():
+        return None
+    out = {"name": truncate(str(raw["name"]).strip(), 50), "count": _int(raw.get("count"), 1, 1, 8)}
+    for k, lo, hi in (("hp", 1, 999), ("ac", 1, 40), ("attack_bonus", -5, 30), ("init_bonus", -5, 15)):
+        if raw.get(k) not in (None, ""):
+            out[k] = _int(raw.get(k), 0, lo, hi)
+    if str(raw.get("damage") or "").strip():
+        out["damage"] = truncate(re.sub(r"[^0-9d+\- ]", "", str(raw["damage"])).replace(" ", "") or "1d6", 16)
+    return out
+
+
+def _check(raw) -> dict | None:
+    if not isinstance(raw, dict) or not str(raw.get("what", "")).strip():
+        return None
+    return {"what": truncate(str(raw["what"]).strip(), 240), "skill": truncate(str(raw.get("skill", "")).strip(), 40),
+            "dc": _int(raw.get("dc"), 10, 1, 40)}
+
+
+def normalize_adventure(raw) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    parts, part_ids = [], set()
+    for p in raw.get("parts") if isinstance(raw.get("parts"), list) else []:
+        if isinstance(p, dict) and str(p.get("title", "")).strip():
+            pid = _slug(p.get("id") or p["title"]) or f"part-{len(parts) + 1}"
+            while pid in part_ids:
+                pid += "-x"
+            part_ids.add(pid)
+            parts.append({"id": pid, "title": truncate(str(p["title"]).strip(), 80)})
+    scenes, ids = [], set()
+    for s in (raw.get("scenes") if isinstance(raw.get("scenes"), list) else [])[:MAX_SCENES]:
+        if not isinstance(s, dict) or not str(s.get("name", "")).strip():
+            continue
+        sid = _slug(s.get("id") or f"{s.get('group', '')} {s['name']}") or f"scene-{len(scenes) + 1}"
+        while sid in ids:
+            sid += "-x"
+        ids.add(sid)
+        part = str(s.get("part") or "")
+        if part not in part_ids:
+            part = parts[0]["id"] if parts else ""
+        scenes.append({
+            "id": sid, "part": part, "name": truncate(str(s["name"]).strip(), 80),
+            "group": truncate(str(s.get("group") or "").strip(), 80),
+            "aliases": [truncate(str(a).strip(), 60) for a in (s.get("aliases") or []) if str(a).strip()][:8]
+            if isinstance(s.get("aliases"), list) else [],
+            "read_aloud": str(s.get("read_aloud") or "")[:TEXT_LIMIT],
+            "notes": str(s.get("notes") or "")[:TEXT_LIMIT],
+            "checks": [c for c in (_check(x) for x in (s.get("checks") or [])[:12]) if c] if isinstance(s.get("checks"), list) else [],
+            "enemies": [e for e in (_enemy(x) for x in (s.get("enemies") or [])[:8]) if e] if isinstance(s.get("enemies"), list) else [],
+            "treasure": truncate(str(s.get("treasure") or ""), 1500),
+            "xp": _int(s.get("xp"), 0, 0, 1_000_000),
+            "leads": [str(x)[:48] for x in (s.get("leads") or []) if str(x).strip()][:12] if isinstance(s.get("leads"), list) else [],
+            "music": str(s.get("music") or "")[:20],
+            "map": str(s.get("map") or "")[:48],
+        })
+    maps, map_ids = [], set()
+    for m in (raw.get("maps") if isinstance(raw.get("maps"), list) else [])[:MAX_MAPS]:
+        if not isinstance(m, dict) or not str(m.get("name", "")).strip():
+            continue
+        mid = _slug(m.get("id") or m["name"]) or f"map-{len(maps) + 1}"
+        while mid in map_ids:
+            mid += "-x"
+        map_ids.add(mid)
+        markers = {}
+        for k, v in (m.get("markers") or {}).items() if isinstance(m.get("markers"), dict) else []:
+            if k in ids and isinstance(v, (list, tuple)) and len(v) == 2:
+                try:
+                    markers[k] = [round(min(1.0, max(0.0, float(v[0]))), 4), round(min(1.0, max(0.0, float(v[1]))), 4)]
+                except (TypeError, ValueError):
+                    pass
+        maps.append({"id": mid, "name": truncate(str(m["name"]).strip(), 80), "picture": _url(m.get("picture")),
+                     "player_picture": _url(m.get("player_picture")), "cols": _int(m.get("cols"), 30, 6, 48),
+                     "rows": _int(m.get("rows"), 20, 4, 48), "markers": markers})
+    for s in scenes:
+        if s["map"] and s["map"] not in map_ids:
+            s["map"] = ""
+    return {"title": truncate(str(raw.get("title") or "").strip(), 100), "background": str(raw.get("background") or "")[:4000],
+            "parts": parts, "scenes": scenes, "maps": maps}
+
+
+def has_adventure(data: dict) -> bool:
+    return bool(((data or {}).get("adventure") or {}).get("scenes"))
+
+
+# ------------------------------------------------------------------ splitting a book into scenes
+def _paragraphs(text: str) -> list[str]:
+    """Lines of the text joined into paragraphs. Text copied from a web page has one paragraph per line; text read from
+    a PDF is cut at the column width, so short lines are joined until a sentence ends."""
+    lines = [ln.rstrip() for ln in text.replace("\r", "").replace("­", "").split("\n")]
+    filled = [ln for ln in lines if ln.strip()]
+    pdf_like = filled and sum(len(ln) for ln in filled) / len(filled) < 75 and len(filled) > 20
+    out: list[str] = []
+    buf = ""
+    for ln in lines:
+        s = ln.strip()
+        if not s or JUNK_LINE.match(s) or (ln.startswith(" ") and len(s.split()) <= 3 and not s.endswith(".")):
+            if buf:
+                out.append(buf)
+                buf = ""
+            continue
+        if not pdf_like:
+            out.append(s)
+            continue
+        if buf and (_heading_like(s) or _heading_like(buf) or buf.endswith((".", "!", "?", ":", "\"", "”")) and s[:1].isupper()
+                    and len(buf) < 60):
+            out.append(buf)
+            buf = s
+        else:
+            buf = re.sub(r"(\w)-$", r"\1", buf) + ("" if buf.endswith("-") else " ") + s if buf else s
+    if buf:
+        out.append(buf)
+    return [p.strip() for p in out if p.strip()]
+
+
+def _heading_like(s: str) -> bool:
+    s = s.strip()
+    if AREA.match(s) or PART.match(s):
+        return True
+    if not s or len(s) > 60 or s[-1] in ".,;:)" or not s[0].isalpha() or s[0].islower():
+        return False
+    words = s.split()
+    if len(words) > 8:
+        return False
+    small = ("of", "the", "and", "a", "an", "in", "on", "to", "or", "for", "with", "at", "by", "from")
+    return all(w[0].isupper() or w.lower() in small or not w[0].isalpha() for w in words)
+
+
+def _read_aloud(par: str, cued: bool) -> bool:
+    words = len(par.split())
+    if words < 8:
+        return False
+    if READ_CUE.search(par):  # "Read the boxed text when you're ready" is advice to the GM
+        return False
+    narration = re.sub(r"[\"“][^\"”]*[\"”]", " ", par)  # "Klarg will build a throne from your bones" is dialogue
+    you = len(re.findall(r"\b(you|your|you're|you've|yourselves)\b", narration, re.I))
+    if cued:
+        return not re.search(r"\b(DC \d|stat block|appendix)\b", par)
+    return you >= 1 and not DM_WORDS.search(par) and not par.lower().startswith(("if ", "when ", "any character"))
+
+
+def _monster_rx() -> re.Pattern:
+    names = sorted(MONSTERS, key=len, reverse=True)
+    forms = []
+    for n in names:
+        plural = n[:-1] + "ves" if n.endswith("f") else n[:-1] + "ies" if n.endswith("y") else n + "s"
+        forms.append(re.escape(plural))
+        forms.append(re.escape(n))
+    return re.compile(r"\b(" + "|".join(forms) + r")\b", re.I)
+
+
+_MON = _monster_rx()
+_ONE = "|".join(re.escape(n) for n in sorted(MONSTERS, key=len, reverse=True))
+NOT_NAMES = {"If", "When", "The", "Since", "While", "Once", "After", "Before", "Unless", "Each", "Every", "A", "An", "And",
+             "But", "Then", "This", "That", "Any", "No", "As", "Although", "Because", "Until", "With", "Without"}
+
+
+def _singular(word: str) -> str:
+    w = word.lower()
+    if w in MONSTERS:
+        return w
+    for n in MONSTERS:
+        if w in (n + "s", n[:-1] + "ves", n[:-1] + "ies"):
+            return n
+    return w
+
+
+def monster_stats(name: str) -> dict:
+    base = _singular(name)
+    if base not in MONSTERS:
+        return {}
+    ac, hp, atk, dmg, init = MONSTERS[base]
+    return {"ac": ac, "hp": hp, "attack_bonus": atk, "damage": dmg, "init_bonus": init}
+
+
+def find_enemies(paragraphs: list[str]) -> list[dict]:
+    """'Four goblins are hiding in the woods', 'Klarg the bugbear', 'his pet wolf, Ripper' -> enemies with SRD numbers."""
+    found: dict[str, dict] = {}
+    num = "|".join(sorted((re.escape(k) for k in NUMBERS), key=len, reverse=True))
+    for par in paragraphs:
+        for sentence in re.split(r"(?<=[.!?])\s+", par):
+            if not PRESENCE.search(sentence) or re.match(r"\s*(if|when|after|once)\b", sentence, re.I):
+                continue
+            for m in re.finditer(rf"\b({num}|\d+)\s+(?:[a-z\-]+\s+){{0,2}}?({_MON.pattern[3:-3]})\b", sentence, re.I):
+                count = NUMBERS.get(m.group(1).lower()) or _int(m.group(1), 1)
+                kind = _singular(m.group(2))
+                key = kind
+                if key in found:  # the same group told twice ("a pair of goblins" ... "Two goblins are stationed")
+                    found[key]["count"] = min(8, max(found[key]["count"], count))
+                else:
+                    found[key] = {"name": kind.title(), "count": min(8, count), **monster_stats(kind)}
+            for m in re.finditer(rf"\b([A-Z][a-z]+) the ({_ONE})\b(?!s)", sentence):
+                name, kind = m.group(1), _singular(m.group(2))
+                if name not in NOT_NAMES and name not in found:
+                    found[name] = {"name": name, "count": 1, **monster_stats(kind)}
+            for m in re.finditer(rf"\b({_ONE}),?\s+(?:named\s+|called\s+)?([A-Z][a-z]+)\b", sentence):
+                kind, name = _singular(m.group(1)), m.group(2)
+                if name not in found and name not in NOT_NAMES:
+                    found[name] = {"name": name, "count": 1, **monster_stats(kind)}
+    return list(found.values())[:8]
+
+
+def find_checks(text: str) -> list[dict]:
+    out, seen = [], set()
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        for m in CHECK.finditer(sentence):
+            ability, skill, kind = m.group(2).title(), (m.group(3) or "").strip(), m.group(4).lower()
+            label = f"{ability} ({skill})" if skill else ability
+            label += " save" if kind.startswith("sav") else ""
+            key = (label, m.group(1), sentence[:40])
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"what": truncate(sentence.strip(), 240), "skill": label, "dc": int(m.group(1))})
+    return out[:12]
+
+
+def _guess_music(text: str) -> str:
+    t = text.lower()
+    for mood, words in (("dungeon", ("cave", "cavern", "tunnel", "crypt", "dungeon", "mine")), ("tavern", ("inn", "tavern", "alehouse")),
+                        ("town", ("town", "village", "market", "street")), ("forest", ("woods", "forest", "trail", "thicket")),
+                        ("horror", ("undead", "corpse", "banshee", "ghoul", "zombie"))):
+        if any(w in t for w in words):
+            return mood
+    return ""
+
+
+def split_adventure(text: str, part_title: str = "") -> dict:
+    """A book (or a chapter of it) -> {"background", "parts", "scenes", "npcs"} for the card editor to review."""
+    pars = _paragraphs(text)
+    parts: list[dict] = []
+    scenes: list[dict] = []
+    background: list[str] = []
+    npcs: list[dict] = []
+    group = ""
+    mode = "scene"          # scene | sub | background | skip
+    sub = ""
+    cued = False
+
+    def part_id() -> str:
+        if not parts:
+            parts.append({"id": _slug(part_title or "Part 1") or "part-1", "title": part_title or "Part 1"})
+        return parts[-1]["id"]
+
+    def new_scene(name: str, number: str = "") -> dict:
+        sc = {"name": name, "group": group if number else "", "number": number, "part": part_id(), "body": [], "subs": [],
+              "aliases": [name.split(". ", 1)[-1], f"area {number}"] if number else []}
+        scenes.append(sc)
+        return sc
+
+    area_numbers = [(i, AREA.match(p)) for i, p in enumerate(pars)]
+    current: dict | None = None
+    for i, par in enumerate(pars):
+        nxt = pars[i + 1] if i + 1 < len(pars) else ""
+        area = AREA.match(par)
+        heading = area or (_heading_like(par) and nxt and not _heading_like(nxt) or _heading_like(par) and len(par) < 40)
+        if heading and not area and (len(par.split()) > 8 or "\t" in par):
+            heading = False
+        if heading:
+            cued = False
+            title = par.strip()
+            pm = PART.match(title)
+            if pm:
+                label = pm.group(2).strip().strip("\"'“”") or f"Part {pm.group(1)}"
+                parts.append({"id": _slug(label) or f"part-{len(parts) + 1}", "title": label})
+                group, current, mode = "", None, "scene"
+                continue
+            if area:
+                current = new_scene(f"{area.group(1)}. {area.group(2).strip()}", area.group(1))
+                mode = "scene"
+                continue
+            if SKIP_HEADINGS.match(title):
+                mode = "skip"
+                continue
+            if BACKGROUND_HEADINGS.match(title):
+                mode, sub = "background", title
+                continue
+            if current and title.lower() == current["name"].lower() or group and title.lower() == group.lower():
+                continue  # the map's title repeats the heading
+            if SUBSECTION.match(title) and current is not None:
+                mode, sub = "sub", title
+                if title.lower().startswith("roleplaying "):
+                    npcs.append({"name": title[12:].strip(), "lines": []})
+                continue
+            inside_areas = current is not None and current.get("number")
+            if inside_areas:
+                later = next((m for j, m in area_numbers[i + 1:] if m), None)
+                cur_n = _int(re.sub(r"\D", "", current["number"]), 0)
+                resets = later is not None and _int(re.sub(r"\D", "", later.group(1)), 0) <= cur_n
+                if not resets:
+                    mode, sub = "sub", title
+                    continue
+            group = title
+            current = new_scene(title)
+            mode = "scene"
+            continue
+
+        # a paragraph
+        if mode == "skip":
+            continue
+        if mode == "background":
+            background.append(par)
+            continue
+        if current is None:
+            current = new_scene(part_title or "Beginning")
+        if mode == "sub":
+            current["subs"].append((sub, par))
+            if npcs and sub.lower().startswith("roleplaying ") and npcs[-1]["name"] == sub[12:].strip():
+                npcs[-1]["lines"].append(par)
+        else:
+            current["body"].append((par, _read_aloud(par, cued)))
+        cued = bool(READ_CUE.search(par))
+
+    out_scenes = []
+    for k, sc in enumerate(scenes):
+        intro = not sc["number"] and any(x["number"] and x["group"] == sc["name"] for x in scenes[k + 1:])
+        body = sc["body"]
+        if not body and not sc["subs"]:
+            continue
+        if sc["number"] and not any(ra for _, ra in body):
+            # boxed text without "you" ("Sacks and crates of looted provisions..."): the first plain description after the intro
+            for k, (p, _) in enumerate(body[1:], 1):
+                if len(p.split()) >= 15 and not DM_WORDS.search(p) and not re.match(r"\s*(if|when)\b", p, re.I):
+                    body[k] = (p, True)
+                    break
+        read = "\n\n".join(p for p, ra in body if ra)
+        notes = [p for p, ra in body if not ra]
+        subs_text: dict[str, list[str]] = {}
+        for title, par in sc["subs"]:
+            subs_text.setdefault(title, []).append(par)
+        treasure = "\n".join(next((v for k, v in subs_text.items() if k.lower() == "treasure"), []))
+        for title, ps in subs_text.items():
+            if title.lower() != "treasure":
+                notes.append(f"{title}: " + " ".join(ps))
+        all_text = "\n".join([p for p, _ in body] + [p for _, p in sc["subs"]])
+        xp = sum(_int(m.group(1).replace(",", ""), 0) for m in XP.finditer(all_text))
+        leads = sorted({m.group(1) for m in re.finditer(r"\barea\s+(\d{1,2})\b", all_text, re.I)} - {sc["number"]}, key=int)
+        out_scenes.append({
+            "name": sc["name"], "group": sc["group"], "part": sc["part"], "aliases": sc["aliases"],
+            "read_aloud": read, "notes": "\n\n".join(notes), "treasure": treasure, "xp": xp,
+            "checks": find_checks(all_text), "enemies": [] if intro else find_enemies([p for p, ra in body if not ra]),
+            "leads": [f"area {n}" for n in leads], "music": _guess_music(sc["name"] + " " + sc["group"] + " " + read),
+        })
+    # area leads -> scene ids of the same group
+    norm = normalize_adventure({"parts": parts, "scenes": out_scenes})
+    by_area = {(s["group"], a): s["id"] for s in norm["scenes"] for a in s["aliases"] if a.startswith("area ")}
+    for s in norm["scenes"]:
+        s["leads"] = [by_area.get((s["group"], x), "") for x in s["leads"]]
+        s["leads"] = [x for x in s["leads"] if x]
+    found_npcs = [{"name": n["name"], "description": truncate(" ".join(n["lines"]), 600)} for n in npcs if n["lines"]]
+    return {"background": truncate("\n\n".join(background), 4000), "parts": norm["parts"], "scenes": norm["scenes"],
+            "npcs": found_npcs}
+
+
+def merge(old: dict, new: dict, title: str = "") -> dict:
+    """Add an imported chapter to the card's adventure (scenes with the same id are replaced)."""
+    old = normalize_adventure(old)
+    parts = old["parts"] + [p for p in new["parts"] if p["id"] not in {x["id"] for x in old["parts"]}]
+    new_ids = {s["id"] for s in new["scenes"]}
+    scenes = [s for s in old["scenes"] if s["id"] not in new_ids] + new["scenes"]
+    background = old["background"] or new.get("background", "")
+    if old["background"] and new.get("background") and new["background"] not in old["background"]:
+        background = truncate(old["background"] + "\n\n" + new["background"], 4000)
+    maps = list(old["maps"])
+    for g in dict.fromkeys(s["group"] for s in new["scenes"] if s["group"]):
+        if not any(m["name"].lower() == g.lower() for m in maps):
+            maps.append({"name": g, "picture": "", "markers": {}})
+    adv = normalize_adventure({"title": old["title"] or title, "background": background, "parts": parts,
+                               "scenes": scenes, "maps": maps})
+    by_name = {m["name"].lower(): m["id"] for m in adv["maps"]}
+    for s in adv["scenes"]:
+        if s["group"] and not s["map"]:
+            s["map"] = by_name.get(s["group"].lower(), "")
+    return adv
+
+
+# ------------------------------------------------------------------ in a game
+def get_scene(adv: dict, scene_id: str) -> dict | None:
+    return next((s for s in (adv or {}).get("scenes") or [] if s["id"] == scene_id), None)
+
+
+def _norm(text: str) -> str:
+    t = unicodedata.normalize("NFKD", str(text or "")).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", " ", re.sub(r"\b(the|a|an|of)\b", " ", t)).strip()
+
+
+def match_scene(adv: dict, location: str, text: str = "", current: str = "") -> str | None:
+    """The scene the story is in now, from the tracker's location (and "area 3" in the reply), or None."""
+    loc = _norm(location)
+    scenes = (adv or {}).get("scenes") or []
+    cur = get_scene(adv, current)
+    best, score = None, 0
+    for s in scenes:
+        for name in [s["name"].split(". ", 1)[-1], s["name"], *[a for a in s["aliases"] if not a.startswith("area ")]]:
+            n = _norm(name)
+            if not n or len(n) < 3:
+                continue
+            sc = 3 if n == loc else 2 if loc and re.search(rf"\b{re.escape(n)}\b", loc) else 0
+            if sc and cur and s["group"] and s["group"] == cur["group"]:
+                sc += 0.5  # the same location group wins ties
+            if sc and s["group"] and _norm(s["group"]) and _norm(s["group"]) in loc:
+                sc += 1    # "Mill Ruins yard": the yard of the mill, not the mill itself
+            if sc > score:
+                best, score = s["id"], sc
+    if not best and cur and cur["group"]:
+        m = re.search(r"\barea\s+(\d{1,2}[a-z]?)\b", f"{location} {text}", re.I)
+        if m:
+            best = next((s["id"] for s in scenes if s["group"] == cur["group"] and f"area {m.group(1)}" in s["aliases"]), None)
+    return best
+
+
+def follow_player(adv: dict, state: dict, text: str) -> str | None:
+    """The player heads for one of the ways on from here ("I climb up to the overpass", "we go to area 3")."""
+    cur = get_scene(adv, (state.get("adventure") or {}).get("scene", ""))
+    if not cur:
+        return None
+    said = _norm(text)
+    for lead in (get_scene(adv, x) for x in cur["leads"]):
+        if not lead:
+            continue
+        names = [lead["name"].split(". ", 1)[-1], *[a for a in lead["aliases"] if not a.startswith("area ")]]
+        if any(len(_norm(n)) >= 4 and re.search(rf"\b{re.escape(_norm(n))}\b", said) for n in names):
+            return lead["id"]
+        m = re.search(r"\barea\s+(\d{1,2}[a-z]?)\b", text, re.I)
+        if m and f"area {m.group(1)}" in lead["aliases"]:
+            return lead["id"]
+    return None
+
+
+def enter(state: dict, scene_id: str) -> bool:
+    """Move the game to a scene. True when the scene changed."""
+    adv = state.setdefault("adventure", {"scene": "", "visited": [], "xp_given": []})
+    if adv.get("scene") == scene_id:
+        return False
+    adv["scene"] = scene_id
+    adv.setdefault("visited", [])
+    if scene_id and scene_id not in adv["visited"]:
+        adv["visited"].append(scene_id)
+        adv["fresh"] = scene_id  # the read-aloud text is narrated on the first reply in a new scene
+    return True
+
+
+def move(adv: dict, state: dict, scene_id: str | None) -> str:
+    """Enter a scene and set its music. Returns the scene's name when the game moved, else ''."""
+    s = get_scene(adv, scene_id or "")
+    if not s or not enter(state, s["id"]):
+        return ""
+    if s["music"]:
+        state["scene_mood"] = s["music"]
+    return s["name"]
+
+
+def narrated(state: dict) -> bool:
+    """After a reply: the scene's read-aloud text has been told."""
+    st = state.get("adventure") or {}
+    if st.get("fresh") and st.get("fresh") == st.get("scene"):
+        st["fresh"] = ""
+        return True
+    return False
+
+
+def scene_section(adv: dict, state: dict, limit: int = 2600) -> str:
+    """The current scene for the Aedo's notes (sent with the reply, kept short: the RX 580 reads every token)."""
+    st = state.get("adventure") or {}
+    s = get_scene(adv, st.get("scene", ""))
+    if not s:
+        return ""
+    title = f"{s['group']} · {s['name']}" if s["group"] else s["name"]
+    lines = [f"## Adventure scene: {title}"]
+    if s["read_aloud"] and st.get("fresh") == s["id"]:
+        lines.append("The player just arrived. Narrate this read-aloud text close to word for word (in the story's language), "
+                     "adapted to what the player is doing, then stop for the player:\n" + truncate(s["read_aloud"], 1400))
+    elif s["read_aloud"]:
+        lines.append("Already described: " + truncate(s["read_aloud"], 240))
+    if s["notes"]:
+        lines.append("GM notes (hidden; the player learns them only through play: what they see, ask the right person, or find "
+                     "with a check):\n" + truncate(s["notes"], 1000))
+    if s["checks"]:
+        lines.append("Checks here (when the player tries one, ask for that roll with its DC and wait for the result; never "
+                     "decide the outcome without the roll): " + "; ".join(f"{c['skill']} DC {c['dc']} ({truncate(c['what'], 90)})"
+                                                                               for c in s["checks"]))
+    if s["enemies"]:
+        lines.append("Enemies here: " + ", ".join(f"{e['count']}x {e['name']}" if e["count"] > 1 else e["name"] for e in s["enemies"])
+                     + ". If a fight breaks out, say so plainly: the app runs it on the battle grid.")
+    if s["treasure"]:
+        lines.append("Treasure (only if found): " + truncate(s["treasure"], 300))
+    leads = [get_scene(adv, x) for x in s["leads"]]
+    if any(leads):
+        lines.append("Ways on from here: " + ", ".join(x["name"] for x in leads if x))
+    return truncate("\n".join(lines), limit)
+
+
+def adventure_background(adv: dict) -> str:
+    """The adventure's background for the stable part of the prompt (GM-only, read once)."""
+    if not adv or not adv.get("background"):
+        return ""
+    return "## The adventure (GM only; the player discovers it in play)\n" + truncate(adv["background"], 2500)
+
+
+def combat_enemies(adv: dict, state: dict) -> list[dict]:
+    s = get_scene(adv, (state.get("adventure") or {}).get("scene", ""))
+    return [dict(e) for e in (s or {}).get("enemies") or []]
+
+
+def battle_map(adv: dict, state: dict) -> dict | None:
+    """The scene's map picture as the battle grid's background, with the scene's marker as the place to start."""
+    s = get_scene(adv, (state.get("adventure") or {}).get("scene", ""))
+    m = next((x for x in (adv or {}).get("maps") or [] if s and x["id"] == s["map"]), None)
+    if not m or not (m["picture"] or m["player_picture"]):
+        return None
+    mark = m["markers"].get(s["id"])
+    return {"background": m["player_picture"] or m["picture"], "name": truncate(s["name"], 60), "w": m["cols"], "h": m["rows"],
+            "near": [int(mark[0] * m["cols"]), int(mark[1] * m["rows"])] if mark else None}

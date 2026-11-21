@@ -599,8 +599,73 @@ function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinned
   );
 }
 
+/* -------------------------------------------------------------- Adventure */
+function AdventureTab({ adventure, state, convId, onState, onFight, busy }) {
+  const st = state.adventure || {};
+  const scenes = adventure.scenes || [];
+  const cur = scenes.find((s) => s.id === st.scene);
+  const visited = new Set(st.visited || []);
+  const [error, setError] = useState("");
+  const go = async (id) => { try { const r = await api.adventureScene(convId, id); onState(r.state); setError(""); } catch (e) { setError(e.message); } };
+  const xp = async () => { try { const r = await api.adventureXp(convId, cur.id); onState(r.state); } catch (e) { setError(e.message); } };
+  const map = cur && (adventure.maps || []).find((m) => m.id === cur.map);
+  const pic = map && (map.player_picture || map.picture);
+  const leads = cur ? (cur.leads || []).map((id) => scenes.find((s) => s.id === id)).filter(Boolean) : [];
+  const parts = adventure.parts || [];
+  return (
+    <div className="tab-body adventure-tab">
+      {cur ? (
+        <>
+          <div className="section-title">{cur.group ? <span className="muted">{cur.group} · </span> : null}{cur.name}</div>
+          {cur.read_aloud && <details className="read-aloud"><summary className="small">📖 What you see</summary><div className="small pre">{cur.read_aloud}</div></details>}
+          <div className="row gap wrap">
+            {cur.enemies?.length > 0 && !state.combat?.active && <button className="btn small" disabled={busy} onClick={onFight}>{`⚔ Fight here (${cur.enemies.map((e) => (e.count > 1 ? `${e.count}× ${e.name}` : e.name)).join(", ")})`}</button>}
+            {cur.xp > 0 && !(st.xp_given || []).includes(cur.id) && <button className="btn small" onClick={xp}>{`🏅 Give the XP (+${cur.xp})`}</button>}
+          </div>
+          {pic && (
+            <div className="adv-map small-map">
+              <img src={portraitSrc(pic)} alt="" />
+              {scenes.filter((s) => s.map === map.id && map.markers?.[s.id] && (visited.has(s.id) || leads.includes(s))).map((s) => (
+                <button key={s.id} className={`adv-pin ${s.id === cur.id ? "on" : visited.has(s.id) ? "seen" : "lead"}`}
+                  style={{ left: `${map.markers[s.id][0] * 100}%`, top: `${map.markers[s.id][1] * 100}%` }}
+                  title={s.name} onClick={() => s.id !== cur.id && go(s.id)}>{(s.name.match(/^[A-Z]?\d+[a-z]?/) || ["•"])[0]}</button>
+              ))}
+            </div>
+          )}
+          {leads.length > 0 && (
+            <>
+              <div className="small muted">Ways on from here</div>
+              <div className="conds">{leads.map((s) => <button key={s.id} className="chip" onClick={() => go(s.id)}>→ {s.name}</button>)}</div>
+            </>
+          )}
+        </>
+      ) : <div className="muted small">Not in a scene of the adventure yet. Pick one below.</div>}
+      <details className="visited" open={!cur}>
+        <summary className="small">{`Where you have been (${visited.size})`}</summary>
+        {(parts.length ? parts : [{ id: "", title: "" }]).map((p) => {
+          const mine = scenes.filter((s) => (s.part || "") === p.id && (visited.has(s.id) || !cur && s === scenes[0]));
+          if (!mine.length) return null;
+          return (
+            <div key={p.id}>
+              {p.title && <div className="tiny muted">{p.title}</div>}
+              {mine.map((s) => (
+                <button key={s.id} className={`link-btn small block ${s.id === st.scene ? "on" : ""}`} onClick={() => go(s.id)}>
+                  {s.group ? `${s.group} · ` : ""}{s.name}{(st.xp_given || []).includes(s.id) ? " 🏅" : ""}
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </details>
+      <div className="muted tiny">The Aedo follows the adventure: the read-aloud text on the first visit, the checks with their DC, the enemies here. The scene changes when the story moves on (or when you pick one here).</div>
+      {error && <div className="error-text small">{error}</div>}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ Panel */
 export const TABS = [
+  ["adventure", "📕", "Adventure"],
   ["status", "📜", "Status"],
   ["sheet", "🧙", "Sheet"],
   ["bag", "🎒", "Bag"],
@@ -617,7 +682,8 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
   const allowed = [...(game.features?.panels || TABS.map(([k]) => k)), ...(state.combat?.active ? ["combat"] : []),
     "sheet", "status",  // always: your character (name, background, looks…) can be read, copied and edited there
-    ...((game.messages || []).some((m) => m.meta?.scene_picture) ? ["map"] : [])];  // the map bag lives on the map tab
+    ...((game.messages || []).some((m) => m.meta?.scene_picture) ? ["map"] : []),
+    ...(conversation.scenario?.adventure?.scenes?.length ? ["adventure", "combat"] : [])];  // the map bag lives on the map tab
   const statusFirst = (game.features?.panels || []).includes("status") || !!game.status_by_app;
   const tabs = TABS.filter(([k]) => allowed.includes(k) && (statusFirst || k !== "status"))
     .concat(statusFirst ? [] : TABS.filter(([k]) => k === "status"));  // without a sheet it waits at the end, to pick one
@@ -633,6 +699,8 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         <button className="icon-btn close-panel" onClick={onClose} title="Hide panel">✕</button>
       </div>
       <div className="tab-scroll">
+        {active === "adventure" && <AdventureTab adventure={conversation.scenario.adventure} state={state} convId={conversation.id}
+          onState={onStateLoaded} onFight={() => onTab("combat")} busy={!canRoll} />}
         {active === "status" && <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every}
           byApp={!!game.status_by_app} fields={game.status_fields} sheetOwn={!!game.sheet_own}
           picked={conversation.scenario?.sheet_template || ""} convId={conversation.id} onReload={onReload}

@@ -572,3 +572,20 @@ body.resizing { user-select: none; cursor: col-resize; }
 .story-frame { margin: 6px 0; }
 .story-frame > summary { cursor: pointer; }
 .sheet-picker { display: flex; flex-direction: column; gap: 6px; }
+/* Adventure (scenes, maps) */
+.adventure-edit .scene-row { border-bottom: 1px solid var(--border); padding: 2px 0; }
+.adventure-edit .scene-head { display: flex; justify-content: space-between; width: 100%; text-align: left; padding: 4px 2px; }
+.adventure-edit .scene-edit { display: flex; flex-direction: column; gap: 6px; padding: 6px 0 10px; }
+.adventure-edit .part-title { font-weight: 600; margin-top: 10px; color: var(--accent); }
+.map-edit { display: flex; flex-direction: column; gap: 6px; }
+.adv-map { position: relative; line-height: 0; border-radius: 6px; overflow: hidden; }
+.adv-map img { width: 100%; height: auto; display: block; }
+.adv-map.placing { cursor: crosshair; outline: 2px dashed var(--accent); }
+.adv-pin { position: absolute; transform: translate(-50%, -50%); min-width: 20px; height: 20px; padding: 0 4px; border-radius: 10px;
+  background: rgba(20, 20, 30, .8); color: #fff; font-size: 11px; line-height: 20px; text-align: center; border: 1px solid #fff8; cursor: pointer; }
+.adv-pin.on { background: var(--accent); border-color: #fff; box-shadow: 0 0 0 3px #fff4; }
+.adv-pin.seen { opacity: .75; }
+.adv-pin.lead { background: rgba(60, 60, 80, .55); border-style: dashed; }
+.adventure-tab .read-aloud .pre { white-space: pre-wrap; padding: 6px 0; }
+.link-btn.block { display: block; text-align: left; }
+.link-btn.block.on { font-weight: 600; }

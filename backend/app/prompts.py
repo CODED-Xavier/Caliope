@@ -17,6 +17,7 @@ from .resources import RESOURCE_RULES
 from .resources import gm_notes as resource_notes
 from .routes import planned_scene, route_section
 from .places import places_section
+from .adventure import adventure_background, scene_section
 
 LANGUAGE_DIRECTIVES = {
     "en": "Write everything in English.",
@@ -256,7 +257,7 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
 WINDOW_STEP = 6  # messages (3 rounds): see build()
 
 SECTION_ORDER = [
-    "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "known_at_start", "fixed_facts", "secrets", "ending", "route", "places",
+    "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "known_at_start", "fixed_facts", "secrets", "ending", "route", "adventure", "places",
     "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_reminders", "card_overrides", "portraits", "npcs", "npc_hint",
     "player", "pinned", "opening", "cantos", "summary",
 ]
@@ -316,6 +317,9 @@ class PromptBuilder:
         route = scenario.get("route")
         if route_section(route):
             sections["route"] = route_section(route)
+        adv = scenario.get("adventure") or {}
+        if adventure_background(adv):
+            sections["adventure"] = adventure_background(adv)
         if state.get("resources"):
             sections["resources"] = "## Resources\n" + RESOURCE_RULES
         if house_rules:
@@ -346,7 +350,7 @@ class PromptBuilder:
             extra = "## Resources (kept by the app)\n" + res_notes + ("\n\n" + extra if extra else "")
         if cal_on:
             extra = "## Date and time (kept by the app)\n" + gm_notes(state, cal) + ("\n\n" + extra if extra else "")
-        scene_plan = planned_scene(route, state)
+        scene_plan = planned_scene(route, state) or scene_section(adv, state)
         if scene_plan:
             extra = scene_plan + ("\n\n" + extra if extra else "")
         wishes = str(state.get("wishes") or "").strip()

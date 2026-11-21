@@ -27,7 +27,7 @@ from .maps import TYPES as MAP_TYPES
 from .maps import MapError, generate as generate_map
 from .jukebox import MOODS as MUSIC_MOODS
 from .jukebox import MusicError
-from .rulebooks import RulebookError, ocr_available
+from .rulebooks import RulebookError, ocr_available, read_pdf, read_text
 from .runtime import ENGINE_KEYS, EngineError
 from .runtime import server_binary as runtime_binary
 from .modelhub import adopt_models, download_root, pick_model_file, use_own_models
@@ -41,7 +41,7 @@ from .playerlore import parse_suggestions, suggest_prompt
 from .checks import roll_line
 from . import shop
 from . import resources
-from . import sheets, statusbook
+from . import adventure, sheets, statusbook
 from . import worldtime
 from .engine import BusyError
 from .llm import LLMError
@@ -292,6 +292,12 @@ async def combat_suggest(conv_id: int, body: dict[str, Any] = Body(default={})):
     """The AI reads the last messages and proposes the enemies (you confirm them in the form)."""
     s = svc()
     system = body.get("system", "d20")
+    adv = s.conversations.get(conv_id)["scenario"].get("adventure") or {}
+    state = s.conversations.get_state(conv_id)
+    scene_foes = adventure.combat_enemies(adv, state)
+    if scene_foes and system == "d20":  # the adventure says who is here: no need to ask the model
+        battle = adventure.battle_map(adv, state)
+        return {"system": system, "enemies": scene_foes, "map": None, "battle": battle, "from_scene": True}
     msgs = s.conversations.list_messages(conv_id)[-6:]
     scene = "\n\n".join(f"{'PLAYER' if m['role'] == 'user' else 'GM'}: {m['content']}" for m in msgs)
     rules = ""
@@ -311,7 +317,8 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
     if action == "start":
         prepare = lambda st: s.combat.start(st, body.get("system", "d20"), body.get("enemies") or [],  # noqa: E731
                                             body.get("allies") or [], body.get("player") or {}, body.get("grid") or {},
-                                            body.get("map") if isinstance(body.get("map"), dict) else None)
+                                            body.get("map") if isinstance(body.get("map"), dict) else None,
+                                            body.get("near") if isinstance(body.get("near"), list) else None)
     elif action == "act":
         prepare = lambda st: s.combat.player_action(st, body.get("move", "attack"), str(body.get("target", "")),  # noqa: E731
                                                     str(body.get("advantage", "")), str(body.get("ability", "")))
@@ -703,6 +710,80 @@ async def recap(conv_id: int):
     conv = svc().conversations.get(conv_id)
     language = conv["scenario"].get("language") or svc().settings.get("response_language")
     return {"text": await svc().cantos.recap(conv_id, conv["title"], conv["summary"], language)}
+
+
+@app.post("/api/scenarios/{scenario_id}/adventure/import")
+async def import_adventure(scenario_id: int, request: Request, part: str = Query(""), filename: str = Query("")):
+    """A published adventure (PDF, .txt or .md as the raw body, or pasted text) split into scenes and added to the card.
+    The book stays on this PC; the card editor then shows the scenes for checking."""
+    s = svc()
+    card = s.scenarios.get(scenario_id)
+    if not card:
+        raise NotFound(f"Scenario {scenario_id} not found")
+    data = await read_body(request, "rulebook")
+    if not data.strip():
+        raise HTTPException(400, "The text is empty.")
+    if data[:5] == b"%PDF-" or filename.lower().endswith(".pdf"):
+        pages, _info = await asyncio.to_thread(read_pdf, data)
+        text = "\n".join(pages)
+    else:
+        text = "\n".join(read_text(data))
+    found = await asyncio.to_thread(adventure.split_adventure, text, part.strip()[:80])
+    if not found["scenes"] and not found["background"]:
+        raise HTTPException(422, "No scenes were found in this text. Headings like '1. Cave Mouth' or 'Goblin Ambush' are needed.")
+    d = dict(card["data"])
+    d["adventure"] = adventure.merge(d.get("adventure"), found, title=card["name"])
+    names = {n["name"].lower() for n in d.get("npcs") or []}
+    added = []
+    for n in found["npcs"]:
+        if n["name"].lower() not in names:
+            d.setdefault("npcs", []).append({"name": n["name"], "description": n["description"], "met": False})
+            added.append(n["name"])
+    first = next((x for x in found["scenes"] if x["read_aloud"]), None)
+    if first and not str(d.get("opening_message") or "").strip():
+        d["opening_message"] = first["read_aloud"]
+    updated = s.scenarios.update(scenario_id, {**d, "name": card["name"]})
+    return {"card": updated, "report": {
+        "scenes": len(found["scenes"]), "read_aloud": sum(1 for x in found["scenes"] if x["read_aloud"]),
+        "checks": sum(len(x["checks"]) for x in found["scenes"]), "enemies": sum(len(x["enemies"]) for x in found["scenes"]),
+        "npcs": added, "background": bool(found["background"])}}
+
+
+@app.post("/api/conversations/{conv_id}/adventure/scene")
+async def adventure_scene(conv_id: int, data: dict[str, Any] = Body(...)):
+    """Go to a scene by hand (the Adventure tab's "Go here")."""
+    s = svc()
+    adv = s.conversations.get(conv_id)["scenario"].get("adventure") or {}
+    state = s.conversations.get_state(conv_id)
+    if not adventure.get_scene(adv, str(data.get("scene") or "")):
+        raise HTTPException(404, "This card has no such scene.")
+    adventure.move(adv, state, str(data["scene"]))
+    s.conversations.save_state(conv_id, state)
+    return {"state": state}
+
+
+@app.post("/api/conversations/{conv_id}/adventure/xp")
+async def adventure_xp(conv_id: int, data: dict[str, Any] = Body(...)):
+    """Give a scene's XP award once: it is added to the sheet's XP field."""
+    s = svc()
+    adv = s.conversations.get(conv_id)["scenario"].get("adventure") or {}
+    scene = adventure.get_scene(adv, str(data.get("scene") or ""))
+    if not scene or not scene["xp"]:
+        raise HTTPException(404, "This scene has no XP award.")
+    state = s.conversations.get_state(conv_id)
+    st = state.setdefault("adventure", {"scene": "", "visited": [], "xp_given": []})
+    if scene["id"] in st.setdefault("xp_given", []):
+        return {"state": state, "xp": 0}
+    status = state.setdefault("card_status", {})
+    key = next((k for k in status if k.strip().lower() in ("xp", "exp", "experience")), "XP")
+    try:
+        before = int(re.sub(r"[^0-9-]", "", str(status.get(key) or "0")) or 0)
+    except ValueError:
+        before = 0
+    status[key] = str(before + scene["xp"])
+    st["xp_given"].append(scene["id"])
+    s.conversations.save_state(conv_id, state)
+    return {"state": state, "xp": scene["xp"], "total": status[key]}
 
 
 @app.get("/api/sheet-templates")

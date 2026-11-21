@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.17**. The version history is at the end of this file.
+Current version: **v2.18**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -198,6 +198,28 @@ In the card editor, **Facts, secrets and the ending** (all optional):
 
 On the **Sheet** tab, **✨ Wishes for the story** takes your soft hints ("Kaida and I could go from rivals to lovers"). The Aedo creates chances for them when the story allows, without forcing them or bending the plot.
 
+### Adventures (published modules)
+For adventure cards that follow a book (*Lost Mine of Phandelver*, any module, your own notes). In the card editor,
+**Adventure: scenes, maps and fights**:
+- **Import** a PDF, or text copied from it, one part at a time (give the part a name). Calíope splits it by itself into
+  **scenes**: numbered areas ("1. Cave Mouth") grouped under their location ("Cragmaw Hideout"), and encounters with their
+  own heading ("Goblin Ambush"). Each scene keeps:
+  - the **read-aloud text**, which the Aedo narrates close to word for word on the first visit;
+  - hidden **GM notes** (who is there, what they do, Developments, what someone knows);
+  - **checks and traps** with their DC ("Wisdom (Perception) DC 12"). The Aedo asks for the roll and waits for the dice;
+  - **enemies** with their numbers (common monsters get their SRD numbers automatically), **treasure** and an **XP award**;
+  - the **ways on** (the areas it leads to).
+- The splitting is automatic, so check each scene once: rename, **⤴ Join to the scene above**, or remove.
+- **Maps:** add the map picture (the GM version, and the player version if the book has one), set how many 5-ft squares wide
+  it is, then choose a scene and click its spot on the map.
+- "Roleplaying ..." sections become characters (not met yet), and the Background and Overview go to the Aedo's notes.
+- The book stays on your PC; only the current scene is sent with each reply.
+
+In play, the **📕 Adventure** tab shows the scene you are in (📖 *What you see*), the map with the places you have visited,
+the ways on, **🏅 Give the XP** (added to the sheet's XP), and **⚔ Fight here**: the Combat tab opens with the scene's enemies
+and starts the fight on the adventure's map, with the enemies around the scene's spot. The scene changes when the story
+moves on (the place the tracker notes, or when you say where you go), or when you pick one in the tab.
+
 ### Character pictures from a folder
 Every card has its own folder in Calíope: `Pictures\<card name>\`, next to Play.bat (made the first time you open the card's *Characters* section). In the card editor > *Characters*:
 - **🔍 Search my PC for the pictures folder…** picks your folder anywhere on the PC (or paste its address and press **Copy in**). Its pictures are copied into the card's Calíope folder, then shown for a check before **Apply**.
@@ -294,6 +316,8 @@ After each reply a short second call (the **tracker**) notes what changed. On qu
 - **House rules** win over the book.
 - Scanned books need the free [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki).
 - A good free start: the **D&D System Reference Document 5.2**.
+
+The monster numbers built into adventure import come from the *System Reference Document 5.1* by Wizards of the Coast LLC, available under the Creative Commons Attribution 4.0 license.
 
 **🧩 Skills** are folders with a `SKILL.md` (style guides, genre advice). Install them in the Skills window and attach up to 3 to a card. Skill scripts are never run.
 
@@ -438,3 +462,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.15 | Cards: what the player knows from the start, fixed facts, secrets (never handed out), story length and ending with THE END and an epilogue; ✨ Wishes for the story on the Sheet tab; the Aedo answers only what your character could know; The Hollow Crown rewritten |
 | 2.16 | Pictures: a new place is described in detail first (architecture, light, air, weather, people there; no more empty white backgrounds), and 🖼 on a reply paints that exact moment with the characters' saved looks and poses |
 | 2.17 | Sheet library: ready character sheets (D&D 5e, Pathfinder 2e, Tormenta20, Vampire V5, Call of Cthulhu, Cyberpunk RED, academy, slice of life) for the Status tab, per card or per game |
+| 2.18 | Adventures: import a published adventure (PDF or text) as scenes with read-aloud text, GM notes, checks with DC, enemies, treasure, XP and maps; the 📕 Adventure tab; fights on the adventure's map; dark route for Lumencia |

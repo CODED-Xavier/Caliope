@@ -1356,7 +1356,53 @@
 "Magic academy": "Academia de magia",
 "Slice of life / romance": "Slice of life / romance",
 "Vampire: the Masquerade V5": "Vampiro: a Máscara V5",
-"Call of Cthulhu 7e": "Chamado de Cthulhu 7e"
+"Call of Cthulhu 7e": "Chamado de Cthulhu 7e",
+"Location (group)": "Local (grupo)",
+"e.g. Cragmaw Hideout": "ex.: Esconderijo Cragmaw",
+"Other names (commas)": "Outros nomes (vírgulas)",
+"Cave Mouth, area 1": "Boca da Caverna, área 1",
+"Read-aloud text (narrated on the first visit)": "Texto para ler em voz alta (narrado na primeira visita)",
+"GM notes (hidden from the player)": "Notas do mestre (escondidas do jogador)",
+"Checks and traps, one per line:": "Testes e armadilhas, um por linha:",
+"Enemies here": "Inimigos aqui",
+"Enemy": "Inimigo",
+"Treasure": "Tesouro",
+"XP award": "Prêmio de XP",
+"Music": "Música",
+"Ways on from here": "Caminhos a partir daqui",
+"Join to the scene above": "Juntar com a cena acima",
+"Remove this scene": "Remover esta cena",
+"Remove the map": "Remover o mapa",
+"GM map": "Mapa do mestre",
+"Player map": "Mapa do jogador",
+"Squares": "Quadrados",
+"Place a marker for": "Marcar o lugar de",
+"(choose a scene, then click its spot)": "(escolha uma cena e clique no lugar dela)",
+"The player map (if you add one) is what the player sees in the Adventure tab and under fights; the GM map is used when there is no player map. Squares: how many 5-ft squares the picture is wide (the height follows the picture), so fights on this map line up with its grid.": "O mapa do jogador (se você adicionar) é o que o jogador vê na aba Aventura e embaixo das lutas; sem ele, usa-se o mapa do mestre. Quadrados: quantos quadrados de 1,5 m a imagem tem de largura (a altura segue a imagem), para as lutas nesse mapa baterem com a grade dele.",
+"Add the map picture (the GM version, and the player version if the book has one).": "Adicione a imagem do mapa (a versão do mestre, e a do jogador se o livro tiver).",
+"Save the card once first, then import the adventure.": "Salve o card uma vez antes e depois importe a aventura.",
+"Adventure: scenes, maps and fights": "Aventura: cenas, mapas e lutas",
+"Import a published adventure (a PDF, or text copied from it) one part at a time. Calíope splits it into scenes with their read-aloud text, GM notes, checks, enemies, treasure and XP. Check each scene afterwards: the splitting is automatic. The book stays on this PC.": "Importe uma aventura publicada (um PDF, ou texto copiado dele) uma parte por vez. A Calíope divide em cenas com o texto para ler em voz alta, notas do mestre, testes, inimigos, tesouro e XP. Confira cada cena depois: a divisão é automática. O livro fica neste PC.",
+"Part name (e.g. Part 1: Goblin Arrows)": "Nome da parte (ex.: Parte 1: Flechas Goblins)",
+"PDF or text file": "PDF ou arquivo de texto",
+"Paste text": "Colar texto",
+"Paste a chapter of the adventure here…": "Cole um capítulo da aventura aqui…",
+"Import this text": "Importar este texto",
+"Reading the adventure…": "Lendo a aventura…",
+"The background went to the Aedo's notes.": "O pano de fundo foi para as notas do Aedo.",
+"The card is saved.": "O card foi salvo.",
+"Background for the Aedo (GM only)": "Pano de fundo para o Aedo (só o mestre)",
+"Maps": "Mapas",
+"New map": "Novo mapa",
+"Add a map": "Adicionar um mapa",
+"Scenes": "Cenas",
+"Part": "Parte",
+"What you see": "O que você vê",
+"Not in a scene of the adventure yet. Pick one below.": "Ainda fora de uma cena da aventura. Escolha uma abaixo.",
+"The Aedo follows the adventure: the read-aloud text on the first visit, the checks with their DC, the enemies here. The scene changes when the story moves on (or when you pick one here).": "O Aedo segue a aventura: o texto para ler em voz alta na primeira visita, os testes com a CD, os inimigos daqui. A cena muda quando a história avança (ou quando você escolhe uma aqui).",
+"A published adventure (Lost Mine of Phandelver, a module, your own notes) split into scenes. Import a PDF, or text copied from it, one part at a time. Each scene keeps its read-aloud text (the Aedo narrates it close to word for word on the first visit), hidden GM notes, checks and traps with their DC (rolled with the dice, not decided by the AI), enemies with their numbers, treasure, an XP award and the ways on. Add the map pictures and click where each area is: in play the Adventure tab shows where you are, and a fight starts on that map with the enemies already placed.": "Uma aventura publicada (A Mina Perdida de Phandelver, um módulo, suas próprias notas) dividida em cenas. Importe um PDF, ou texto copiado dele, uma parte por vez. Cada cena guarda o texto para ler em voz alta (o Aedo narra quase palavra por palavra na primeira visita), notas escondidas do mestre, testes e armadilhas com a CD (rolados nos dados, não decididos pela IA), inimigos com seus números, tesouro, um prêmio de XP e os caminhos seguintes. Adicione as imagens dos mapas e clique onde fica cada área: no jogo a aba Aventura mostra onde você está, e a luta começa nesse mapa com os inimigos já posicionados.",
+"For adventure cards that follow a book. The splitting is automatic, so check each scene once (merge, rename or remove scenes) before playing.": "Para cards de aventura que seguem um livro. A divisão é automática, então confira cada cena uma vez (junte, renomeie ou remova cenas) antes de jogar.",
+"Only the current scene is sent with each reply (a few hundred tokens). The book stays on this PC.": "Só a cena atual vai com cada resposta (algumas centenas de tokens). O livro fica neste PC."
 },
 "patterns": [
 [
@@ -1654,6 +1700,42 @@
 [
 "▶ Load {0}",
 "▶ Carregar {0}"
+],
+[
+"Found {0} scenes ({1} with read-aloud text), {2} checks and {3} enemy groups.",
+"Encontradas {0} cenas ({1} com texto para ler em voz alta), {2} testes e {3} grupos de inimigos."
+],
+[
+"New characters: {0}.",
+"Novos personagens: {0}."
+],
+[
+"({0} scenes)",
+"({0} cenas)"
+],
+[
+"× {0} (5-ft squares)",
+"× {0} (quadrados de 1,5 m)"
+],
+[
+"⚔ Fight here ({0})",
+"⚔ Lutar aqui ({0})"
+],
+[
+"🏅 Give the XP (+{0})",
+"🏅 Dar o XP (+{0})"
+],
+[
+"Where you have been ({0})",
+"Onde você já esteve ({0})"
+],
+[
+"The adventure's map ({0})",
+"O mapa da aventura ({0})"
+],
+[
+"Remove \"{0}\"?",
+"Remover \"{0}\"?"
 ]
 ]
 }

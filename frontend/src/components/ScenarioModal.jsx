@@ -3,6 +3,7 @@ import { ask } from "../dialogs.jsx";
 import { CharacterPreview, FillCharacters, PicturesFolder, PlacesEditor, StartsEditor } from "./CardExtras.jsx";
 import Modal from "./Modal.jsx";
 import SheetPicker from "./SheetPicker.jsx";
+import AdventureEditor from "./AdventureEditor.jsx";
 import HelpTip from "./HelpTip.jsx";
 import KindPicker from "./KindPicker.jsx";
 import SetupView from "./SetupView.jsx";
@@ -377,6 +378,12 @@ function Editor({ initial, id, onCancel, onSaved }) {
       <textarea className="field" rows={4} value={d.opening_message} onChange={(e) => set("opening_message", e.target.value)} />
       <StartsEditor starts={d.starts} npcs={d.npcs} onChange={(v) => set("starts", v)} />
       <PlacesEditor places={d.places} onChange={(v) => set("places", v)} />
+      {d.mode !== "character" && <AdventureEditor cardId={id} adventure={d.adventure} onChange={(v) => set("adventure", v)}
+        onImported={(card) => setD((p) => {
+          const have = new Set(p.npcs.map((n) => n.name.toLowerCase()));
+          return { ...p, adventure: card.data.adventure, opening_message: p.opening_message || card.data.opening_message,
+            npcs: [...p.npcs, ...(card.data.npcs || []).filter((n) => !have.has(n.name.toLowerCase()))] };
+        })} />}
 
       <div className="section-title">{d.mode === "character" ? "The character" : "Characters (NPCs)"} <span className="muted tiny">({d.npcs.length})</span></div>
       <PicturesFolder cardId={id} npcs={d.npcs} onApplied={(card) => {

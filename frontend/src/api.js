@@ -98,6 +98,14 @@ export const api = {
   closeCanto: (id, title) => request("POST", `/api/conversations/${id}/cantos/close`, { title }),
   renameCanto: (id, title) => request("PATCH", `/api/cantos/${id}`, { title }),
   recap: (id) => request("POST", `/api/conversations/${id}/recap`),
+  async importAdventure(cardId, body, part = "", filename = "") {
+    const qs = new URLSearchParams({ part, filename }).toString();
+    const res = await fetch(`/api/scenarios/${cardId}/adventure/import?${qs}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    return res.json();
+  },
+  adventureScene: (id, scene) => request("POST", `/api/conversations/${id}/adventure/scene`, { scene }),
+  adventureXp: (id, scene) => request("POST", `/api/conversations/${id}/adventure/xp`, { scene }),
   sheetTemplates: () => request("GET", "/api/sheet-templates"),
   setSheetTemplate: (id, text) => request("POST", `/api/conversations/${id}/sheet-template`, { text }),
   epilogue: (id) => request("POST", `/api/conversations/${id}/epilogue`),

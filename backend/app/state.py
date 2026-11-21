@@ -118,7 +118,21 @@ def _calendar_part(merged: dict) -> dict:
             "date_label": truncate(str(merged.get("date_label") or ""), 120),
             "wishes": truncate(str(merged.get("wishes") or ""), 600),          # the player's hints for the Aedo
             "finished": bool(merged.get("finished")),                           # the card's ending was reached
-            "sheet_from_chat": bool(merged.get("sheet_from_chat"))}
+            "sheet_from_chat": bool(merged.get("sheet_from_chat"))} | _story_part(merged)
+
+
+def _story_part(merged: dict) -> dict:
+    """Where the game stands in a route's fixed scenes and in an adventure's scenes (kept when the sheet is edited)."""
+    out: dict = {}
+    script = merged.get("script")
+    if isinstance(script, dict):
+        out["script"] = {"next": max(0, as_int(script.get("next", 0)))}
+    adv = merged.get("adventure")
+    if isinstance(adv, dict):
+        ids = lambda v: [str(x)[:60] for x in v if str(x).strip()][:300] if isinstance(v, list) else []  # noqa: E731
+        out["adventure"] = {"scene": str(adv.get("scene") or "")[:60], "visited": ids(adv.get("visited")),
+                            "xp_given": ids(adv.get("xp_given")), "fresh": str(adv.get("fresh") or "")[:60]}
+    return out
 
 
 # ---------------------------------------------------------------- model updates

@@ -5,6 +5,7 @@ import json
 import random
 import re
 
+from . import adventure
 from .appearance import normalize_appearance
 from .db import Database, pack_snapshot, unpack_snapshot
 from .scenarios import normalize_portraits, normalize_scenario
@@ -85,6 +86,14 @@ class ConversationRepository:
                 state["setup"] = setup
             if route and route["scenes"]:
                 state["script"] = {"next": 0}
+            adv = data.get("adventure") or {}
+            if adv.get("scenes") and not route:
+                first = adv["scenes"][0]
+                adventure.enter(state, first["id"])
+                if first.get("music"):
+                    state["scene_mood"] = first["music"]
+                if str(data.get("opening_message") or "").strip():
+                    state["adventure"]["fresh"] = ""  # the opening already set the scene
             focus = {f.lower() for f in (route or {}).get("focus") or []}
             self.db.execute("INSERT INTO game_state(conversation_id, data) VALUES(?,?)", (conv_id, json.dumps(state, ensure_ascii=False)))
             for i, npc in enumerate(data.get("npcs", [])):

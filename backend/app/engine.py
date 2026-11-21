@@ -17,7 +17,7 @@ from typing import AsyncIterator
 
 from .appearance import appearance_line, appearance_seed
 from .checks import find_checks
-from . import aedo_desk, resources, routes, sheetchat
+from . import adventure, aedo_desk, resources, routes, sheetchat
 from .places import find_place, place_picture
 from .shop import find_offers, is_trade
 from . import statusbook
@@ -643,6 +643,10 @@ class ChatEngine:
         state = self.repo.get_state(conv_id)
         npcs = self.repo.list_npcs(conv_id)
         history = aedo_desk.without_ooc(self.repo.list_messages(conv_id, after_id=conv["summary_upto"]))
+        adv = scenario.get("adventure") or {}
+        if adv.get("scenes") and not is_gm_message(user_msg["content"]):
+            if adventure.move(adv, state, adventure.follow_player(adv, state, user_msg["content"])):
+                self.repo.save_state(conv_id, state)  # the player walks into the next area: its text is read now
 
         previous_assistant = next((m for m in reversed(history[:-1]) if m["role"] == "assistant"), None)
         previous_text = previous_assistant["content"] if previous_assistant else ""
@@ -739,6 +743,7 @@ class ChatEngine:
         assistant_msg = self.repo.add_message(conv_id, "assistant", reply, meta)
         st = self.repo.get_state(conv_id)
         moved = routes.advance(st, scenario.get("route"))  # the planned scene was written: the next one comes after it
+        moved = adventure.narrated(st) or moved
         if ended:
             st["finished"] = True  # the card's ending happened: the chat offers the epilogue
         if moved or ended:
@@ -1024,6 +1029,12 @@ class ChatEngine:
             changes += resources.apply_tracker(new_state, updates.get("resource_changes", []))  # the app counted ✨/⚔ turns
         if cal_on:
             changes += self._move_clock(new_state, cal, updates)
+        adv = scenario.get("adventure") or {}
+        if adv.get("scenes") and updates.get("location"):
+            st_adv = new_state.get("adventure") or {}
+            went = adventure.move(adv, new_state, adventure.match_scene(adv, updates["location"], reply, st_adv.get("scene", "")))
+            if went:
+                changes.append(f"Scene: {went}")
         self.repo.save_state(conv_id, new_state)
 
         for npc in updates["new_npcs"]:

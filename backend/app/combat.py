@@ -23,7 +23,7 @@ from .util import as_int, clamp, truncate
 SYSTEMS = ("d20", "pool")
 SIDES = ("player", "ally", "enemy")
 MAX_COMBATANTS = 16
-GRID_MAX = 24
+GRID_MAX = 48  # an adventure's map picture can hold a big grid
 CONDITIONS = ("prone", "grappled", "restrained", "poisoned", "stunned", "blinded", "frightened", "invisible", "dodging")
 
 
@@ -111,7 +111,8 @@ class CombatEngine:
 
     # ------------------------------------------------------------------ start / end
     def start(self, state: dict, system: str, enemies: list[dict], allies: list[dict] | None = None,
-              player: dict | None = None, grid: dict | None = None, battle_map: dict | None = None) -> tuple[dict, str]:
+              player: dict | None = None, grid: dict | None = None, battle_map: dict | None = None,
+              near: list | None = None) -> tuple[dict, str]:
         system = system if system in SYSTEMS else "d20"
         if not enemies:
             raise CombatError("Add at least one enemy.")
@@ -138,7 +139,10 @@ class CombatEngine:
         else:
             w = max(6, min(GRID_MAX, as_int((grid or {}).get("w", 12), 12)))
             h = max(4, min(GRID_MAX, as_int((grid or {}).get("h", 8), 8)))
-        self._place(people, w, h, tiles)
+        anchor = None
+        if near and len(near) == 2:
+            anchor = (max(0, min(w - 1, as_int(near[0], 0))), max(0, min(h - 1, as_int(near[1], 0))))
+        self._place(people, w, h, tiles, anchor)
         log = []
         for c in people:
             if system == "pool":
@@ -160,13 +164,20 @@ class CombatEngine:
         return state, line
 
     @staticmethod
-    def _place(people: list[dict], w: int, h: int, tiles: list[str] | None = None) -> None:
-        """Your side near the left edge, enemies near the right, only on squares everyone can reach."""
+    def _place(people: list[dict], w: int, h: int, tiles: list[str] | None = None, anchor: tuple | None = None) -> None:
+        """Your side near the left edge, enemies near the right, only on squares everyone can reach. With an anchor (the
+        scene's spot on an adventure map), enemies gather around it and your side a few squares away."""
         cells = open_cells(tiles) if tiles else [(x, y) for x in range(w) for y in range(h)]
         taken = {(c["x"], c["y"]) for c in people if (c["x"], c["y"]) in set(cells)}
         mid = h / 2
-        left = sorted(cells, key=lambda p: (p[0], abs(p[1] - mid)))
-        right = sorted(cells, key=lambda p: (-p[0], abs(p[1] - mid)))
+        if anchor:
+            ax, ay = anchor
+            mx = ax - 4 if ax >= 4 else ax + 4
+            right = sorted(cells, key=lambda p: (abs(p[0] - ax) + abs(p[1] - ay), p))
+            left = sorted(cells, key=lambda p: (abs(p[0] - mx) + abs(p[1] - ay), p))
+        else:
+            left = sorted(cells, key=lambda p: (p[0], abs(p[1] - mid)))
+            right = sorted(cells, key=lambda p: (-p[0], abs(p[1] - mid)))
         for c in people:
             if (c["x"], c["y"]) in taken and 0 <= c["x"] < w:
                 continue
