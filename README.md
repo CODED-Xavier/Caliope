@@ -10,6 +10,8 @@ Inside Calíope:
 
 Current version: **v2.5**. The version history is at the end of this file.
 
+**Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
+
 ---
 
 ## Contents
