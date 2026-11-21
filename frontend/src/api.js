@@ -105,13 +105,15 @@ export const api = {
     return res.json();
   },
   adventureScene: (id, scene) => request("POST", `/api/conversations/${id}/adventure/scene`, { scene }),
+  adventureNoFight: (id, scene) => request("POST", `/api/conversations/${id}/adventure/no-fight`, { scene }),
   adventureXp: (id, scene) => request("POST", `/api/conversations/${id}/adventure/xp`, { scene }),
   bestiary: () => request("GET", "/api/bestiary"),
   bestiaryFind: (name) => request("GET", `/api/bestiary/find?name=${encodeURIComponent(name)}`),
   bestiarySave: (monster, oldId = "") => request("POST", "/api/bestiary", { monster, old_id: oldId }),
-  bestiaryDelete: (id) => request("DELETE", `/api/bestiary/${encodeURIComponent(id)}`),
-  async bestiaryImport(body, replace = false) {
-    const res = await fetch(`/api/bestiary/import?replace=${replace ? "true" : "false"}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body });
+  bestiaryDelete: (id) => request("DELETE", `/api/bestiary/${id.split("/").map(encodeURIComponent).join("/")}`),
+  bestiaryOpen: (book = "") => request("POST", "/api/bestiary/open", { book }),
+  async bestiaryImport(body, replace = false, book = "") {
+    const res = await fetch(`/api/bestiary/import?replace=${replace ? "true" : "false"}&book=${encodeURIComponent(book)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body });
     if (!res.ok) throw new Error(await errorMessage(res));
     return res.json();
   },

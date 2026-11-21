@@ -23,7 +23,7 @@ const FIELDS = {
 /* ---------------------------------------------------------------- start form */
 function StartForm({ convId, kind, busy, onStart, sceneFight }) {
   const [system, setSystem] = useState("d20");
-  const [enemies, setEnemies] = useState([{ ...BLANK.d20, name: "Bandit", count: 2 }]);
+  const [enemies, setEnemies] = useState([{ ...BLANK.d20, name: "", count: 1 }]);  // a name from the Bestiary fills the numbers
   const [me, setMe] = useState({});
   const [grid, setGrid] = useState({ w: 12, h: 8 });
   const [mapMode, setMapMode] = useState("gen");          // gen | saved | empty

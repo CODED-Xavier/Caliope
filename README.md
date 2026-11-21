@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.22**. The version history is at the end of this file.
+Current version: **v2.23**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -160,7 +160,7 @@ Each card can have its own calendar (card editor > Calendar). **The app keeps th
 - The weather comes from the season and the card's climate.
 
 ### The Bestiary (monster sheets)
-**🐉 Bestiary** (left column, bottom) keeps monster sheets in `backend\data\bestiary`, one file per monster: AC, HP,
+**🐉 Bestiary** (left column, bottom) keeps monster sheets in `backend\data\bestiary`, one file per monster, in a folder per book (`bestiary\Lost Mine of Phandelver\goblin.json`; the ones you make yourself sit at the top, as *My monsters*): AC, HP,
 speed, STR to CHA, skills, senses, challenge and XP, traits and attacks.
 - **＋ Create monster** opens an empty sheet. **⤒ Import stat blocks** reads them from a book's appendix (Markdown, text
   or PDF, in the usual 5e layout). Importing an adventure adds the book's monsters by itself.
@@ -239,6 +239,8 @@ For adventure cards that follow a book (*Lost Mine of Phandelver*, any module, y
   **Fog of war:** how many squares stay clear around each place visited (0 turns the fog off).
 - "Roleplaying ..." sections become characters (not met yet), and the Background and Overview go to the Aedo's notes.
 - The book stays on your PC; only the current scene is sent with each reply.
+
+When a fight breaks out in a scene that has enemies (you attack, or they charge), a **⚔ A fight!** box under the reply starts it in one click, with the scene's enemies and its map; **Not now** hides it. The scene also moves on by itself when the story walks into the next one (its enemies appear, or its name is said).
 
 In play, the **📕 Adventure** tab shows the scene you are in (📖 *What you see*), the map with the places you have visited,
 the ways on, **🏅 Give the XP** (added to the sheet's XP), and **⚔ Fight here**: the Combat tab opens with the scene's enemies
@@ -507,3 +509,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.22.3 | Fix: the Status tab blanked the screen before the first reply; an error in one part of the screen no longer blanks the whole app |
 | 2.22.4 | The top bar no longer moves when the mouse is over the music controls; the game's title stays on one line (full name on hover) |
 | 2.22.5 | The side panel's tab row scrolls sideways (mouse wheel, drag, or the ‹ › arrows); the open tab stays in view |
+| 2.23 | Bestiary: a folder per book (imports go to bestiary/<book>/, 📂 Open folder, filter by book); adventures: the story walks into the next scene by itself, and a **⚔ A fight!** offer under the reply starts the scene's fight in one click |

@@ -1489,7 +1489,18 @@
 "Try again": "Tentar de novo",
 "The side panel": "O painel lateral",
 "The story": "A história",
-"This part": "Esta parte"
+"This part": "Esta parte",
+", in a folder per book.": ", numa pasta por livro.",
+"Open the folder in Windows Explorer": "Abrir a pasta no Explorador do Windows",
+"Book (folder) name: the file's name if empty": "Nome do livro (pasta): o nome do arquivo se vazio",
+"✍ My monsters": "✍ Meus monstros",
+"My monsters": "Meus monstros",
+"Book (folder)": "Livro (pasta)",
+"empty = My monsters": "vazio = Meus monstros",
+"⚔ A fight!": "⚔ Uma luta!",
+"Start the fight": "Começar a luta",
+"It isn't a fight (yet)": "Não é uma luta (ainda)",
+"Not now": "Agora não"
 },
 "patterns": [
 [
@@ -1883,6 +1894,18 @@
 [
 "{0} hit an error.",
 "{0} deu um erro."
+],
+[
+"All books ({0})",
+"Todos os livros ({0})"
+],
+[
+"My monsters ({0})",
+"Meus monstros ({0})"
+],
+[
+"Added {0} to the folder \"{1}\": {2}.",
+"Adicionados {0} na pasta \"{1}\": {2}."
 ]
 ]
 }

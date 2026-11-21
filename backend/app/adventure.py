@@ -533,6 +533,12 @@ def split_adventure(text: str, part_title: str = "") -> dict:
     for s in norm["scenes"]:
         s["leads"] = [by_area.get((s["group"], x), "") for x in s["leads"]]
         s["leads"] = [x for x in s["leads"] if x]
+    # a scene with no keyed areas leads on to the next one in the book (the start -> the ambush -> the trail -> the hideout)
+    sc = norm["scenes"]
+    for i, s in enumerate(sc[:-1]):
+        nxt = sc[i + 1]
+        if not s["leads"] and not re.match(r"^[A-Z]?\d", s["name"]) and nxt["part"] == s["part"]:
+            s["leads"] = [nxt["id"]]
     found_npcs = [{"name": n["name"], "description": truncate(" ".join(n["lines"]), 600)} for n in npcs
                   if n["lines"] and n["name"][:1].isupper() and not re.search(r"\b(NPCs|the)\b|s$", n["name"])]
     return {"background": truncate("\n\n".join(background), 4000), "parts": norm["parts"], "scenes": norm["scenes"],
@@ -562,6 +568,19 @@ def merge(old: dict, new: dict, title: str = "") -> dict:
 
 
 # ------------------------------------------------------------------ in a game
+def leads_of(adv: dict, scene: dict) -> list[str]:
+    """Where a scene leads: its own list, or (a scene without keyed areas) the next scene of the same part."""
+    if scene.get("leads"):
+        return scene["leads"]
+    scenes = (adv or {}).get("scenes") or []
+    if re.match(r"^[A-Z]?\d", scene.get("name", "")):
+        return []
+    i = next((k for k, x in enumerate(scenes) if x["id"] == scene["id"]), -1)
+    if 0 <= i < len(scenes) - 1 and scenes[i + 1].get("part") == scene.get("part"):
+        return [scenes[i + 1]["id"]]  # (a location's intro: its first area)
+    return []
+
+
 def get_scene(adv: dict, scene_id: str) -> dict | None:
     return next((s for s in (adv or {}).get("scenes") or [] if s["id"] == scene_id), None)
 
@@ -602,7 +621,7 @@ def follow_player(adv: dict, state: dict, text: str) -> str | None:
     if not cur:
         return None
     said = _norm(text)
-    for lead in (get_scene(adv, x) for x in cur["leads"]):
+    for lead in (get_scene(adv, x) for x in leads_of(adv, cur)):
         if not lead:
             continue
         names = [lead["name"].split(". ", 1)[-1], *[a for a in lead["aliases"] if not a.startswith("area ")]]
@@ -611,6 +630,47 @@ def follow_player(adv: dict, state: dict, text: str) -> str | None:
         m = re.search(r"\barea\s+(\d{1,2}[a-z]?)\b", text, re.I)
         if m and f"area {m.group(1)}" in lead["aliases"]:
             return lead["id"]
+    return None
+
+
+FIGHT_WORDS = re.compile(
+    r"\b(attack\w*|charg\w*|ambush\w*|leap\w* (?:out|at)|lunge\w*|swing\w*|strike\w*|shoot\w*|arrows? (?:fly|whizz|thud)\w*|"
+    r"draws? (?:a |their |his |her )?(?:weapon|blade|sword|bow)s?|battle|fight\w*|initiative|combat|close in|"
+    r"atac\w*|embosca\w*|investe\w*|golpe\w*|flecha\w*|batalha|luta\w*|combate|iniciativa)\b", re.I)
+
+
+def _mentions(text: str, name: str) -> bool:
+    n = _singular(name)
+    forms = {n, n + "s", n[:-1] + "ves" if n.endswith("f") else n, n[:-1] + "ies" if n.endswith("y") else n}
+    return any(re.search(rf"\b{re.escape(f)}\b", text, re.I) for f in forms if len(f) >= 3)
+
+
+def follow_story(adv: dict, state: dict, text: str) -> str | None:
+    """The story itself walked into the next scene: its enemies show up ("goblins leap out") or its name is said."""
+    cur = get_scene(adv, (state.get("adventure") or {}).get("scene", ""))
+    if not cur:
+        return None
+    for lead in (get_scene(adv, x) for x in leads_of(adv, cur)):
+        if not lead:
+            continue
+        if any(_mentions(text, e["name"]) for e in lead["enemies"]) and not any(_mentions(text, e["name"]) for e in cur["enemies"]):
+            return lead["id"]
+        short = _norm(lead["name"].split(". ", 1)[-1])
+        if len(short) >= 6 and re.search(rf"\b{re.escape(short)}\b", _norm(text)):
+            return lead["id"]
+    return None
+
+
+def fight_offer(adv: dict, state: dict, user_text: str, reply: str) -> dict | None:
+    """A fight is breaking out in a scene that has enemies: the chat offers to start it on the battle grid."""
+    st = state.get("adventure") or {}
+    s = get_scene(adv, st.get("scene", ""))
+    if not s or not s["enemies"] or (state.get("combat") or {}).get("active") or s["id"] in (st.get("fought") or []):
+        return None
+    talked_of = any(_mentions(reply, e["name"]) for e in s["enemies"])
+    if FIGHT_WORDS.search(user_text) or (talked_of and FIGHT_WORDS.search(reply)):
+        return {"scene": s["id"], "name": s["name"],
+                "enemies": [{"name": e["name"], "count": e["count"]} for e in s["enemies"]]}
     return None
 
 
@@ -671,7 +731,7 @@ def scene_section(adv: dict, state: dict, limit: int = 2600) -> str:
                      + ". If a fight breaks out, say so plainly: the app runs it on the battle grid.")
     if s["treasure"]:
         lines.append("Treasure (only if found): " + truncate(s["treasure"], 300))
-    leads = [get_scene(adv, x) for x in s["leads"]]
+    leads = [get_scene(adv, x) for x in leads_of(adv, s)]
     if any(leads):
         lines.append("Ways on from here: " + ", ".join(x["name"] for x in leads if x))
     return truncate("\n".join(lines), limit)

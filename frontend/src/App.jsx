@@ -301,6 +301,20 @@ export default function App() {
   const combatEdit = async (cid, patch) => {
     try { const state = await api.combatEdit(activeId, cid, patch); setGame((g) => (g ? { ...g, state } : g)); } catch (e) { setError(e.message); }
   };
+  const startSceneFight = async (fight) => { // ⚔ under a reply: the scene's enemies, on the adventure's map when it has one
+    try {
+      const r = await api.combatSuggest(activeRef.current, "d20");
+      const b = r.battle;
+      setPanelOpen(true); setTab("combat");
+      combatAction({ action: "start", system: "d20", enemies: r.enemies, scene: fight.scene,
+        grid: b ? { w: b.w, h: b.h } : { w: 12, h: 8 },
+        map: b ? { tiles: [], background: b.background, name: b.name, geom: b.geom, fog: b.fog } : undefined,
+        near: b?.near || undefined });
+    } catch (e) { setError(e.message); }
+  };
+  const noSceneFight = async (fight) => {
+    try { const r = await api.adventureNoFight(activeRef.current, fight.scene); setGame((g) => (g ? { ...g, state: r.state } : g)); } catch (e) { setError(e.message); }
+  };
   const buyOffer = (messageId, index) => runTurn(`/api/conversations/${activeRef.current}/buy`, { message_id: messageId, index, qty: 1 });
   const usePower = (id) => runTurn(`/api/conversations/${activeRef.current}/ability`, { ability: id });
   const restNow = (kind) => runTurn(`/api/conversations/${activeRef.current}/rest`, { kind });
@@ -492,7 +506,7 @@ export default function App() {
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
               onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt} onSheet={sheetFrom} onEpilogue={writeEpilogue}
               follow={view.follow} portraitStyle={view.portraits} searchOpen={searchOpen}
-              scenePictures={scenePictures} onPaint={paintScene} onCheck={rollCheck} onBuy={buyOffer}
+              scenePictures={scenePictures} onPaint={paintScene} onCheck={rollCheck} onBuy={buyOffer} onFight={startSceneFight} onNoFight={noSceneFight}
               voiceOn={!!voice.name} speaking={speaking} onSpeak={playVoice} onCloseSearch={() => setSearchOpen(false)} /></ErrorBoundary>
           </>
         ) : (

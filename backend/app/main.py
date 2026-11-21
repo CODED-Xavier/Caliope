@@ -315,10 +315,15 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
     s = svc()
     action = body.get("action")
     if action == "start":
-        prepare = lambda st: s.combat.start(st, body.get("system", "d20"), BESTIARY.enrich(body.get("enemies") or []),  # noqa: E731
-                                            body.get("allies") or [], body.get("player") or {}, body.get("grid") or {},
-                                            body.get("map") if isinstance(body.get("map"), dict) else None,
-                                            body.get("near") if isinstance(body.get("near"), list) else None)
+        def prepare(st):
+            new, line = s.combat.start(st, body.get("system", "d20"), BESTIARY.enrich(body.get("enemies") or []),
+                                       body.get("allies") or [], body.get("player") or {}, body.get("grid") or {},
+                                       body.get("map") if isinstance(body.get("map"), dict) else None,
+                                       body.get("near") if isinstance(body.get("near"), list) else None)
+            if body.get("scene"):  # this scene's fight happened: the chat stops offering it
+                adv_st = new.setdefault("adventure", {"scene": "", "visited": [], "xp_given": []})
+                adv_st.setdefault("fought", []).append(str(body["scene"])[:60])
+            return new, line
     elif action == "act":
         prepare = lambda st: s.combat.player_action(st, body.get("move", "attack"), str(body.get("target", "")),  # noqa: E731
                                                     str(body.get("advantage", "")), str(body.get("ability", "")))
@@ -718,7 +723,7 @@ BESTIARY = bestiary.Bestiary(Path(DB_PATH).parent / "bestiary")
 @app.get("/api/bestiary")
 async def bestiary_list():
     """🐉 Every monster sheet (backend/data/bestiary, one file per monster)."""
-    return {"monsters": BESTIARY.list(), "folder": str(BESTIARY.folder)}
+    return {"monsters": BESTIARY.list(), "books": BESTIARY.books(), "folder": str(BESTIARY.folder)}
 
 
 @app.get("/api/bestiary/find")
@@ -733,14 +738,24 @@ async def bestiary_save(body: dict[str, Any] = Body(...)):
     return BESTIARY.save(body.get("monster") or {}, str(body.get("old_id") or ""))
 
 
-@app.delete("/api/bestiary/{monster_id}")
+@app.post("/api/bestiary/open")
+async def bestiary_open(body: dict[str, Any] = Body(default={})):
+    """Open the Bestiary's folder (or one book's) in Windows Explorer."""
+    folder = BESTIARY.folder / bestiary.book_folder(str(body.get("book") or ""))
+    folder.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        os.startfile(str(folder))  # noqa: S606
+    return {"folder": str(folder)}
+
+
+@app.delete("/api/bestiary/{monster_id:path}")
 async def bestiary_delete(monster_id: str):
     BESTIARY.delete(monster_id)
     return {"deleted": True}
 
 
 @app.post("/api/bestiary/import")
-async def bestiary_import(request: Request, replace: bool = Query(False)):
+async def bestiary_import(request: Request, replace: bool = Query(False), book: str = Query("")):
     """Read stat blocks from a text, Markdown or PDF (a book's monster appendix). Sheets already here are kept unless
     `replace`."""
     data = await read_body(request, "rulebook")
@@ -749,18 +764,21 @@ async def bestiary_import(request: Request, replace: bool = Query(False)):
         text = "\n".join(pages)
     else:
         text = "\n".join(read_text(data))
-    return _store_monsters(text, replace)
+    return _store_monsters(text, replace, book)
 
 
-def _store_monsters(text: str, replace: bool = False) -> dict:
+def _store_monsters(text: str, replace: bool = False, book: str = "") -> dict:
+    """Every stat block in the text, saved in the book's own folder (bestiary/<book>/)."""
     added, kept = [], []
+    book = bestiary.book_folder(book)
+    have = {(m["book"], bestiary.slug(m["name"])) for m in BESTIARY.list()}
     for m in bestiary.parse_statblocks(text):
-        if BESTIARY.get(m["name"]) and not replace:
+        if (book, bestiary.slug(m["name"])) in have and not replace:
             kept.append(m["name"])
             continue
-        BESTIARY.save(m)
+        BESTIARY.save({**m, "book": book})
         added.append(m["name"])
-    return {"added": added, "kept": kept}
+    return {"added": added, "kept": kept, "book": book}
 
 
 @app.post("/api/scenarios/{scenario_id}/adventure/import")
@@ -780,7 +798,8 @@ async def import_adventure(scenario_id: int, request: Request, part: str = Query
     else:
         text = "\n".join(read_text(data))
     found = await asyncio.to_thread(adventure.split_adventure, text, part.strip()[:80])
-    monsters = await asyncio.to_thread(_store_monsters, text)  # the book's stat blocks go to the Bestiary
+    book = re.sub(r"\.(md|txt|pdf)$", "", filename, flags=re.I) if filename and filename != "pasted.txt" else card["name"]
+    monsters = await asyncio.to_thread(_store_monsters, text, False, book)  # the book's stat blocks: bestiary/<book>/
     for sc in found["scenes"]:
         sc["enemies"] = [{**e, **{k: v for k, v in bestiary.combat_numbers(m).items() if k in ("hp", "ac", "attack_bonus", "damage", "init_bonus")}}
                          if (m := BESTIARY.find(e["name"])) else e for e in sc["enemies"]]
@@ -813,6 +832,19 @@ async def adventure_scene(conv_id: int, data: dict[str, Any] = Body(...)):
     if not adventure.get_scene(adv, str(data.get("scene") or "")):
         raise HTTPException(404, "This card has no such scene.")
     adventure.move(adv, state, str(data["scene"]))
+    s.conversations.save_state(conv_id, state)
+    return {"state": state}
+
+
+@app.post("/api/conversations/{conv_id}/adventure/no-fight")
+async def adventure_no_fight(conv_id: int, data: dict[str, Any] = Body(...)):
+    """"Not now" on a fight offer: this scene's fight is not offered again (it can still start from the Combat tab)."""
+    s = svc()
+    state = s.conversations.get_state(conv_id)
+    st = state.setdefault("adventure", {"scene": "", "visited": [], "xp_given": []})
+    scene = str(data.get("scene") or "")[:60]
+    if scene and scene not in st.setdefault("fought", []):
+        st["fought"].append(scene)
     s.conversations.save_state(conv_id, state)
     return {"state": state}
 

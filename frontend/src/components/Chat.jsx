@@ -69,7 +69,18 @@ function CheckButtons({ checks, onCheck }) {
   );
 }
 
-const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, scenePictures, onPaint, onCheck, onBuy, currency, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, onSheet, hit, voiceOn, isSpeaking, onSpeak }) {
+function FightOffer({ fight, onFight, onNoFight }) {
+  const foes = fight.enemies.map((e) => (e.count > 1 ? `${e.count}× ${e.name}` : e.name)).join(", ");
+  return (
+    <div className="fight-offer">
+      <span className="small"><b>⚔ A fight!</b> {foes}</span>
+      <button className="btn small primary" onClick={() => onFight(fight)}>Start the fight</button>
+      <button className="btn small" onClick={() => onNoFight(fight)} title="It isn't a fight (yet)">Not now</button>
+    </div>
+  );
+}
+
+const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, scenePictures, onPaint, onCheck, onBuy, onFight, onNoFight, fightOpen, currency, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, onSheet, hit, voiceOn, isSpeaking, onSpeak }) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -191,6 +202,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
             </div>
           )}
           {isLast && canAct && m.meta?.checks?.length > 0 && <CheckButtons checks={m.meta.checks} onCheck={(i, mode) => onCheck(m.id, i, mode)} />}
+          {isLast && canAct && m.meta?.fight && fightOpen && onFight && <FightOffer fight={m.meta.fight} onFight={onFight} onNoFight={onNoFight} />}
           {isLast && canAct && m.meta?.offers?.length > 0 && (
             <div className="check-row">
               {m.meta.offers.map((o, i) => (
@@ -244,7 +256,7 @@ function withMode(t, mode) {
   return t;
 }
 
-export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, onSheet, onEpilogue, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint, onCheck, onBuy, voiceOn, speaking, onSpeak }) {
+export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, onSheet, onEpilogue, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint, onCheck, onBuy, onFight, onNoFight, voiceOn, speaking, onSpeak }) {
   const [text, setText] = useState("");
   const [fixing, setFixing] = useState(false);
   const [beforeFix, setBeforeFix] = useState(null);
@@ -376,7 +388,8 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
             <React.Fragment key={m.id}>
             {dividers[m.id] && <div className="canto-divider"><span>{dividers[m.id].label}{dividers[m.id].title ? ` · ${dividers[m.id].title}` : ""}</span></div>}
             <Message key={m.id} m={m} npcs={game.npcs} speaker={speaker} playerPic={playerPic} portraitStyle={portraitStyle}
-              scenePictures={scenePictures} onPaint={actions.onPaint} onCheck={actions.check} onBuy={actions.buy} currency={game.conversation.scenario?.currency || "gold"} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
+              scenePictures={scenePictures} onPaint={actions.onPaint} onCheck={actions.check} onBuy={actions.buy} onFight={onFight} onNoFight={onNoFight}
+              fightOpen={!game.state?.combat?.active && !(game.state?.adventure?.fought || []).includes(m.meta?.fight?.scene)} currency={game.conversation.scenario?.currency || "gold"} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
               onRegenerate={actions.regenerate} onContinue={actions.onContinue} onFork={actions.onFork} onSheet={actions.onSheet}
               hit={m.id === current ? "search-hit current" : hits.includes(m.id) ? "search-hit" : ""} canAct={!busy} lastContext={busy ? null : lastContext}
               onEdit={actions.onEdit} onResend={actions.onResend} onRewind={actions.onRewind}

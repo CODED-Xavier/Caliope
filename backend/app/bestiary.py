@@ -83,47 +83,87 @@ def combat_numbers(m: dict) -> dict:
     return out
 
 
+def book_folder(name: str) -> str:
+    """A safe folder name for a book ("Lost Mine of Phandelver"), or '' for monsters of your own."""
+    t = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', " ", str(name or "")).strip(" .")
+    return re.sub(r"\s{2,}", " ", t)[:80]
+
+
 class Bestiary:
+    """One JSON file per monster. Monsters from a book live in a folder named after it
+    (bestiary/Lost Mine of Phandelver/goblin.json); the ones you make yourself sit at the top."""
+
     def __init__(self, folder: Path):
         self.folder = Path(folder)
 
-    def _path(self, name: str) -> Path:
-        s = slug(name)
-        if not s:
-            raise BestiaryError("A monster needs a name.")
-        return self.folder / f"{s}.json"
-
-    def list(self) -> list[dict]:
+    def _files(self) -> list[Path]:
         if not self.folder.is_dir():
             return []
-        out = []
-        for p in sorted(self.folder.glob("*.json"))[:MAX_MONSTERS]:
-            try:
-                out.append({**normalize(json.loads(p.read_text("utf-8"))), "id": p.stem})
-            except (OSError, ValueError):
-                continue
-        return sorted(out, key=lambda m: m["name"].lower())
+        top = sorted(self.folder.glob("*.json"))
+        inner = sorted(p for p in self.folder.glob("*/*.json"))
+        return (top + inner)[:MAX_MONSTERS]
+
+    def _id(self, p: Path) -> str:
+        return p.relative_to(self.folder).with_suffix("").as_posix()
+
+    def _load(self, p: Path) -> dict | None:
+        try:
+            m = normalize(json.loads(p.read_text("utf-8")))
+        except (OSError, ValueError):
+            return None
+        book = p.parent.name if p.parent != self.folder else ""
+        return {**m, "book": book, "id": self._id(p)}
+
+    def _by_id(self, monster_id: str) -> Path | None:
+        parts = [x for x in str(monster_id or "").split("/") if x]
+        if not parts or len(parts) > 2 or any(x in (".", "..") for x in parts):
+            return None
+        p = self.folder.joinpath(*parts[:-1], f"{slug(parts[-1])}.json")
+        return p if p.is_file() and self.folder.resolve() in p.resolve().parents else None
+
+    def list(self) -> list[dict]:
+        out = [m for m in (self._load(p) for p in self._files()) if m]
+        return sorted(out, key=lambda m: (m["book"].lower(), m["name"].lower()))
+
+    def books(self) -> list[str]:
+        return sorted({m["book"] for m in self.list() if m["book"]}, key=str.lower)
 
     def get(self, name_or_id: str) -> dict | None:
-        p = self.folder / f"{slug(name_or_id)}.json"
-        if p.is_file():
-            try:
-                return {**normalize(json.loads(p.read_text("utf-8"))), "id": p.stem}
-            except (OSError, ValueError):
-                return None
+        """By id ("Lost Mine of Phandelver/goblin") or by name; your own monsters win over a book's."""
+        p = self._by_id(name_or_id) if "/" in str(name_or_id) else None
+        if p:
+            return self._load(p)
+        s = slug(name_or_id)
+        if not s:
+            return None
+        own = self.folder / f"{s}.json"
+        if own.is_file():
+            return self._load(own)
+        for p in sorted(self.folder.glob(f"*/{s}.json")) if self.folder.is_dir() else []:
+            m = self._load(p)
+            if m:
+                return m
         return None
 
     def save(self, raw: dict, old_id: str = "") -> dict:
         m = normalize(raw)
-        self.folder.mkdir(parents=True, exist_ok=True)
-        path = self._path(m["name"])
+        book = book_folder(raw.get("book", ""))
+        s = slug(m["name"])
+        if not s:
+            raise BestiaryError("A monster needs a name.")
+        folder = self.folder / book if book else self.folder
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"{s}.json"
         path.write_text(json.dumps(m, ensure_ascii=False, indent=1), encoding="utf-8")
-        if old_id and slug(old_id) != path.stem:  # renamed: the old file goes
-            (self.folder / f"{slug(old_id)}.json").unlink(missing_ok=True)
-        return {**m, "id": path.stem}
+        old = self._by_id(old_id) if "/" in str(old_id) else (self.folder / f"{slug(old_id)}.json" if old_id else None)
+        if old and old.is_file() and old.resolve() != path.resolve():  # renamed or moved to another book: the old file goes
+            old.unlink(missing_ok=True)
+        return self._load(path)
 
-    def delete(self, name_or_id: str) -> None:
-        (self.folder / f"{slug(name_or_id)}.json").unlink(missing_ok=True)
+    def delete(self, monster_id: str) -> None:
+        p = self._by_id(monster_id) if "/" in str(monster_id) else self.folder / f"{slug(monster_id)}.json"
+        if p and p.is_file():
+            p.unlink(missing_ok=True)
 
     def find(self, name: str) -> dict | None:
         """A monster for an enemy's name: 'Goblin', 'Goblins', 'goblin 2', 'Cragmaw goblin'."""

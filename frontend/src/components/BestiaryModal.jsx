@@ -15,28 +15,33 @@ const mod = (v) => { const m = Math.floor((parseInt(v, 10) || 10) - 10) >> 1; re
 export default function BestiaryModal({ onClose }) {
   const [list, setList] = useState([]);
   const [folder, setFolder] = useState("");
+  const [books, setBooks] = useState([]);
+  const [shelf, setShelf] = useState("all");      // all | "" (your own) | a book
   const [query, setQuery] = useState("");
   const [edit, setEdit] = useState(null);         // {monster, oldId}
   const [importing, setImporting] = useState(false);
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
   const [err, setErr] = useState("");
-  const load = () => api.bestiary().then((r) => { setList(r.monsters || []); setFolder(r.folder || ""); }).catch((e) => setErr(e.message));
+  const load = () => api.bestiary().then((r) => { setList(r.monsters || []); setBooks(r.books || []); setFolder(r.folder || ""); }).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, []);
 
-  const runImport = async (body) => {
+  const [bookName, setBookName] = useState("");
+  const runImport = async (body, filename = "") => {
     setErr(""); setNote("");
     try {
-      const r = await api.bestiaryImport(body);
-      setNote(r.added.length ? `Added ${r.added.length}: ${r.added.join(", ")}.${r.kept.length ? ` Already here (kept): ${r.kept.join(", ")}.` : ""}`
+      const book = bookName.trim() || filename.replace(/\.(md|txt|pdf)$/i, "");
+      const r = await api.bestiaryImport(body, false, book);
+      setNote(r.added.length ? `Added ${r.added.length}${r.book ? ` to the folder "${r.book}"` : ""}: ${r.added.join(", ")}.${r.kept.length ? ` Already here (kept): ${r.kept.join(", ")}.` : ""}`
         : r.kept.length ? `All already here: ${r.kept.join(", ")}.` : "No stat blocks were found in that text.");
-      setImporting(false); setText(""); load();
+      setImporting(false); setText(""); setBookName(""); if (r.book) setShelf(r.book); load();
     } catch (e) { setErr(e.message); }
   };
 
   if (edit) {
     return (
       <Modal title={edit.oldId ? `🐉 ${edit.monster.name}` : "🐉 Create monster"} onClose={onClose} wide>
+        <datalist id="bestiary-books">{books.map((b) => <option key={b} value={b} />)}</datalist>
         <MonsterSheet initial={edit.monster} onCancel={() => setEdit(null)}
           onSave={async (m) => { try { await api.bestiarySave(m, edit.oldId); setEdit(null); setNote(`"${m.name}" saved.`); load(); } catch (e) { ask.alert(e.message); } }}
           onDelete={edit.oldId ? async () => {
@@ -47,22 +52,30 @@ export default function BestiaryModal({ onClose }) {
     );
   }
   const q = query.trim().toLowerCase();
-  const shown = list.filter((m) => !q || `${m.name} ${m.type}`.toLowerCase().includes(q));
+  const shown = list.filter((m) => (shelf === "all" || m.book === shelf) && (!q || `${m.name} ${m.type}`.toLowerCase().includes(q)));
+  const groups = [...new Set(shown.map((m) => m.book))];
   return (
     <Modal title="🐉 Bestiary" onClose={onClose} wide>
       <div className="bestiary">
-        <div className="muted small"><HelpTip id="bestiary" /> Monster sheets for fights. An enemy with the same name (or its plural) gets these numbers: AC, HP, attack, damage, initiative and speed. Each monster is a file in <span className="mono no-tr">{folder}</span>.</div>
+        <div className="muted small"><HelpTip id="bestiary" /> Monster sheets for fights. An enemy with the same name (or its plural) gets these numbers: AC, HP, attack, damage, initiative and speed. Each monster is a file in <span className="mono no-tr">{folder}</span>, in a folder per book.</div>
         <div className="row gap center wrap">
-          <button className="btn small primary" onClick={() => setEdit({ monster: { ...BLANK, stats: { ...BLANK.stats }, actions: [...BLANK.actions] }, oldId: "" })}>＋ Create monster</button>
+          <button className="btn small primary" onClick={() => setEdit({ monster: { ...BLANK, book: shelf === "all" ? "" : shelf, stats: { ...BLANK.stats }, actions: [...BLANK.actions] }, oldId: "" })}>＋ Create monster</button>
           <button className="btn small" onClick={() => setImporting(!importing)}>⤒ Import stat blocks</button>
+          <button className="btn small" onClick={() => api.bestiaryOpen(shelf === "all" ? "" : shelf).catch((e) => setErr(e.message))} title="Open the folder in Windows Explorer">📂 Open folder</button>
           <span className="grow" />
-          <input className="field" style={{ maxWidth: 220 }} placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <select className="field" style={{ maxWidth: 220 }} value={shelf} onChange={(e) => setShelf(e.target.value)}>
+            <option value="all">{`All books (${list.length})`}</option>
+            <option value="">{`My monsters (${list.filter((m) => !m.book).length})`}</option>
+            {books.map((b) => <option key={b} value={b}>{`${b} (${list.filter((m) => m.book === b).length})`}</option>)}
+          </select>
+          <input className="field" style={{ maxWidth: 180 }} placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         {importing && (
           <div className="card">
             <div className="small">A book's monster appendix (or any text with stat blocks: "Armor Class 15", "Hit Points 7 (2d6)", the STR…CHA table, "+4 to hit… Hit: 5 (1d6 + 2)"). Monsters already here are kept.</div>
-            <div className="row gap center">
-              <label className="btn small">⬆ File (.md, .txt, .pdf)<input type="file" accept=".md,.txt,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) runImport(f); e.target.value = ""; }} /></label>
+            <div className="row gap center wrap">
+              <input className="field grow" placeholder="Book (folder) name: the file's name if empty" value={bookName} onChange={(e) => setBookName(e.target.value)} />
+              <label className="btn small">⬆ File (.md, .txt, .pdf)<input type="file" accept=".md,.txt,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) runImport(f, f.name); e.target.value = ""; }} /></label>
             </div>
             <textarea className="field" rows={6} placeholder="…or paste the stat blocks here" value={text} onChange={(e) => setText(e.target.value)} />
             <button className="btn small primary" disabled={!text.trim()} onClick={() => runImport(new Blob([text], { type: "text/plain" }))}>Read them</button>
@@ -71,12 +84,17 @@ export default function BestiaryModal({ onClose }) {
         {note && <div className="ok-text small">{note}</div>}
         {err && <div className="error-text small">{err}</div>}
         <div className="monster-list">
-          {shown.map((m) => (
-            <button key={m.id} className="monster-row" onClick={() => setEdit({ monster: m, oldId: m.id })}>
-              {m.picture ? <img src={portraitSrc(m.picture)} alt="" /> : <span className="monster-dot">🐉</span>}
-              <span className="grow"><b>{m.name}</b> <span className="muted tiny">{m.type}</span></span>
-              <span className="tiny">{`AC ${m.ac} · HP ${m.hp}${m.cr ? ` · CR ${m.cr}` : ""}`}</span>
-            </button>
+          {groups.map((g) => (
+            <React.Fragment key={g || "own"}>
+              <div className="book-title">{g ? `📖 ${g}` : "✍ My monsters"}</div>
+              {shown.filter((m) => m.book === g).map((m) => (
+                <button key={m.id} className="monster-row" onClick={() => setEdit({ monster: m, oldId: m.id })}>
+                  {m.picture ? <img src={portraitSrc(m.picture)} alt="" /> : <span className="monster-dot">🐉</span>}
+                  <span className="grow"><b>{m.name}</b> <span className="muted tiny">{m.type}</span></span>
+                  <span className="tiny">{`AC ${m.ac} · HP ${m.hp}${m.cr ? ` · CR ${m.cr}` : ""}`}</span>
+                </button>
+              ))}
+            </React.Fragment>
           ))}
           {!shown.length && <div className="muted small">{list.length ? "Nothing matches." : "No monsters yet: create one or import a book's appendix."}</div>}
         </div>
@@ -99,6 +117,7 @@ function MonsterSheet({ initial, onSave, onCancel, onDelete }) {
         <div className="grow">
           <label className="lbl">Name<input className="field" value={m.name} onChange={(e) => set("name", e.target.value)} placeholder="Goblin" /></label>
           <label className="lbl">Type<input className="field" value={m.type} onChange={(e) => set("type", e.target.value)} placeholder="Small Humanoid (Goblinoid), Neutral Evil" /></label>
+          <label className="lbl">Book (folder)<input className="field" value={m.book || ""} onChange={(e) => set("book", e.target.value)} placeholder="empty = My monsters" list="bestiary-books" /></label>
           <label className="btn small">⬆ Picture<input type="file" accept="image/*" hidden onChange={(e) => upload(e.target.files?.[0])} /></label>
         </div>
       </div>

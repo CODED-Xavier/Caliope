@@ -688,7 +688,12 @@ function AdventureTab({ adventure, state, convId, onState, onFight, busy }) {
   const xp = async () => { try { const r = await api.adventureXp(convId, cur.id); onState(r.state); } catch (e) { setError(e.message); } };
   const map = cur && (adventure.maps || []).find((m) => m.id === cur.map);
   const pic = map && (map.player_picture || map.picture);
-  const leads = cur ? (cur.leads || []).map((id) => scenes.find((s) => s.id === id)).filter(Boolean) : [];
+  const leadIds = !cur ? [] : cur.leads?.length ? cur.leads : (() => { // no keyed areas: the next scene of the same part
+    if (/^[A-Z]?\d/.test(cur.name)) return [];
+    const i = scenes.indexOf(cur), nxt = scenes[i + 1];
+    return nxt && nxt.part === cur.part ? [nxt.id] : [];
+  })();
+  const leads = leadIds.map((id) => scenes.find((s) => s.id === id)).filter(Boolean);
   const parts = adventure.parts || [];
   return (
     <div className="tab-body adventure-tab">

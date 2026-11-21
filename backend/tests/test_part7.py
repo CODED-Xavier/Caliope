@@ -415,3 +415,44 @@ class MarkdownBookTests(unittest.TestCase):
         self.assertIn("Developments:", den["notes"])
         self.assertIn("copper ring", burrow["treasure"])
         self.assertEqual(burrow["group"], "Rat Den")
+
+
+class SceneFlowTests(unittest.TestCase):
+    def test_the_story_walks_into_the_next_scene_and_a_fight_is_offered(self):
+        from app import adventure
+        adv = adventure.normalize_adventure({"parts": [{"id": "p", "title": "Road"}], "scenes": [
+            {"name": "The start", "part": "p", "read_aloud": "You ride south."},
+            {"name": "Goblin Ambush", "part": "p", "enemies": [{"name": "Goblin", "count": 4, "hp": 7}]},
+            {"name": "Goblin Trail", "part": "p"}]})
+        st = {"adventure": {"scene": "the-start", "visited": ["the-start"], "xp_given": []}}
+        self.assertEqual(adventure.leads_of(adv, adv["scenes"][0]), ["goblin-ambush"])   # no areas: the next scene
+        self.assertIsNone(adventure.follow_story(adv, st, "The road is quiet."))
+        went = adventure.follow_story(adv, st, "Shrill laughter: a pack of goblins leaps out of the woods!")
+        self.assertEqual(went, "goblin-ambush")
+        adventure.move(adv, st, went)
+        offer = adventure.fight_offer(adv, st, "I draw my sword and attack.", "The goblins charge.")
+        self.assertEqual(offer["enemies"], [{"name": "Goblin", "count": 4}])
+        self.assertIsNone(adventure.fight_offer(adv, st, "I greet them.", "The goblins watch you quietly."))
+        st["adventure"]["fought"] = ["goblin-ambush"]
+        self.assertIsNone(adventure.fight_offer(adv, st, "I attack!", "The goblins charge."))
+
+
+class BestiaryBookTests(unittest.TestCase):
+    def test_a_books_monsters_live_in_its_own_folder(self):
+        import tempfile
+        from pathlib import Path
+        from app import bestiary as B
+        with tempfile.TemporaryDirectory() as d:
+            book = B.Bestiary(Path(d))
+            g = book.save({"name": "Goblin", "hp": 7, "book": "Lost Mine of Phandelver"})
+            self.assertTrue((Path(d) / "Lost Mine of Phandelver" / "goblin.json").is_file())
+            self.assertEqual((g["book"], g["id"]), ("Lost Mine of Phandelver", "Lost Mine of Phandelver/goblin"))
+            book.save({"name": "Goblin", "hp": 9})                                # your own goblin wins
+            self.assertEqual(book.find("Goblins")["hp"], 9)
+            self.assertEqual(book.books(), ["Lost Mine of Phandelver"])
+            book.delete("Lost Mine of Phandelver/goblin")
+            self.assertEqual([m["id"] for m in book.list()], ["goblin"])
+            self.assertIsNone(book._by_id("../../etc/passwd"))
+            moved = book.save({"name": "Goblin", "hp": 9, "book": "My homebrew"}, old_id="goblin")  # moved to a book
+            self.assertEqual(moved["id"], "My homebrew/goblin")
+            self.assertFalse((Path(d) / "goblin.json").exists())

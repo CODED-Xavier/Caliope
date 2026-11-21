@@ -740,6 +740,16 @@ class ChatEngine:
         ended = story_ended(reply) and bool(scenario.get("ending") or scenario.get("length", "open") != "open")
         if ended:
             meta["finished"] = True
+        adv = scenario.get("adventure") or {}
+        if adv.get("scenes") and not is_gm_message(user_msg["content"]):
+            st = self.repo.get_state(conv_id)
+            went = adventure.move(adv, st, adventure.follow_story(adv, st, reply))
+            if went:
+                st["adventure"]["fresh"] = ""  # the story already walked in: no need to read the box again
+                self.repo.save_state(conv_id, st)
+            offer = adventure.fight_offer(adv, st, user_msg["content"], reply)
+            if offer:
+                meta["fight"] = offer  # "⚔ A fight! 4 × Goblin [Start the fight]" under the reply
         assistant_msg = self.repo.add_message(conv_id, "assistant", reply, meta)
         st = self.repo.get_state(conv_id)
         moved = routes.advance(st, scenario.get("route"))  # the planned scene was written: the next one comes after it

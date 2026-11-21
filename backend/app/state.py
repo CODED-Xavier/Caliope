@@ -135,7 +135,8 @@ def _story_part(merged: dict) -> dict:
     if isinstance(adv, dict):
         ids = lambda v: [str(x)[:60] for x in v if str(x).strip()][:300] if isinstance(v, list) else []  # noqa: E731
         out["adventure"] = {"scene": str(adv.get("scene") or "")[:60], "visited": ids(adv.get("visited")),
-                            "xp_given": ids(adv.get("xp_given")), "fresh": str(adv.get("fresh") or "")[:60]}
+                            "xp_given": ids(adv.get("xp_given")), "fresh": str(adv.get("fresh") or "")[:60],
+                            "fought": ids(adv.get("fought"))}
     return out
 
 
