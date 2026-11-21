@@ -105,3 +105,32 @@ def merge(npc: dict, values: dict) -> dict:
             out[k] = values[k]
     return out
 
+
+def merge_characters(card: dict, incoming: list[dict]) -> tuple[dict, list[str], list[str]]:
+    """Add characters to a card's data: one with the same name gets its empty boxes filled (pictures and anything
+    already written stay), new names are added (not met yet). Returns (data, added names, updated names)."""
+    from .cardpics import match_name
+
+    data = dict(card)
+    npcs = list(data.get("npcs", []))
+    added, updated = [], []
+    for new in incoming:
+        who = match_name(new["name"], [n["name"] for n in npcs])
+        if who:
+            i = next(k for k, n in enumerate(npcs) if n["name"] == who)
+            old = dict(npcs[i])
+            for k in ("description", "personality", "speech_style"):
+                if not str(old.get(k, "")).strip() and new.get(k):
+                    old[k] = new[k]
+            looks = dict(old.get("appearance") or {})
+            for k, v in (new.get("appearance") or {}).items():
+                if v and not str(looks.get(k, "")).strip():
+                    looks[k] = v
+            old["appearance"] = looks
+            npcs[i] = old
+            updated.append(who)
+        else:
+            npcs.append({**new, "met": False, "in_prompt": True})
+            added.append(new["name"])
+    data["npcs"] = npcs
+    return data, added, updated

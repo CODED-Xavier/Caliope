@@ -170,6 +170,45 @@ class Muse:
         raw = await self.llm.chat(msgs, max_tokens=max_tokens, temperature=temperature)
         return re.sub(r"^\s*(sure|here( is|'s)|of course)[^\n]*\n", "", (raw or "").strip(), flags=re.I).strip()
 
+    async def make_characters(self, talk_id: int) -> AsyncIterator[dict]:
+        """Sheets for the characters of the talk (to add to an existing card), one character at a time."""
+        talk = self.get(talk_id)
+        if not talk["messages"]:
+            yield {"type": "error", "message": "Talk with the Muse about your characters first."}
+            return
+        summary, recent = await self._context(talk)
+        try:
+            yield {"type": "progress", "step": "Who the characters are"}
+            listing = await self._ask(summary, recent, "List the characters we created or discussed in this talk (at most 8), "
+                                                       "one per line, as: Name - role. Only the list.", 250, 0.3)
+            cast = parse_cast(listing)
+            if not cast:
+                yield {"type": "error", "message": "The Muse found no characters in this talk. Name them first."}
+                return
+            npcs = []
+            for i, (cname, role) in enumerate(cast):
+                yield {"type": "progress", "step": f"Character {i + 1} of {len(cast)}: {cname}"}
+                npcs.append(await self._sheet(summary, recent, cname, role, first=False))
+        except Exception as exc:  # the model server went away
+            yield {"type": "error", "message": f"The Muse could not finish: {exc}"}
+            return
+        yield {"type": "characters", "npcs": npcs}
+        yield {"type": "done"}
+
+    async def _sheet(self, summary: str, recent: list[dict], cname: str, role: str, first: bool) -> dict:
+        sheet = parse_sheet(await self._ask(summary, recent, (
+            f"Write the sheet of {cname} ({role}) as exactly five labeled lines:\n"
+            "Description: (who they are, history, what they want; 2-4 sentences)\n"
+            "Personality: (traits, a contradiction, habits)\nSpeech: (how they talk)\n"
+            "Looks: (hair, eyes, build, clothes)\nRace: (one or two words)"), 420))
+        return {
+            "name": cname,
+            "description": (f"{role}. " if role else "") + sheet.get("description", ""),
+            "personality": sheet.get("personality", ""), "speech_style": sheet.get("speech", ""),
+            "appearance": {"race": sheet.get("race", ""), "extra": sheet.get("looks", "")},
+            "relationship": 0, "met": first, "in_prompt": True,
+        }
+
     async def make_card(self, talk_id: int) -> AsyncIterator[dict]:
         talk = self.get(talk_id)
         if not talk["messages"]:
@@ -198,18 +237,7 @@ class Muse:
             npcs = []
             for i, (cname, role) in enumerate(cast):
                 yield {"type": "progress", "step": f"Character {i + 1} of {len(cast)}: {cname}"}
-                sheet = parse_sheet(await ask("npc", (
-                    f"Write the sheet of {cname} ({role}) as exactly five labeled lines:\n"
-                    "Description: (who they are, history, what they want; 2-4 sentences)\n"
-                    "Personality: (traits, a contradiction, habits)\nSpeech: (how they talk)\n"
-                    "Looks: (hair, eyes, build, clothes)\nRace: (one or two words)"), 420))
-                npcs.append({
-                    "name": cname,
-                    "description": (f"{role}. " if role else "") + sheet.get("description", ""),
-                    "personality": sheet.get("personality", ""), "speech_style": sheet.get("speech", ""),
-                    "appearance": {"race": sheet.get("race", ""), "extra": sheet.get("looks", "")},
-                    "relationship": 0, "met": i == 0 and who.startswith("CHAR"), "in_prompt": True,
-                })
+                npcs.append(await self._sheet(summary, recent, cname, role, first=(i == 0 and who.startswith("CHAR"))))
             yield {"type": "progress", "step": "The opening scene"}
             opening = await ask("opening", "Write the opening message of the story: 120 to 250 words, in second person "
                                            "('you'), vivid, ending at a moment where the player must act.", 500, 0.9)

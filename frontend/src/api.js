@@ -107,6 +107,7 @@ export const api = {
   museCreate: (title = "") => request("POST", "/api/muse", { title }),
   museDelete: (id) => request("DELETE", `/api/muse/${id}`),
   museUndo: (id) => request("POST", `/api/muse/${id}/undo`),
+  mergeCharacters: (id, npcs) => request("POST", `/api/scenarios/${id}/npcs/merge`, { npcs }),
   cardFile: (card) => request("POST", "/api/cards/export", { card }),
   cardPicturesBrowse: (id) => request("POST", `/api/scenarios/${id}/pictures/browse`),
   cardPicturesScan: (id, folder) => request("POST", `/api/scenarios/${id}/pictures/scan`, { folder }),

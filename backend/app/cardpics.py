@@ -37,7 +37,8 @@ def match_name(folder: str, names: list[str]) -> str | None:
         return exact[0]
     for test in (lambda n: norm(n).split(" ")[0] == f,                        # first name
                  lambda n: f in norm(n).split(" "),                           # any part of the name
-                 lambda n: norm(n).startswith(f + " ") or f.startswith(norm(n) + " ")):
+                 lambda n: norm(n).startswith(f + " ") or f.startswith(norm(n) + " "),
+                 lambda n: norm(n) in f.split()):                                # "Sister Maelis" -> "Maelis"
         hits = [n for n in names if test(n)]
         if len(hits) == 1:
             return hits[0]

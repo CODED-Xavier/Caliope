@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.7**. The version history is at the end of this file.
+Current version: **v2.8**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -218,6 +218,7 @@ The bucket stays private: Calíope signs every download with your keys and keeps
 - **↶ Undo last** removes her last answer so you can ask differently.
 - **✨ Make it a card** turns the talk into a card. The model is asked for one piece at a time (title, pitch, world, tone, each character's sheet, the opening), so the card always comes out valid. It takes one or two minutes on an RX 580.
 - The preview offers **＋ Add to Calíope** (find it in New game; ✎ to edit) or **⤓ Save file** (a JSON card to import later).
+- **👥 Add characters to a card** writes sheets (description, personality, speech, looks) for the characters of the talk and adds them to one of your cards. A character with the same name already in the card (for example one created from your pictures folder) keeps its pictures and anything written; only its empty boxes are filled. Games using the card get the characters too, not met yet.
 
 The Muse and your games share the model, so one waits for the other.
 
@@ -407,3 +408,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.5 | Narration voice |
 | 2.6 | Columns hide fully, no scrollbars, spell check, character notes (yours and the Aedo's), Personas, new characters from a picture folder |
 | 2.7 | Character boxes filled from the card (once), sheet from your first answer, pictures right before speech and on mood changes, Places with fixed pictures |
+| 2.8 | The Muse adds characters to an existing card |

@@ -760,6 +760,38 @@ async def muse_card(talk_id: int):
     return stream_response(_one_at_a_time(svc().muse.make_card(talk_id)))
 
 
+@app.post("/api/muse/{talk_id}/characters")
+async def muse_characters(talk_id: int):
+    svc().muse.get(talk_id)
+    return stream_response(_one_at_a_time(svc().muse.make_characters(talk_id)))
+
+
+@app.post("/api/scenarios/{scenario_id}/npcs/merge")
+async def card_merge_characters(scenario_id: int, body: dict = Body(...)):
+    """Add characters (from the Muse) to a card: a character with the same name (e.g. one made from a picture
+    folder) gets its empty boxes filled; new names are added. Games using the card get them too (not met yet)."""
+    sc, names = _card_names(scenario_id)
+    incoming = [n for n in body.get("npcs") or [] if isinstance(n, dict) and str(n.get("name", "")).strip()][:20]
+    data, added, updated = npcfill.merge_characters(sc["data"], incoming)
+    svc().scenarios.update(scenario_id, {**data, "name": sc["name"]})
+    card = svc().scenarios.get(scenario_id)
+    by = {n["name"]: n for n in card["data"]["npcs"]}
+    for r in svc().db.query("SELECT id FROM conversations WHERE scenario_id = ?", (scenario_id,)):
+        for name in added + updated:
+            n = by.get(name)
+            row = svc().conversations.find_npc(r["id"], name)
+            if not n:
+                continue
+            if not row:
+                svc().conversations.add_npc(r["id"], name, description=n.get("description", ""), personality=n.get("personality", ""),
+                                            speech_style=n.get("speech_style", ""), appearance=n.get("appearance"),
+                                            portraits=n.get("portraits"), met=False)
+            else:
+                svc().conversations.update_npc(row["id"], **{k: n.get(k) for k in ("description", "personality", "speech_style")
+                                                            if not str(row.get(k, "")).strip() and n.get(k)})
+    return {"added": added, "updated": updated, "card": card}
+
+
 @app.post("/api/cards/export")
 async def card_to_file(body: dict = Body(...)):
     """A card the Muse made, as a standard Character Card file (without adding it to Calíope)."""

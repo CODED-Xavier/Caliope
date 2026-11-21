@@ -14,6 +14,7 @@ export default function MuseModal({ onClose, onCardAdded }) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [card, setCard] = useState(null);
+  const [chars, setChars] = useState(null);
   const [note, setNote] = useState("");
   const [err, setErr] = useState("");
   const bottom = useRef(null);
@@ -53,6 +54,18 @@ export default function MuseModal({ onClose, onCardAdded }) {
     setBusy(false); setProgress("");
   };
 
+  const makeChars = async () => {
+    if (busy || !talk) return;
+    setBusy(true); setErr(""); setCard(null); setChars(null); setNote(""); setProgress("Starting…");
+    try {
+      await streamPost(`/api/muse/${talk.id}/characters`, {}, (ev) => {
+        if (ev.type === "progress") setProgress(ev.step);
+        else if (ev.type === "characters") setChars(ev.npcs);
+        else if (ev.type === "error") setErr(ev.message);
+      });
+    } catch (e) { setErr(e.message); }
+    setBusy(false); setProgress("");
+  };
   const addCard = async () => {
     try { const saved = await api.createScenario(card); setNote(`"${saved.name}" is in Calíope now: find it in New game (✎ to edit it).`); onCardAdded?.(); } catch (e) { setErr(e.message); }
   };
@@ -107,6 +120,7 @@ export default function MuseModal({ onClose, onCardAdded }) {
                 {stream && <div className="msg assistant"><div className="bubble"><Markdown text={stream} /></div></div>}
                 {busy && !stream && <div className="muted small"><span className="spinner" /> {progress || "The Muse is thinking…"}</div>}
                 {card && <CardPreview card={card} onAdd={addCard} onSave={saveFile} onDiscard={() => setCard(null)} />}
+                {chars && <CharactersPreview npcs={chars} onDone={(msg) => { setChars(null); setNote(msg); }} onError={setErr} onDiscard={() => setChars(null)} />}
                 {note && <div className="ok-text small">{note}</div>}
                 {err && <div className="error-text small">{err}</div>}
                 <div ref={bottom} />
@@ -120,6 +134,7 @@ export default function MuseModal({ onClose, onCardAdded }) {
               <div className="row gap center muse-actions">
                 <button className="btn small" disabled={busy || !talk.messages.length} onClick={undo} title="Remove her last answer (and your message) to ask differently">↶ Undo last</button>
                 <span className="grow" />
+                <button className="btn small" disabled={busy || !talk.messages.length} onClick={makeChars} title="Write sheets for the characters of this talk and add them to one of your cards">👥 Add characters to a card</button>
                 <button className="btn small primary" disabled={busy || !talk.messages.length} onClick={makeCard}>✨ Make it a card</button>
               </div>
             </>
@@ -152,6 +167,40 @@ function CardPreview({ card, onAdd, onSave, onDiscard }) {
         <button className="btn small" onClick={onDiscard}>Discard</button>
         <button className="btn small" onClick={onSave}>⤓ Save file</button>
         <button className="btn small primary" onClick={onAdd}>＋ Add to Calíope</button>
+      </div>
+    </div>
+  );
+}
+
+function CharactersPreview({ npcs, onDone, onError, onDiscard }) {
+  const [cards, setCards] = useState([]);
+  const [target, setTarget] = useState("");
+  const [pick, setPick] = useState(() => npcs.map(() => true));
+  useEffect(() => { api.scenarios().then((l) => { setCards(l); if (l[0]) setTarget(String(l[0].id)); }).catch(() => {}); }, []);
+  const add = async () => {
+    try {
+      const chosen = npcs.filter((_, i) => pick[i]);
+      const r = await api.mergeCharacters(target, chosen);
+      const name = cards.find((c) => String(c.id) === target)?.name || "the card";
+      onDone(`${name}: ${r.added.length ? `added ${r.added.join(", ")}` : ""}${r.added.length && r.updated.length ? "; " : ""}${r.updated.length ? `filled in ${r.updated.join(", ")}` : ""}. Games using the card have them too.`);
+    } catch (e) { onError(e.message); }
+  };
+  return (
+    <div className="card muse-card">
+      <strong>Characters from this talk</strong>
+      {npcs.map((n, i) => (
+        <label key={n.name} className="check small" style={{ alignItems: "flex-start" }}>
+          <input type="checkbox" checked={pick[i]} onChange={(e) => setPick((p) => p.map((v, j) => (j === i ? e.target.checked : v)))} />
+          <span><b>{n.name}</b>: {n.description}<br /><span className="muted">{n.personality}{n.speech_style ? ` · ${n.speech_style}` : ""}</span></span>
+        </label>
+      ))}
+      <div className="muted tiny">A character with the same name already in the card (for example one added from your pictures folder) keeps its pictures and anything written; only its empty boxes are filled.</div>
+      <div className="row gap center">
+        <select className="field grow" value={target} onChange={(e) => setTarget(e.target.value)}>
+          {cards.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <button className="btn small" onClick={onDiscard}>Discard</button>
+        <button className="btn small primary" disabled={!target || !pick.some(Boolean)} onClick={add}>＋ Add to this card</button>
       </div>
     </div>
   );

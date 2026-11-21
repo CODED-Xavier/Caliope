@@ -23,7 +23,7 @@ class MuseLLM(FakeLLM):
             return "Beneath Lumencia lies the Black Seminary..."
         if "tone and writing style" in q:
             return "Gothic, intimate, light-dark."
-        if "List the important characters" in q:
+        if "List the important characters" in q or "List the characters" in q:
             return "1. **Bishop Corvin** - head of the seminary\n2. Sister Maelis: a doubting acolyte\n3. Bishop Corvin - duplicate"
         if "Write the sheet of" in q:
             return ("Description: Leads the rites.\nPersonality: Gentle and cruel.\nSpeech: Soft, formal.\n"
@@ -97,3 +97,25 @@ class MuseTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AddCharactersTests(unittest.IsolatedAsyncioTestCase):
+    async def test_make_and_merge(self):
+        from app.npcfill import merge_characters
+        llm = MuseLLM()
+        s = make_services(llm)
+        t = s.muse.create()
+        s.muse._add(t["id"], "user", "Students for the cult route: Bishop Corvin and Sister Maelis")
+        events = await collect(s.muse.make_characters(t["id"]))
+        npcs = next(e["npcs"] for e in events if e["type"] == "characters")
+        self.assertEqual([n["name"] for n in npcs], ["Bishop Corvin", "Sister Maelis"])
+        card = {"npcs": [{"name": "Maelis", "portraits": {"default": "/api/cardpics/1/maelis/1.png", "moods": []},
+                          "personality": "Already written"}]}
+        data, added, updated = merge_characters(card, npcs)
+        self.assertEqual(added, ["Bishop Corvin"])
+        self.assertEqual(updated, ["Maelis"])                       # matched the picture-folder character by name
+        maelis = data["npcs"][0]
+        self.assertEqual(maelis["personality"], "Already written")  # never overwritten
+        self.assertEqual(maelis["speech_style"], "Soft, formal.")
+        self.assertEqual(maelis["portraits"]["default"], "/api/cardpics/1/maelis/1.png")
+        self.assertFalse(data["npcs"][1]["met"])
