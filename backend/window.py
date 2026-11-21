@@ -70,12 +70,13 @@ def _set_icon() -> None:
 
 
 class WindowApi:
-    """Called by the page through window.pywebview.api (F11)."""
-    window = None
+    """Called by the page through window.pywebview.api (F11). The window is kept in an underscore attribute: pywebview
+    hands every public attribute of this object to the page, and walking the whole Window object froze the app."""
+    _window = None
 
     def toggle_fullscreen(self):
-        if self.window is not None:
-            self.window.toggle_fullscreen()
+        if self._window is not None:
+            self._window.toggle_fullscreen()
         return True
 
 
@@ -99,7 +100,7 @@ def main() -> int:
                                            maximized=True, js_api=api)
         except TypeError:  # an older pywebview without "maximized"
             window = webview.create_window(TITLE, url, width=1400, height=900, min_size=(900, 600), text_select=True, js_api=api)
-        api.window = window
+        api._window = window
         window.events.shown += lambda: threading.Thread(target=_set_icon, daemon=True).start()
         webview.start(private_mode=False, storage_path=storage)  # keeps your settings between sessions
     except Exception as e:  # no WebView2, or another start problem: the launcher uses Edge instead

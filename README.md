@@ -503,3 +503,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.21 | Reputation as a system: the tracker names the event, the app gives fixed values (repeats count less, capped per reply); defined effects for each relationship level; the reasons in the People tab |
 | 2.22 | 🐉 Bestiary (Create monster, import stat blocks, fights use the sheets); Markdown books (headings and read-aloud boxes); the Status shows from the start; the window opens maximized, F11 full screen; the icon is back on the game window |
 | 2.22.1 | Big map pictures (20+ MB PNGs) are turned into WebP when uploaded |
+| 2.22.2 | Fix: the app window froze at start (the F11 helper exposed the whole window to the page) |
