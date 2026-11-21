@@ -921,6 +921,9 @@ async def card_fill_characters(scenario_id: int, body: dict = Body(default={})):
             data = dict(sc["data"])
             data["npcs"] = [npcfill.merge(n, values) if n["name"] == npc["name"] else n for n in data["npcs"]]
             svc().scenarios.update(scenario_id, {**data, "name": sc["name"]})
+            done_npc = next((n for n in data["npcs"] if n["name"] == npc["name"]), None)
+            if done_npc:  # shown in the editor right away, one character at a time
+                yield {"type": "filled", "npc": done_npc}
             for r in svc().db.query("SELECT id FROM conversations WHERE scenario_id = ?", (scenario_id,)):
                 row = svc().conversations.find_npc(r["id"], npc["name"])
                 if row:  # running games: only boxes that are still empty there

@@ -205,6 +205,7 @@ export function FillCharacters({ cardId, npcs, onFilled }) {
     try {
       await streamPost(`/api/scenarios/${cardId}/npcs/fill`, {}, (ev) => {
         if (ev.type === "progress") setStep(ev.step);
+        else if (ev.type === "filled") onFilled({ data: { npcs: [ev.npc] } });  // each character as soon as it is written
         else if (ev.type === "error") setErr(ev.message);
         else if (ev.type === "done") { setNote(`Filled ${ev.filled} character(s). Saved in the card and in games using it.`); if (ev.card) onFilled(ev.card); }
       });
