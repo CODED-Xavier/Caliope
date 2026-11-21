@@ -31,7 +31,7 @@ from .rulebooks import RulebookError, ocr_available
 from .runtime import ENGINE_KEYS, EngineError
 from .modelhub import download_root, pick_model_file
 from .picker import pick_folder
-from . import backups, cardpics, r2
+from . import backups, cardpics, npcfill, r2
 from .voice import CATALOG as VOICE_CATALOG, VoiceError
 from .images import UPLOAD_NAME, ImageError, get_image, http_fetch, save_upload
 from .scenes import PixAIError, is_pixai, is_pollinations, pixai_paint, polite_fetch
@@ -834,6 +834,47 @@ async def card_pictures_apply(scenario_id: int, body: dict = Body(...)):
                     touched = True
             games += touched
     return {"characters": len(pics), "new": new_names, "games": games, "card": svc().scenarios.get(scenario_id)}
+
+
+@app.post("/api/scenarios/{scenario_id}/npcs/fill")
+async def card_fill_characters(scenario_id: int, body: dict = Body(default={})):
+    """Write the empty looks / personality / speech boxes of the card's characters (from what the card says, the rest
+    invented once to fit), save them in the card and in games already using it. Streams progress."""
+    _card_names(scenario_id)
+    wanted = {str(n) for n in body.get("names") or []}
+
+    async def run():
+        sc = svc().scenarios.get(scenario_id)
+        todo = [n for n in sc["data"].get("npcs", []) if (not wanted or n["name"] in wanted) and npcfill.missing(n)]
+        if not todo:
+            yield {"type": "done", "filled": 0, "card": sc}
+            return
+        filled = 0
+        for i, npc in enumerate(todo, 1):
+            yield {"type": "progress", "step": f"{npc['name']} ({i} of {len(todo)})"}
+            try:
+                values = await npcfill.fill_one(svc().llm, sc["data"], npc)
+            except Exception as exc:  # the model went away: keep what is done
+                yield {"type": "error", "message": f"Stopped at {npc['name']}: {exc}"}
+                break
+            if not values:
+                continue
+            sc = svc().scenarios.get(scenario_id)  # saved after each one, so stopping keeps the work
+            data = dict(sc["data"])
+            data["npcs"] = [npcfill.merge(n, values) if n["name"] == npc["name"] else n for n in data["npcs"]]
+            svc().scenarios.update(scenario_id, {**data, "name": sc["name"]})
+            for r in svc().db.query("SELECT id FROM conversations WHERE scenario_id = ?", (scenario_id,)):
+                row = svc().conversations.find_npc(r["id"], npc["name"])
+                if row:  # running games: only boxes that are still empty there
+                    keep = {k: v for k, v in values.items() if k in npcfill.missing(row)}
+                    if keep:
+                        merged = npcfill.merge(row, keep)
+                        svc().conversations.update_npc(row["id"], appearance=merged["appearance"],
+                                                       personality=merged["personality"], speech_style=merged["speech_style"])
+            filled += 1
+        yield {"type": "done", "filled": filled, "card": svc().scenarios.get(scenario_id)}
+
+    return stream_response(run())
 
 
 @app.post("/api/scenarios/{scenario_id}/pictures/r2")

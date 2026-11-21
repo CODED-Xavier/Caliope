@@ -523,3 +523,8 @@ body.resizing { user-select: none; cursor: col-resize; }
 .npc-notes li.aedo { color: var(--accent-2); }
 .npc-notes li.aedo::marker { content: "✒ "; }
 .persona-bar { flex-wrap: wrap; margin: 4px 0 10px; }
+.fill-chars { flex-wrap: wrap; margin: 4px 0 8px; }
+.places-edit > summary { cursor: pointer; list-style: none; }
+.place-thumb { width: 96px; height: 64px; object-fit: cover; border-radius: 8px; background: var(--bg2); flex-shrink: 0; }
+.place-thumb.empty { display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.col { display: flex; flex-direction: column; gap: 4px; }

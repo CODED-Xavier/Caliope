@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.6**. The version history is at the end of this file.
+Current version: **v2.7**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -89,7 +89,7 @@ Settings > *API key* also works with services that speak the same language (Open
 1. **＋ New game** → pick a card. 👥 shows its characters with picture, name and role.
 2. If the card has several starts, choose one in **Choose your start** (for example, Lumencia's default start or another route).
 3. **Create your sheet** (Adventure cards) or **Who are you?** (Roleplay cards).
-   - Or choose *Let the story ask me* for cards that create your character in the chat.
+   - Or choose *Let the story ask me* for cards that create your character in the chat (like Lumencia). When you answer with your sheet (name, origin, department, attributes…), the app reads it once and fills your **Sheet** tab.
    - **✨ Fill the empty fields** suggests a background, looks and personality.
    - **Your world additions**: lore of your own (a great house, a home village, a secret order). It is canon in this game, even where the card says otherwise.
    - **🎭 Personas**: pick one of your saved characters to fill this screen, or **💾 Save as persona** to reuse this one in other games (name, background, looks, personality and world additions).
@@ -171,6 +171,8 @@ The AI's role:
 - **＋ New game → ✎** on a card opens the editor. **✨ Write with AI** drafts the teaser, world, rules, tone or opening from the rest of the card.
 - **✨ Generate from an idea** drafts a whole card. The [Muse](#5-the-muse) goes further.
 - **Characters**: description, personality, speech style, looks, pictures and moods.
+  - **✨ Fill looks, personality and speech from the card**: the AI reads what the card says about each character and writes their empty boxes. What the card says is used as it is; what it doesn't say is invented **once** to fit the character. It's saved in the card, so the character stays the same in every game, and it's also written into games already using the card. Edit anything afterwards here or in the People tab.
+- **Places**: locations with a fixed picture (⬆ from your PC or a link), plus other names and a short description. When the story arrives at a place, its picture appears above the reply at once (nothing is painted) and goes in the map bag. The Aedo learns the places' names.
 
 ### Importing and sharing
 - **Import a card** reads Character Card V2 JSON files (the SillyTavern format), the lorebook included, and **.caliope** files.
@@ -225,11 +227,11 @@ The Muse and your games share the model, so one waits for the other.
 
 ### Character pictures and moods
 People tab or card editor → *🖼 Pictures and moods*: a main picture plus Standard, Happy, Sad, Angry, Disgusted, Blushing, and up to 12 moods of your own. Each comes from your PC (⬆) or a link (🔗).
-- The Aedo shows a character's picture above the part where they speak, and the picture changes with their mood.
+- The Aedo narrates first, then shows the character's picture **right before they speak**. When their mood changes later in the reply, the picture appears again with the new mood. (The app moves a misplaced picture to just before the character's line.)
 - **Your own picture**: click the circle beside your name on the Sheet.
 
 ### Scene pictures and the map bag (optional, needs internet)
-Settings > *Scene pictures*. When a scene starts (a new place, a fight), the Aedo describes the place and a picture is painted above the reply.
+Settings > *Scene pictures*. When a scene starts (a new place, a fight), the Aedo describes the place and a picture is painted above the reply. Places the card has a fixed picture for use that picture instead (no painting, no internet).
 - **Pollinations** (free, no account) is the default. **PixAI** can be used with your own API key and model ID.
 - Only the description of the place leaves your PC: names are removed and your messages are never sent.
 - **🎒 Map bag** (Map tab): the first picture of each place is kept on its own, and **📌** keeps any other. Each shows the place, in-game date and Canto.
@@ -404,3 +406,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.4 | Daily backups and .caliope card files |
 | 2.5 | Narration voice |
 | 2.6 | Columns hide fully, no scrollbars, spell check, character notes (yours and the Aedo's), Personas, new characters from a picture folder |
+| 2.7 | Character boxes filled from the card (once), sheet from your first answer, pictures right before speech and on mood changes, Places with fixed pictures |

@@ -17,7 +17,8 @@ from typing import AsyncIterator
 
 from .appearance import appearance_seed
 from .checks import find_checks
-from . import resources, routes
+from . import resources, routes, sheetchat
+from .places import find_place, place_picture
 from .shop import find_offers, is_trade
 from . import statusbook
 from .signals import needs_tracking, quiet_minutes
@@ -608,8 +609,34 @@ class ChatEngine:
                 else:
                     yield {"type": "state", **result}
 
-        if settings.get("scene_pictures") and not is_gm_message(user_msg["content"]):
-            place_now = self.repo.get_state(conv_id).get("location", "")
+        st_now = self.repo.get_state(conv_id)
+        if sheetchat.wanted(st_now, self.repo.count_replies(conv_id) + 1, user_msg["content"]):
+            # cards that create your character in the story: your answer fills the Sheet tab (once)
+            opening = next((m["content"] for m in self.repo.list_messages(conv_id) if m["role"] == "assistant"), "")
+            try:
+                sheet = await sheetchat.read_sheet(self.llm, opening, user_msg["content"])
+            except Exception as exc:  # the sheet stays as it was; the story goes on
+                log.warning("Reading the sheet from the chat failed: %s", exc)
+                sheet = None
+            if sheet:
+                st_now = self.repo.get_state(conv_id)
+                got = sheetchat.apply_sheet(st_now, sheet)
+                if got:
+                    self.repo.save_state(conv_id, st_now)
+                    yield {"type": "state", "state": st_now, "npcs": self.repo.list_npcs(conv_id), "changes": ["Your sheet: " + "; ".join(got)]}
+
+        place_now = self.repo.get_state(conv_id).get("location", "")
+        fixed = place_picture(find_place(scenario.get("places") or [], place_now)) \
+            if place_now and (place_now != place_before or not self.repo.has_meta(conv_id, "scene_picture")) else None
+        if fixed and not is_gm_message(user_msg["content"]):  # a place the card has a picture for: shown at once
+            self.repo.update_message_meta(assistant_msg["id"], {"scene_picture": fixed})
+            if self.cantos and settings.get("auto_keep_pictures", True):
+                kept = self.cantos.auto_keep(conv_id, assistant_msg["id"], fixed, self.repo.get_state(conv_id))
+                if kept:
+                    self.repo.update_message_meta(assistant_msg["id"], {"kept_picture": kept["id"]})
+            yield {"type": "scene_picture", "message_id": assistant_msg["id"], "picture": fixed}
+            yield {"type": "message_updated", "message": self.repo.get_message(assistant_msg["id"])}
+        elif settings.get("scene_pictures") and not is_gm_message(user_msg["content"]):
             first = not self.repo.has_meta(conv_id, "scene_picture")
             new_scene = first or (place_now and place_now != place_before) or "\u2694\ufe0f Combat starts" in user_msg["content"]
             if new_scene:

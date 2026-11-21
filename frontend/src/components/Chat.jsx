@@ -28,7 +28,7 @@ function ScenePicture({ pic, onReroll, canAct, kept, onKeep }) {
       <figcaption>
         {!kept && state === "ok" && <button className="icon-btn" title="Keep it in the map bag (Map tab)" onClick={onKeep}>📌</button>}
         {kept && <span className="tiny muted" title="In the map bag (Map tab)">📌 kept</span>}
-        {canAct && <button className="icon-btn" title="Another version of this picture" onClick={onReroll}>🎲</button>}
+        {canAct && !pic.place && <button className="icon-btn" title="Another version of this picture" onClick={onReroll}>🎲</button>}
         <button className="icon-btn" title="Hide" onClick={() => setHidden(true)}>✕</button>
       </figcaption>
     </figure>

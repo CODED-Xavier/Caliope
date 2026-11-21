@@ -102,6 +102,8 @@ def resolve_portraits(text: str, npcs: list[dict], max_n: int = MAX_PER_REPLY) -
     """Rewrite portrait marks as clean tags. Returns (new text, {"Name|Mood": picture URL})."""
     shown: dict[str, str] = {}
     people: set[str] = set()
+    last_mood: dict[str, str] = {}
+    last_who = [""]
 
     def tag(npc: dict | None, mood: str) -> str:
         if not npc or not npc.get("portraits"):
@@ -112,7 +114,11 @@ def resolve_portraits(text: str, npcs: list[dict], max_n: int = MAX_PER_REPLY) -
         key = f"{npc['name']}|{label}"
         if npc["name"] not in people and len(people) >= max_n:
             return ""  # only the two most important characters get a picture
+        if last_mood.get(npc["name"]) == label and last_who[0] == npc["name"]:
+            return ""  # the same face again, nothing changed
         people.add(npc["name"])
+        last_mood[npc["name"]] = label
+        last_who[0] = npc["name"]
         shown[key] = url
         return f"\n[[show: {npc['name']} | {label}]]\n"
 
@@ -135,8 +141,48 @@ def resolve_portraits(text: str, npcs: list[dict], max_n: int = MAX_PER_REPLY) -
         return img_sub(_IMG.match(m.group(0)))
 
     out = combined.sub(any_sub, text or "")
+    out = place_before_speech(out)
     out = re.sub(r"\n{3,}", "\n\n", out).strip()
     return out, shown
+
+
+_QUOTE = re.compile(r"[\"\u201c\u00ab]")
+_TAG_LINE = re.compile(r"^\[\[show:[^\]]*\]\]$")
+
+
+def place_before_speech(text: str) -> str:
+    """Move each portrait to just before the character's spoken line, after the narration.
+
+    A tag followed by narration slides down to the first paragraph with speech (before the next tag). When that
+    paragraph starts with narration and the speech comes after a full sentence, the paragraph is split there so the
+    picture sits between the narration and the line."""
+    paras = [p for p in re.split(r"\n\s*\n|\n(?=\[\[show:)|(?<=\]\])\n", text) if p.strip()]
+    out: list[str] = []
+    i = 0
+    while i < len(paras):
+        p = paras[i].strip()
+        if not _TAG_LINE.match(p):
+            out.append(p)
+            i += 1
+            continue
+        # find the first paragraph with speech after this tag, before the next tag
+        j = i + 1
+        while j < len(paras) and not _TAG_LINE.match(paras[j].strip()) and not _QUOTE.search(paras[j]):
+            j += 1
+        if j >= len(paras) or _TAG_LINE.match(paras[j].strip()):
+            out.append(p)  # no speech follows: keep the picture where the model put it
+            i += 1
+            continue
+        out.extend(x.strip() for x in paras[i + 1:j])  # the narration first
+        target = paras[j].strip()
+        q = _QUOTE.search(target)
+        head = target[:q.start()].rstrip()
+        if q.start() > 0 and re.search(r"[.!?*\u2026]$", head):
+            out += [head, p, target[q.start():]]
+        else:
+            out += [p, target]
+        i = j + 1
+    return "\n\n".join(out)
 
 
 def portrait_instructions(npcs: list[dict], mode: str = "gm_world") -> str:
@@ -161,10 +207,10 @@ def portrait_instructions(npcs: list[dict], mode: str = "gm_world") -> str:
         )
     return (
         "## Portraits\n"
-        "To show a character's portrait, write a line  [[show: Name | Mood]]  right before the paragraph where that "
-        "character speaks or acts. Moods: Standard, Happy, Sad, Angry, Disgusted, Blushing." + extra_line + " Show at most 2 portraits per "
-        "reply: the 2 most important characters of the scene, the second one only when its part starts. Never write "
-        "image links or URLs; the app inserts the pictures.\n"
+        "Narrate first. Then, right before a character's spoken line, write a line  [[show: Name | Mood]]  with their mood. "
+        "When their mood changes later in the reply, write the line again with the new mood before they speak again. "
+        "Moods: Standard, Happy, Sad, Angry, Disgusted, Blushing." + extra_line + " At most 2 characters with portraits per "
+        "reply (the 2 most important of the scene). Never write image links or URLs; the app inserts the pictures.\n"
         "Characters with portraits: " + ", ".join(names)
     )
 

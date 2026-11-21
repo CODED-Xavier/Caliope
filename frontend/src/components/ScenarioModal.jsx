@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { CharacterPreview, PicturesFolder, StartsEditor } from "./CardExtras.jsx";
+import { CharacterPreview, FillCharacters, PicturesFolder, PlacesEditor, StartsEditor } from "./CardExtras.jsx";
 import Modal from "./Modal.jsx";
 import HelpTip from "./HelpTip.jsx";
 import KindPicker from "./KindPicker.jsx";
@@ -340,6 +340,7 @@ function Editor({ initial, id, onCancel, onSaved }) {
       <label className="lbl">Opening message <DraftButton field="opening_message" card={d} onText={(t) => set("opening_message", t)} /></label>
       <textarea className="field" rows={4} value={d.opening_message} onChange={(e) => set("opening_message", e.target.value)} />
       <StartsEditor starts={d.starts} npcs={d.npcs} onChange={(v) => set("starts", v)} />
+      <PlacesEditor places={d.places} onChange={(v) => set("places", v)} />
 
       <div className="section-title">{d.mode === "character" ? "The character" : "Characters (NPCs)"} <span className="muted tiny">({d.npcs.length})</span></div>
       <PicturesFolder cardId={id} npcs={d.npcs} onApplied={(card) => {
@@ -349,6 +350,10 @@ function Editor({ initial, id, onCancel, onSaved }) {
           const added = (card.data.npcs || []).filter((n) => !have.has(n.name)); // "＋ Add as a new character"
           return { ...p, npcs: [...p.npcs.map((n) => (pics[n.name] ? { ...n, portraits: pics[n.name] } : n)), ...added] };
         });
+      }} />
+      <FillCharacters cardId={id} npcs={d.npcs} onFilled={(card) => {
+        const by = Object.fromEntries((card.data.npcs || []).map((n) => [n.name, n]));
+        setD((p) => ({ ...p, npcs: p.npcs.map((n) => (by[n.name] ? { ...n, appearance: by[n.name].appearance, personality: by[n.name].personality, speech_style: by[n.name].speech_style } : n)) }));
       }} />
       {d.npcs.length > 8 && <div className="row gap center"><input className="field grow" placeholder="Find a character…" value={npcFilter} onChange={(e) => setNpcFilter(e.target.value)} /></div>}
       {d.npcs.map((n, i) => (npcFilter && !n.name.toLowerCase().includes(npcFilter.toLowerCase())) ? null : (

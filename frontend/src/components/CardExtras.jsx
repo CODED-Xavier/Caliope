@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { api } from "../api.js";
+import { api, streamPost } from "../api.js";
 import { moodUrl, portraitSrc } from "../portraits.js";
 import HelpTip from "./HelpTip.jsx";
 
@@ -185,5 +185,76 @@ export function PicturesFolder({ cardId, npcs, onApplied }) {
       {note && <div className="ok-text small">{note}</div>}
       {err && <div className="error-text small">{err}</div>}
     </div>
+  );
+}
+
+
+/** Card editor: write the empty looks / personality / speech boxes from what the card says (the rest invented once
+ *  to fit the character), saved in the card and in games already using it. */
+export function FillCharacters({ cardId, npcs, onFilled }) {
+  const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState("");
+  const [note, setNote] = useState("");
+  const [err, setErr] = useState("");
+  const LOOK = ["race", "hair", "eyes", "build", "skin", "outfit"];
+  const empty = (npcs || []).filter((n) => !n.personality || !n.speech_style || LOOK.some((k) => !(n.appearance || {})[k])).length;
+  const run = async () => {
+    if (!window.confirm(`Fill the empty boxes of ${empty} character(s)? What the card says is used; what it doesn't say is invented once to fit each character. You can edit everything afterwards.`)) return;
+    setBusy(true); setErr(""); setNote(""); setStep("Starting…");
+    try {
+      await streamPost(`/api/scenarios/${cardId}/npcs/fill`, {}, (ev) => {
+        if (ev.type === "progress") setStep(ev.step);
+        else if (ev.type === "error") setErr(ev.message);
+        else if (ev.type === "done") { setNote(`Filled ${ev.filled} character(s). Saved in the card and in games using it.`); if (ev.card) onFilled(ev.card); }
+      });
+    } catch (e) { setErr(e.message); }
+    setBusy(false); setStep("");
+  };
+  if (!cardId || !empty) return null;
+  return (
+    <div className="row gap center fill-chars">
+      <button className="btn small" disabled={busy} onClick={run}>✨ Fill looks, personality and speech from the card ({empty})</button>
+      <HelpTip id="fill_characters" />
+      {busy && <span className="muted small"><span className="spinner" /> {step}</span>}
+      {note && <span className="ok-text small">{note}</span>}
+      {err && <span className="error-text small">{err}</span>}
+    </div>
+  );
+}
+
+/** Card editor: places with a fixed picture (from this PC or a link), shown when the story arrives there. */
+export function PlacesEditor({ places, onChange }) {
+  const list = places || [];
+  const setAt = (i, k, v) => onChange(list.map((p, j) => (j === i ? { ...p, [k]: v } : p)));
+  const upload = async (i, file) => {
+    if (!file) return;
+    try { const r = await api.uploadPicture(file); setAt(i, "picture", r.url); } catch (e) { window.alert(e.message); }
+  };
+  return (
+    <details className="places-edit" open={list.length > 0 && list.length <= 4}>
+      <summary className="section-title">Places <HelpTip id="places" /> <span className="muted tiny">({list.length})</span></summary>
+      <div className="muted tiny">Places of this world with a fixed picture. When the story arrives at one, its picture appears at once (nothing is painted). The Aedo also learns their names.</div>
+      {list.map((p, i) => (
+        <div className="card place-row" key={i}>
+          <div className="row gap">
+            {p.picture ? <img className="place-thumb" src={portraitSrc(p.picture)} alt="" /> : <div className="place-thumb empty">🏞</div>}
+            <div className="grow col">
+              <div className="row gap center">
+                <input className="field grow" placeholder="Name (e.g. Grand Hall)" value={p.name || ""} onChange={(e) => setAt(i, "name", e.target.value)} />
+                <button className="icon-btn" title="Remove" onClick={() => onChange(list.filter((_, j) => j !== i))}>✕</button>
+              </div>
+              <input className="field" placeholder="Other names, separated by commas (e.g. Great Hall, Salão)" value={(p.aliases || []).join(", ")}
+                onChange={(e) => setAt(i, "aliases", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))} />
+              <div className="row gap center">
+                <label className="btn small">⬆ From this PC<input type="file" accept="image/*" hidden onChange={(e) => upload(i, e.target.files?.[0])} /></label>
+                <input className="field grow" placeholder="…or a picture link" value={p.picture || ""} onChange={(e) => setAt(i, "picture", e.target.value.trim())} />
+              </div>
+              <input className="field" placeholder="Short description (optional)" value={p.description || ""} onChange={(e) => setAt(i, "description", e.target.value)} />
+            </div>
+          </div>
+        </div>
+      ))}
+      {list.length < 60 && <button className="btn small" onClick={() => onChange([...list, { name: "", aliases: [], picture: "", description: "" }])}>＋ Add a place</button>}
+    </details>
   );
 }

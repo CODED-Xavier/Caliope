@@ -16,6 +16,7 @@ from .worldtime import CALENDAR_RULES, gm_notes
 from .resources import RESOURCE_RULES
 from .resources import gm_notes as resource_notes
 from .routes import planned_scene, route_section
+from .places import places_section
 
 LANGUAGE_DIRECTIVES = {
     "en": "Write everything in English.",
@@ -198,7 +199,7 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
 
 
 SECTION_ORDER = [
-    "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "route",
+    "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "route", "places",
     "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
     "player", "pinned", "opening", "cantos", "summary",
 ]
@@ -249,6 +250,8 @@ class PromptBuilder:
             sections["player_lore"] = always_section(player_lore)
         if cantos:
             sections["cantos"] = cantos
+        if places_section(scenario.get("places")):
+            sections["places"] = places_section(scenario.get("places"))
         route = scenario.get("route")
         if route_section(route):
             sections["route"] = route_section(route)

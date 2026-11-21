@@ -265,7 +265,7 @@ class UploadTests(unittest.TestCase):
         from app.portraits import portrait_instructions
         npcs = [{"name": "Mira", "is_main": True, "active": True, "portraits": {"default": "https://x/m.png", "moods": []}}]
         self.assertIn("Start EVERY reply with a line  [[show: Mira | Mood]]", portrait_instructions(npcs, "character"))
-        self.assertIn("at most 2 portraits", portrait_instructions(npcs, "gm_cast"))
+        self.assertIn("At most 2 characters with portraits", portrait_instructions(npcs, "gm_cast"))
 
 
 class CoverTests(unittest.TestCase):

@@ -16,6 +16,7 @@ from .cards import KINDS, default_kind, normalize_features
 from .db import Database
 from .portraits import _url, normalize_portraits  # noqa: F401  (kept here for older imports)
 from .routes import normalize_starts
+from .places import normalize_places
 from .status import split_template
 from .util import extract_json, now, slugify, truncate
 from .worldtime import normalize_calendar
@@ -160,6 +161,7 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "alternate_openings": [_clip(x, 6000) for x in raw.get("alternate_openings", [])[:10] if str(x).strip()] if isinstance(raw.get("alternate_openings"), list) else [],
         "opening_message": str(raw.get("opening_message", "")),
         "starts": normalize_starts(raw.get("starts")),
+        "places": normalize_places(raw.get("places")),
         "player": raw.get("player") if isinstance(raw.get("player"), dict) else {},
         "npcs": npcs,
         "skills": {"attached": attached},
