@@ -15,7 +15,7 @@ import time
 from contextlib import aclosing
 from typing import AsyncIterator
 
-from .appearance import appearance_seed
+from .appearance import appearance_line, appearance_seed
 from .checks import find_checks
 from . import aedo_desk, resources, routes, sheetchat
 from .places import find_place, place_picture
@@ -832,17 +832,25 @@ class ChatEngine:
         yield {"type": "done"}
 
     async def _scene_picture(self, conv_id: int, message_id: int, text: str, settings: dict,
-                             reroll_of: dict | None = None) -> dict | None:
+                             reroll_of: dict | None = None, kind: str = "place") -> dict | None:
         """Write a picture prompt for this scene and attach the picture link to the message (Pollinations paints it
         when the interface first shows it). A reroll keeps the prompt and changes only the seed."""
         try:
             if reroll_of and reroll_of.get("prompt"):
                 prompt = reroll_of["prompt"]
             else:
-                names = [n["name"] for n in self.repo.list_npcs(conv_id)]
+                npcs = self.repo.list_npcs(conv_id)
+                names = [n["name"] for n in npcs]
                 state = self.repo.get_state(conv_id)
-                names.append(state["player"].get("name") or "")
-                prompt = await write_prompt(self.llm, text, state, settings.get("scene_picture_style", ""), names)
+                player = state["player"].get("name") or ""
+                names.append(player)
+                low = text.lower()
+                people = [(n["name"], appearance_line(n.get("appearance") or {}) or truncate(n.get("description") or "", 160))
+                          for n in npcs if n["name"].split()[0].lower() in low]
+                if player:  # the player's character, when the scene shows them (by name or as "you")
+                    people.append((player, truncate(state["player"].get("description") or "", 200)))
+                prompt = await write_prompt(self.llm, text, state, settings.get("scene_picture_style", ""), names,
+                                            kind=kind, people=people[:5])
         except (LLMError, ValueError) as exc:
             log.warning("Scene picture prompt failed: %s", exc)
             return None
@@ -860,7 +868,7 @@ class ChatEngine:
         if self.is_busy(conv_id):
             raise BusyError("Wait for the current reply to finish.")
         pic = await self._scene_picture(conv_id, message_id, msg["content"], self.settings.all(),
-                                        msg["meta"].get("scene_picture") if reroll else None)
+                                        msg["meta"].get("scene_picture") if reroll else None, kind="scene")
         if not pic:
             raise LLMError("The model could not describe this scene. Is LM Studio running?")
         return self.repo.get_message(message_id)

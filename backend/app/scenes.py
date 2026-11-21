@@ -49,33 +49,55 @@ async def polite_fetch(url: str, fetch) -> tuple[bytes, str]:
             _last_request = time.monotonic()
 
 
-def clean_prompt(text: str) -> str:
+def clean_prompt(text: str, limit: int = 400) -> str:
     t = re.sub(r"^\W*(image prompt|prompt)\s*:\s*", "", (text or "").strip(), flags=re.I)
     t = t.strip().strip('"\u201c\u201d').strip()
     t = re.sub(r"\s+", " ", t)
-    return truncate(t, 400)
+    return truncate(t, limit)
 
 
-async def write_prompt(llm, scene_text: str, state: dict, style: str, names: list[str]) -> str:
-    """One short call: describe the place, light and mood for a painter (no names, no text in the picture)."""
+PLACE_ASK = (
+    "Write a prompt for an illustrator who paints ONE wide establishing picture of the PLACE where this scene happens.\n"
+    "In 60 to 90 words describe: the architecture and materials (walls, floors, arches, windows, furniture), the size of the "
+    "space, the light (sources, colour, time of day), the air and atmosphere (dust, mist, smoke, warmth), the weather if "
+    "outside, and the people or creatures there, small in the scene. Fill the whole picture: a detailed background, "
+    "never a plain or white background, never a lone silhouette in an empty space.\n"
+    "No names, no text or letters in the picture. English only. Output only the prompt.")
+
+SCENE_ASK = (
+    "Write a prompt for an illustrator who paints ONE picture of this exact moment of the story.\n"
+    "In 70 to 110 words describe: the place around them (architecture, light, atmosphere, weather), then each character "
+    "in view with their looks given below (hair, eyes, build, clothes) and what they are doing right now: pose, gesture, "
+    "expression, where they stand, who looks at whom. Detailed background, never a plain or white background.\n"
+    "Refer to people only by their looks (\"a slender woman with silver hair\"), never by name. No text or letters in the "
+    "picture. English only. Output only the prompt.")
+
+TAIL = "detailed environment, cinematic lighting, rich background"
+
+
+async def write_prompt(llm, scene_text: str, state: dict, style: str, names: list[str],
+                       kind: str = "place", people: list[tuple[str, str]] | None = None) -> str:
+    """One short call that writes the picture prompt. `kind` "place": the place itself, in detail (the automatic
+    picture on arriving somewhere). "scene": this moment, with the characters' saved looks and their poses (the 🖼
+    button). Names never leave the PC: each is replaced by "a figure" if the model still writes one."""
     where = ", ".join(x for x in (state.get("location"), state.get("time"), state.get("weather")) if x)
+    looks = "\n".join(f"- {n}: {l}" for n, l in (people or []) if l)
     prompt = (
-        "Write a prompt for an illustrator who paints ONE picture of the current scene of a story.\n"
-        "Describe in at most 45 words: the place, the light and weather, the mood, and the important things or creatures "
-        "in view. Do not use any person's name, do not describe the main character's face, no text or letters in the "
-        "picture. English only. Output only the prompt.\n"
+        (SCENE_ASK if kind == "scene" else PLACE_ASK) + "\n"
         + (f"Where/when: {where}\n" if where else "")
-        + f"Scene:\n{truncate(scene_text, 1500)}"
+        + (f"Looks of the characters (use them exactly):\n{looks}\n" if kind == "scene" and looks else "")
+        + f"Scene:\n{truncate(scene_text, 1800)}"
     )
-    raw = await llm.chat([{"role": "user", "content": prompt}], max_tokens=120, temperature=0.7)
-    text = clean_prompt(raw)
-    for name in names:  # names never leave the PC
-        if len(name) >= 3:
-            text = re.sub(rf"\b{re.escape(name)}\b", "a figure", text, flags=re.I)
+    raw = await llm.chat([{"role": "user", "content": prompt}], max_tokens=220, temperature=0.7)
+    text = clean_prompt(raw, 900)
+    for name in sorted(names, key=len, reverse=True):  # names never leave the PC
+        for part in {name, *name.split()}:
+            if len(part) >= 3:
+                text = re.sub(rf"\b{re.escape(part)}\b", "a figure", text, flags=re.I)
     if not text:
         raise ValueError("The model did not describe the scene.")
     style = (style or "").strip()
-    return truncate(f"{text}, {style}" if style else text, 450)
+    return truncate(", ".join(x for x in (text, style, TAIL) if x), 1000)
 
 
 def new_seed() -> int:

@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.15**. The version history is at the end of this file.
+Current version: **v2.16**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -247,7 +247,7 @@ People tab or card editor → *🖼 Pictures and moods*: a main picture plus Sta
 - **Your own picture**: click the circle beside your name on the Sheet.
 
 ### Scene pictures and the map bag (optional, needs internet)
-Settings > *Scene pictures*. When a scene starts (a new place, a fight), the Aedo describes the place and a picture is painted above the reply. Places the card has a fixed picture for use that picture instead (no painting, no internet).
+Settings > *Scene pictures*. When a scene starts (a new place, a fight), the Aedo first describes the place in detail (architecture, windows, light, air, weather, the people there) and a picture of it is painted above the reply. **🖼** under any reply paints *that moment* instead: the place plus each character in view with their saved looks (hair, eyes, build, clothes) and what they are doing. Names never leave your PC; people are described by their looks. Places the card has a fixed picture for use that picture instead (no painting, no internet).
 - **Pollinations** (free, no account) is the default. **PixAI** can be used with your own API key and model ID.
 - Only the description of the place leaves your PC: names are removed and your messages are never sent.
 - **🎒 Map bag** (Map tab): the first picture of each place is kept on its own, and **📌** keeps any other. Each shows the place, in-game date and Canto.
@@ -430,6 +430,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |
 | 2.11 | The interface in English and Português (Brasil), switched in Settings or in the tour |
 | 2.11.1 | Audit 2 fixes (see AUDIT.md): start names, Places in .caliope files, repeated place pictures, safer imports |
+| 2.16 | Pictures: a new place is described in detail first (architecture, light, air, weather, people there; no more empty white backgrounds), and 🖼 on a reply paints that exact moment with the characters' saved looks and poses |
 | 2.15 | Cards: what the player knows from the start, fixed facts, secrets (never handed out), story length and ending with THE END and an epilogue; ✨ Wishes for the story on the Sheet tab; the Aedo answers only what your character could know; The Hollow Crown rewritten |
 | 2.14 | Group 1 of the playtest notes: never speaking for your character, the story language next to every message, reputation only from your actions, speaking modes under the text box (and `mestre,` questions), a first-model card on the home screen, summaries in the background, roomier card titles; each card has its own Pictures folder with 🔍 Search |
 | 2.13 | Calíope runs its models itself (own models folder, LM Studio's copies moved in, LM Studio never opened), desktop and Start menu shortcuts, faster replies (story read ahead, card reminders read once, window moves in steps), your sheet in the chat fills the card's Status (📋 on any of your messages to read it again) |

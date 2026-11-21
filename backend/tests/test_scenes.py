@@ -16,8 +16,23 @@ class PromptTests(unittest.IsolatedAsyncioTestCase):
         text = await write_prompt(llm, "Rena walks to the docks.", {"location": "Harbor", "time": "dawn"}, "oil painting", ["Rena"])
         self.assertNotIn("Rena", text)
         self.assertTrue(text.startswith("a figure stands in a misty harbor"))
-        self.assertTrue(text.endswith("oil painting"))
-        self.assertIn("Where/when: Harbor, dawn", llm.chat_calls[-1][0][0]["content"])
+        self.assertIn(", oil painting, ", text)
+        self.assertTrue(text.endswith("rich background"))
+        ask = llm.chat_calls[-1][0][0]["content"]
+        self.assertIn("Where/when: Harbor, dawn", ask)
+        self.assertIn("never a plain or white background", ask)                  # the place, in detail
+
+    async def test_scene_prompt_uses_the_characters_looks(self):
+        llm = FakeLLM()
+        llm.summary = "Lyra Moonwhisper leans on the railing while Aster watches"
+        text = await write_prompt(llm, "Lyra leans on the railing.", {}, "", ["Lyra Moonwhisper", "Aster"], kind="scene",
+                                  people=[("Lyra Moonwhisper", "Elf; hair: silver; eyes: violet")])
+        ask = llm.chat_calls[-1][0][0]["content"]
+        self.assertIn("pose, gesture", ask)
+        self.assertIn("- Lyra Moonwhisper: Elf; hair: silver; eyes: violet", ask)
+        self.assertNotIn("Lyra", text)
+        self.assertNotIn("Moonwhisper", text)
+        self.assertNotIn("Aster", text)
 
     def test_url(self):
         url = picture_url("a dark forest, rain", 42)
