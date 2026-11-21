@@ -41,7 +41,7 @@ from .playerlore import parse_suggestions, suggest_prompt
 from .checks import roll_line
 from . import shop
 from . import resources
-from . import adventure, sheets, statusbook, wikiresearch
+from . import adventure, bestiary, sheets, statusbook, wikiresearch
 from . import worldtime
 from .engine import BusyError
 from .llm import LLMError
@@ -315,7 +315,7 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
     s = svc()
     action = body.get("action")
     if action == "start":
-        prepare = lambda st: s.combat.start(st, body.get("system", "d20"), body.get("enemies") or [],  # noqa: E731
+        prepare = lambda st: s.combat.start(st, body.get("system", "d20"), BESTIARY.enrich(body.get("enemies") or []),  # noqa: E731
                                             body.get("allies") or [], body.get("player") or {}, body.get("grid") or {},
                                             body.get("map") if isinstance(body.get("map"), dict) else None,
                                             body.get("near") if isinstance(body.get("near"), list) else None)
@@ -712,6 +712,57 @@ async def recap(conv_id: int):
     return {"text": await svc().cantos.recap(conv_id, conv["title"], conv["summary"], language)}
 
 
+BESTIARY = bestiary.Bestiary(Path(DB_PATH).parent / "bestiary")
+
+
+@app.get("/api/bestiary")
+async def bestiary_list():
+    """🐉 Every monster sheet (backend/data/bestiary, one file per monster)."""
+    return {"monsters": BESTIARY.list(), "folder": str(BESTIARY.folder)}
+
+
+@app.get("/api/bestiary/find")
+async def bestiary_find(name: str = Query("")):
+    """The sheet for an enemy's name ("Goblins" finds Goblin), with the numbers a fight uses."""
+    m = BESTIARY.find(name)
+    return {"monster": m, "combat": bestiary.combat_numbers(m) if m else None}
+
+
+@app.post("/api/bestiary")
+async def bestiary_save(body: dict[str, Any] = Body(...)):
+    return BESTIARY.save(body.get("monster") or {}, str(body.get("old_id") or ""))
+
+
+@app.delete("/api/bestiary/{monster_id}")
+async def bestiary_delete(monster_id: str):
+    BESTIARY.delete(monster_id)
+    return {"deleted": True}
+
+
+@app.post("/api/bestiary/import")
+async def bestiary_import(request: Request, replace: bool = Query(False)):
+    """Read stat blocks from a text, Markdown or PDF (a book's monster appendix). Sheets already here are kept unless
+    `replace`."""
+    data = await read_body(request, "rulebook")
+    if data[:5] == b"%PDF-":
+        pages, _ = await asyncio.to_thread(read_pdf, data)
+        text = "\n".join(pages)
+    else:
+        text = "\n".join(read_text(data))
+    return _store_monsters(text, replace)
+
+
+def _store_monsters(text: str, replace: bool = False) -> dict:
+    added, kept = [], []
+    for m in bestiary.parse_statblocks(text):
+        if BESTIARY.get(m["name"]) and not replace:
+            kept.append(m["name"])
+            continue
+        BESTIARY.save(m)
+        added.append(m["name"])
+    return {"added": added, "kept": kept}
+
+
 @app.post("/api/scenarios/{scenario_id}/adventure/import")
 async def import_adventure(scenario_id: int, request: Request, part: str = Query(""), filename: str = Query("")):
     """A published adventure (PDF, .txt or .md as the raw body, or pasted text) split into scenes and added to the card.
@@ -729,6 +780,10 @@ async def import_adventure(scenario_id: int, request: Request, part: str = Query
     else:
         text = "\n".join(read_text(data))
     found = await asyncio.to_thread(adventure.split_adventure, text, part.strip()[:80])
+    monsters = await asyncio.to_thread(_store_monsters, text)  # the book's stat blocks go to the Bestiary
+    for sc in found["scenes"]:
+        sc["enemies"] = [{**e, **{k: v for k, v in bestiary.combat_numbers(m).items() if k in ("hp", "ac", "attack_bonus", "damage", "init_bonus")}}
+                         if (m := BESTIARY.find(e["name"])) else e for e in sc["enemies"]]
     if not found["scenes"] and not found["background"]:
         raise HTTPException(422, "No scenes were found in this text. Headings like '1. Cave Mouth' or 'Goblin Ambush' are needed.")
     d = dict(card["data"])
@@ -746,7 +801,7 @@ async def import_adventure(scenario_id: int, request: Request, part: str = Query
     return {"card": updated, "report": {
         "scenes": len(found["scenes"]), "read_aloud": sum(1 for x in found["scenes"] if x["read_aloud"]),
         "checks": sum(len(x["checks"]) for x in found["scenes"]), "enemies": sum(len(x["enemies"]) for x in found["scenes"]),
-        "npcs": added, "background": bool(found["background"])}}
+        "npcs": added, "background": bool(found["background"]), "monsters": len(monsters["added"])}}
 
 
 @app.post("/api/conversations/{conv_id}/adventure/scene")
@@ -1304,6 +1359,13 @@ def not_busy(conv_id: int) -> None:
         raise BusyError("Wait for the current reply to finish.")
 
 
+def _status_now(conv_id: int) -> str:
+    """The sheet as it stands, so the Status tab shows it before the first reply too."""
+    s = svc()
+    tpl = s.engine._status_template(s.conversations.get(conv_id)["scenario"], s.settings.all())
+    return statusbook.render(tpl, s.conversations.get_state(conv_id), s.conversations.list_npcs(conv_id)) if tpl else ""
+
+
 def full_conversation(conv_id: int) -> dict:
     s = svc()
     return {
@@ -1317,6 +1379,7 @@ def full_conversation(conv_id: int) -> dict:
         "status_fields": statusbook.custom_fields(statusbook.template_of(s.conversations.get(conv_id)["scenario"]) or ""),
         "status_by_app": bool(s.engine._status_template(s.conversations.get(conv_id)["scenario"], s.settings.all())),
         "sheet_own": bool(statusbook.template_of({**s.conversations.get(conv_id)["scenario"], "sheet_template": ""})),
+        "status_now": _status_now(conv_id),
         "card_has_resources": _card_has_resources(conv_id),
         "cantos": s.cantos.list(conv_id),
     }

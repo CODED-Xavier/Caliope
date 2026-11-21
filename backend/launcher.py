@@ -204,7 +204,7 @@ def open_app_window(url: str, profile: Path):
         return None
     profile.mkdir(parents=True, exist_ok=True)
     try:
-        return subprocess.Popen([exe, f"--app={url}", f"--user-data-dir={profile}", "--window-size=1400,900",
+        return subprocess.Popen([exe, f"--app={url}", f"--user-data-dir={profile}", "--start-maximized",
                                  "--no-first-run", "--no-default-browser-check", "--disable-features=Translate"])
     except OSError:
         return None

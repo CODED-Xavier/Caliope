@@ -34,8 +34,8 @@ function GameSheet({ convId, current, onReload, onDone }) {
   );
 }
 
-function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, picked, convId, onReload }) {
-  const status = latestStatus(messages);
+function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, picked, convId, onReload, now }) {
+  const status = latestStatus(messages) || (byApp ? now : "");  // before the first reply: the sheet as it stands
   const [editing, setEditing] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [draft, setDraft] = useState({});
@@ -734,7 +734,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
           onState={onStateLoaded} onFight={() => onTab("combat")} busy={!canRoll} />}
         {active === "status" && <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every}
           byApp={!!game.status_by_app} fields={game.status_fields} sheetOwn={!!game.sheet_own}
-          picked={conversation.scenario?.sheet_template || ""} convId={conversation.id} onReload={onReload}
+          picked={conversation.scenario?.sheet_template || ""} convId={conversation.id} onReload={onReload} now={game.status_now}
           values={state.card_status} onPatch={onPatch} />}
         {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} onPower={onPower} onRest={onRest} busy={!canRoll}
           convId={conversation.id} onState={onStateLoaded} />}

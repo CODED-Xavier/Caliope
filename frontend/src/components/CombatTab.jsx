@@ -56,6 +56,15 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
   useEffect(() => { if (sceneFight) suggest(); }, [sceneFight]); // eslint-disable-line
   const switchSystem = (s) => { setSystem(s); setEnemies(enemies.map((e) => ({ ...BLANK[s], name: e.name, count: e.count }))); };
   const setEnemy = (i, k, v) => setEnemies(enemies.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
+  const [monsters, setMonsters] = useState([]);
+  useEffect(() => { api.bestiary().then((r) => setMonsters(r.monsters || [])).catch(() => {}); }, []);
+  const fromBestiary = async (i) => { // a monster from the Bestiary: its sheet's numbers
+    if (system !== "d20" || !enemies[i]?.name?.trim()) return;
+    try {
+      const r = await api.bestiaryFind(enemies[i].name.trim());
+      if (r.combat) setEnemies((list) => list.map((e, j) => (j === i ? { ...e, ...r.combat } : e)));
+    } catch { /* no sheet: keep what is typed */ }
+  };
   const suggest = async () => {
     setSuggesting(true); setError("");
     try {
@@ -90,7 +99,8 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
       {enemies.map((e, i) => (
         <div className="enemy-row" key={i}>
           <div className="row gap center">
-            <input className="field grow" placeholder="Name" value={e.name} onChange={(ev) => setEnemy(i, "name", ev.target.value)} />
+            <input className="field grow" placeholder="Name" value={e.name} onChange={(ev) => setEnemy(i, "name", ev.target.value)}
+              list="bestiary-names" onBlur={() => fromBestiary(i)} title="A name from the 🐉 Bestiary fills in its numbers" />
             <span className="tiny muted">×</span>
             <input className="field num" style={{ width: 40 }} value={e.count} onChange={(ev) => setEnemy(i, "count", ev.target.value)} title="How many" />
             <button className="icon-btn" title="Remove" onClick={() => setEnemies(enemies.filter((_, j) => j !== i))}>✕</button>
@@ -115,6 +125,7 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
         </div>
       ))}
       <button className="btn small" onClick={() => setEnemies([...enemies, { ...BLANK[system] }])}>＋ Add enemy</button>
+      <datalist id="bestiary-names">{monsters.map((m) => <option key={m.id} value={m.name} />)}</datalist>
       <div className="section-title">You <span className="muted tiny">(from your sheet; change for this fight)</span></div>
       <div className="row gap enemy-stats">
         {myFields.map(([k, label]) => (

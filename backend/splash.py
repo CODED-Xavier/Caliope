@@ -52,7 +52,7 @@ def main() -> int:
             pass
 
     root = tk.Tk()
-    root.title("Calíope")
+    root.title("Calíope · loading")  # not the game window's title: its icon goes to the game window
     root.overrideredirect(True)          # no title bar: a loading card
     root.configure(bg=BG)
     root.attributes("-topmost", True)

@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.21**. The version history is at the end of this file.
+Current version: **v2.22**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -49,7 +49,7 @@ screen or in the taskbar. A small **loading screen** with Calíope's icon and a 
 setup, an interface update, starting the engine) and closes when the game window opens. If something goes wrong, the loading
 screen shows the reason, with a button to open the log (`backend\data\caliope.log`). Shortcuts made by older versions are
 updated by themselves. Double-clicking `Play.bat` still works, with the black window, which is handy to see what happens.
-**Closing the game window stops everything.** Run `Play.bat --shortcut` to make the shortcuts again.
+The game window opens **maximized**; **F11** switches full screen. **Closing the game window stops everything.** Run `Play.bat --shortcut` to make the shortcuts again.
 
 Options: `Play.bat --no-browser`.
 
@@ -159,6 +159,14 @@ Each card can have its own calendar (card editor > Calendar). **The app keeps th
 - Appointments ("the festival is on Sunday") land on the exact day.
 - The weather comes from the season and the card's climate.
 
+### The Bestiary (monster sheets)
+**🐉 Bestiary** (left column, bottom) keeps monster sheets in `backend\data\bestiary`, one file per monster: AC, HP,
+speed, STR to CHA, skills, senses, challenge and XP, traits and attacks.
+- **＋ Create monster** opens an empty sheet. **⤒ Import stat blocks** reads them from a book's appendix (Markdown, text
+  or PDF, in the usual 5e layout). Importing an adventure adds the book's monsters by itself.
+- In a fight, an enemy with the same name (or its plural: "Goblins") gets the sheet's numbers: the first attack with a
+  to-hit bonus and damage is the one it uses. In the Combat tab the enemy name field suggests the Bestiary's monsters.
+
 ### Combat
 ⚔ Combat → choose **d20** (D&D 5e) or a **d10 dice pool** (Vampire 5e) → add enemies, or **✨ Suggest from the scene** → pick a map → **Start the fight**.
 - The app rolls everything (initiative, attacks, damage, powers, enemy spells). The Aedo only narrates one ⚔️ card per round.
@@ -216,7 +224,7 @@ On the **Sheet** tab, **✨ Wishes for the story** takes your soft hints ("Kaida
 ### Adventures (published modules)
 For adventure cards that follow a book (*Lost Mine of Phandelver*, any module, your own notes). In the card editor,
 **Adventure: scenes, maps and fights**:
-- **Import** a PDF, or text copied from it, one part at a time: type the chapter's name ("Part 1: Goblin Arrows"), then import. The **Parts** list shows the chapters; **⬆ Import here** adds the next text to one of them. **Maps** and **Scenes** are below. Calíope splits it by itself into
+- **Import** a PDF, a Markdown file (as exported by 5e.tools: its headings and `>>` read-aloud boxes are used exactly), or text copied from it. A whole Markdown book is split into its parts by itself. Or import one part at a time: type the chapter's name ("Part 1: Goblin Arrows"), then import. The **Parts** list shows the chapters; **⬆ Import here** adds the next text to one of them. **Maps** and **Scenes** are below. Calíope splits it by itself into
   **scenes**: numbered areas ("1. Cave Mouth") grouped under their location ("Cragmaw Hideout"), and encounters with their
   own heading ("Goblin Ambush"). Each scene keeps:
   - the **read-aloud text**, which the Aedo narrates close to word for word on the first visit;
@@ -493,3 +501,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.19 | The Muse researches a work on its fan wiki (📚 Research a work); 🔁 loop a song in the music controls; adventure Parts list |
 | 2.20 | Main menu with all your cards; loading screen and no black window (Caliope.vbs); 🔍 Find the grid on adventure maps (Foundry/Roll20-style), fights on the map's own squares, fog of war |
 | 2.21 | Reputation as a system: the tracker names the event, the app gives fixed values (repeats count less, capped per reply); defined effects for each relationship level; the reasons in the People tab |
+| 2.22 | 🐉 Bestiary (Create monster, import stat blocks, fights use the sheets); Markdown books (headings and read-aloud boxes); the Status shows from the start; the window opens maximized, F11 full screen; the icon is back on the game window |

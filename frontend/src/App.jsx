@@ -9,6 +9,7 @@ import SettingsModal from "./components/SettingsModal.jsx";
 import SkillsModal from "./components/SkillsModal.jsx";
 import RulebooksModal from "./components/RulebooksModal.jsx";
 import ModelsModal, { FirstModel } from "./components/ModelsModal.jsx";
+import BestiaryModal from "./components/BestiaryModal.jsx";
 import MainMenu from "./components/MainMenu.jsx";
 import MuseModal from "./components/MuseModal.jsx";
 import { RecapView } from "./components/Cantos.jsx";
@@ -131,6 +132,16 @@ export default function App() {
     a.play().catch(() => {});
   };
   useEffect(() => { loadSettingsFlags(); }, []);
+  useEffect(() => { // F11: full screen (the app window does it itself; a browser window uses the page's full screen)
+    const onKey = (e) => {
+      if (e.key !== "F11") return;
+      e.preventDefault();
+      if (window.pywebview?.api?.toggle_fullscreen) { window.pywebview.api.toggle_fullscreen(); return; }
+      if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => {});
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   useEffect(() => { api.music().then((r) => setTracks(r.tracks)).catch(() => {}); }, []);
   const setView = (v) => { setViewState(v); try { localStorage.setItem("view", JSON.stringify(v)); } catch { /* private mode */ } };
   const setPanelOpen = (open) => { setPanelOpenState(open); setView({ ...loadView(), panelHidden: !open }); };
@@ -446,7 +457,7 @@ export default function App() {
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => { setMenuInit(null); setModal("new"); }}
         onHome={() => { if (!busy) { setActiveId(null); setGame(null); localStorage.removeItem("activeConv"); } }}
-        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
+        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onBestiary={() => setModal("bestiary")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         collapsed={view.sideCollapsed} onCollapse={setSideCollapsed}
       />
@@ -518,6 +529,7 @@ export default function App() {
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} onTour={() => { setModal(null); setTour(true); }} />}
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}
       {modal === "rulebooks" && <RulebooksModal onClose={() => setModal(null)} />}
+      {modal === "bestiary" && <BestiaryModal onClose={() => setModal(null)} />}
       {modal === "jukebox" && <JukeboxModal onClose={() => setModal(null)} onChanged={setTracks} />}
     </div>
   );

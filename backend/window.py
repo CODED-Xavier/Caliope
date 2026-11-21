@@ -5,6 +5,7 @@ when pywebview is not installed or cannot start, so the launcher falls back to a
 """
 from __future__ import annotations
 
+import os
 import sys
 import threading
 import time
@@ -37,18 +38,45 @@ def _set_icon() -> None:
     user32.FindWindowW.restype = wintypes.HWND
     user32.LoadImageW.restype = wintypes.HANDLE
     user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    # this process's own window with the title (the loading screen has a similar one: it must not get the icon)
+    pid = os.getpid()
+    found = []
+    proto = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def check(hwnd, _):
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid and user32.IsWindowVisible(hwnd):
+            buf = ctypes.create_unicode_buffer(128)
+            user32.GetWindowTextW(hwnd, buf, 128)
+            if buf.value == TITLE:
+                found.append(hwnd)
+                return False
+        return True
+
     for _ in range(50):  # the window may take a moment to get its title
-        hwnd = user32.FindWindowW(None, TITLE)
-        if hwnd:
+        user32.EnumWindows(proto(check), 0)
+        if found:
             break
         time.sleep(0.1)
     else:
         return
+    hwnd = found[0]
     IMAGE_ICON, LR_LOADFROMFILE, WM_SETICON = 1, 0x10, 0x80
     for kind, size in ((0, 16), (1, 32)):  # ICON_SMALL, ICON_BIG
         h = user32.LoadImageW(None, str(ICON), IMAGE_ICON, size, size, LR_LOADFROMFILE)
         if h:
             user32.SendMessageW(hwnd, WM_SETICON, kind, h)
+
+
+class WindowApi:
+    """Called by the page through window.pywebview.api (F11)."""
+    window = None
+
+    def toggle_fullscreen(self):
+        if self.window is not None:
+            self.window.toggle_fullscreen()
+        return True
 
 
 def main() -> int:
@@ -65,7 +93,13 @@ def main() -> int:
         except Exception:
             pass
         _own_taskbar_entry()
-        window = webview.create_window(TITLE, url, width=1400, height=900, min_size=(900, 600), text_select=True)
+        api = WindowApi()
+        try:  # opens maximized; F11 (sent by the page) switches full screen
+            window = webview.create_window(TITLE, url, width=1400, height=900, min_size=(900, 600), text_select=True,
+                                           maximized=True, js_api=api)
+        except TypeError:  # an older pywebview without "maximized"
+            window = webview.create_window(TITLE, url, width=1400, height=900, min_size=(900, 600), text_select=True, js_api=api)
+        api.window = window
         window.events.shown += lambda: threading.Thread(target=_set_icon, daemon=True).start()
         webview.start(private_mode=False, storage_path=storage)  # keeps your settings between sessions
     except Exception as e:  # no WebView2, or another start problem: the launcher uses Edge instead

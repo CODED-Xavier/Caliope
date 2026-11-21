@@ -106,6 +106,15 @@ export const api = {
   },
   adventureScene: (id, scene) => request("POST", `/api/conversations/${id}/adventure/scene`, { scene }),
   adventureXp: (id, scene) => request("POST", `/api/conversations/${id}/adventure/xp`, { scene }),
+  bestiary: () => request("GET", "/api/bestiary"),
+  bestiaryFind: (name) => request("GET", `/api/bestiary/find?name=${encodeURIComponent(name)}`),
+  bestiarySave: (monster, oldId = "") => request("POST", "/api/bestiary", { monster, old_id: oldId }),
+  bestiaryDelete: (id) => request("DELETE", `/api/bestiary/${encodeURIComponent(id)}`),
+  async bestiaryImport(body, replace = false) {
+    const res = await fetch(`/api/bestiary/import?replace=${replace ? "true" : "false"}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    return res.json();
+  },
   sheetTemplates: () => request("GET", "/api/sheet-templates"),
   setSheetTemplate: (id, text) => request("POST", `/api/conversations/${id}/sheet-template`, { text }),
   epilogue: (id) => request("POST", `/api/conversations/${id}/epilogue`),

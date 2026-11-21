@@ -226,6 +226,8 @@ def _heading_like(s: str) -> bool:
 
 
 def _read_aloud(par: str, cued: bool) -> bool:
+    if par.startswith(BOXED):
+        return True
     words = len(par.split())
     if words < 8:
         return False
@@ -324,8 +326,73 @@ def _guess_music(text: str) -> str:
     return ""
 
 
+BOXED = "\u0001"  # marks a paragraph the book itself shows as read-aloud text (a ">>" box in Markdown)
+
+
+def is_markdown(text: str) -> bool:
+    lines = text.splitlines()
+    return sum(1 for ln in lines if re.match(r"^#{1,6}\s+\S", ln)) >= 3
+
+
+def markdown_to_text(text: str) -> str:
+    """A Markdown book (as exported by 5e.tools or Homebrewery) -> the plain layout the splitter reads: headings without
+    '#', '# Part' titles as "Part N: ...", '>>' boxes as read-aloud paragraphs, '>' sidebars as plain text, pictures and
+    the appendices (monsters, items: read separately) left out."""
+    out: list[str] = []
+    part = 0
+    box: list[str] = []
+
+    def flush_box():
+        if box:
+            out.append(BOXED + " ".join(x for x in box if x))
+            out.append("")
+            box.clear()
+
+    for raw in text.replace("\r", "").split("\n"):
+        line = raw.rstrip()
+        if line.startswith(">>"):
+            body = line[2:].strip()
+            if body:
+                box.append(_plain(body))
+            else:
+                flush_box()
+            continue
+        flush_box()
+        if line.startswith(">"):
+            line = line.lstrip(">").strip()
+        if re.match(r"^!\[[^\]]*\]\([^)]*\)", line) or line.strip() in ("___", "---"):
+            continue
+        h = re.match(r"^(#{1,6})\s+(.+?)\s*#*$", line)
+        if h:
+            title = _plain(h.group(2))
+            if len(h.group(1)) == 1:
+                if re.match(r"^(appendix|credits)", title, re.I):
+                    break                                   # monsters and items: not scenes
+                if not re.match(r"^introduction$", title, re.I):
+                    part += 1
+                    out += ["", f"Part {part}: {title}", ""]
+                    continue
+            out += ["", ("¶" if len(h.group(1)) >= 4 else "") + title, ""]   # ¶: a minor heading (a subsection inside an area)
+            continue
+        b = re.match(r"^\*\*([^*]{2,60})\*\*\s*$", line)
+        if b:                                               # a bold line on its own: a subsection title
+            out += ["", "§" + b.group(1).strip().rstrip("."), ""]
+            continue
+        out.append(_plain(line))
+    flush_box()
+    return "\n".join(out)
+
+
+def _plain(text: str) -> str:
+    t = re.sub(r"\*\*\*|\*\*|(?<![\w*])\*(?!\s)|(?<=\S)\*(?![\w*])", "", text)
+    return re.sub(r"\{@\w+\s+([^}|]+)[^}]*\}", r"\1", t).strip()
+
+
 def split_adventure(text: str, part_title: str = "") -> dict:
     """A book (or a chapter of it) -> {"background", "parts", "scenes", "npcs"} for the card editor to review."""
+    strict = is_markdown(text)  # the book marks its read-aloud boxes: no guessing
+    if strict:
+        text = markdown_to_text(text)
     pars = _paragraphs(text)
     parts: list[dict] = []
     scenes: list[dict] = []
@@ -351,6 +418,22 @@ def split_adventure(text: str, part_title: str = "") -> dict:
     current: dict | None = None
     for i, par in enumerate(pars):
         nxt = pars[i + 1] if i + 1 < len(pars) else ""
+        if par.startswith("§"):  # a bold line on its own (Markdown): always a subsection of the current scene
+            if current is not None:
+                mode, sub = "sub", par[1:].strip()
+                if sub.lower().startswith("roleplaying "):
+                    npcs.append({"name": sub[12:].strip(), "lines": []})
+                cued = False
+                continue
+            par = par[1:].strip()
+        if par.startswith("¶"):
+            par = par[1:].strip()
+            if current is not None and (current.get("number") or SUBSECTION.match(par)) and not AREA.match(par):
+                mode, sub = "sub", par
+                if par.lower().startswith(("roleplaying ", "role playing ")):
+                    npcs.append({"name": re.sub(r"^role\s?playing\s+", "", par, flags=re.I).strip(), "lines": []})
+                cued = False
+                continue
         area = AREA.match(par)
         heading = area or (_heading_like(par) and nxt and not _heading_like(nxt) or _heading_like(par) and len(par) < 40)
         if heading and not area and (len(par.split()) > 8 or "\t" in par):
@@ -401,13 +484,15 @@ def split_adventure(text: str, part_title: str = "") -> dict:
             background.append(par)
             continue
         if current is None:
-            current = new_scene(part_title or "Beginning")
+            current = new_scene(part_title or (f"{parts[-1]['title']}: the start" if parts else "Beginning"))
         if mode == "sub":
             current["subs"].append((sub, par))
-            if npcs and sub.lower().startswith("roleplaying ") and npcs[-1]["name"] == sub[12:].strip():
+            if par.startswith(BOXED):  # a read-aloud box inside a subsection ("Flood!") is still read aloud
+                current["body"].append((par, True))
+            if npcs and re.match(r"role\s?playing\s", sub, re.I) and npcs[-1]["name"] == re.sub(r"^role\s?playing\s+", "", sub, flags=re.I).strip():
                 npcs[-1]["lines"].append(par)
         else:
-            current["body"].append((par, _read_aloud(par, cued)))
+            current["body"].append((par, par.startswith(BOXED) if strict else _read_aloud(par, cued)))
         cued = bool(READ_CUE.search(par))
 
     out_scenes = []
@@ -416,12 +501,14 @@ def split_adventure(text: str, part_title: str = "") -> dict:
         body = sc["body"]
         if not body and not sc["subs"]:
             continue
-        if sc["number"] and not any(ra for _, ra in body):
+        if sc["number"] and not strict and not any(ra for _, ra in body):
             # boxed text without "you" ("Sacks and crates of looted provisions..."): the first plain description after the intro
             for k, (p, _) in enumerate(body[1:], 1):
                 if len(p.split()) >= 15 and not DM_WORDS.search(p) and not re.match(r"\s*(if|when)\b", p, re.I):
                     body[k] = (p, True)
                     break
+        body = [(p.lstrip(BOXED), ra) for p, ra in body]
+        sc["subs"] = [(t, p.lstrip(BOXED)) for t, p in sc["subs"]]
         read = "\n\n".join(p for p, ra in body if ra)
         notes = [p for p, ra in body if not ra]
         subs_text: dict[str, list[str]] = {}
@@ -446,7 +533,8 @@ def split_adventure(text: str, part_title: str = "") -> dict:
     for s in norm["scenes"]:
         s["leads"] = [by_area.get((s["group"], x), "") for x in s["leads"]]
         s["leads"] = [x for x in s["leads"] if x]
-    found_npcs = [{"name": n["name"], "description": truncate(" ".join(n["lines"]), 600)} for n in npcs if n["lines"]]
+    found_npcs = [{"name": n["name"], "description": truncate(" ".join(n["lines"]), 600)} for n in npcs
+                  if n["lines"] and n["name"][:1].isupper() and not re.search(r"\b(NPCs|the)\b|s$", n["name"])]
     return {"background": truncate("\n\n".join(background), 4000), "parts": norm["parts"], "scenes": norm["scenes"],
             "npcs": found_npcs}
 

@@ -622,3 +622,15 @@ body.resizing { user-select: none; cursor: col-resize; }
 .rel-effect { margin: 4px 0; opacity: .9; }
 .rep-log { margin: 2px 0 6px; padding-left: 16px; }
 .rep-log .good { color: var(--good); } .rep-log .bad { color: var(--bad); }
+/* Bestiary */
+.bestiary { display: flex; flex-direction: column; gap: 10px; }
+.monster-list { display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow-y: auto; }
+.monster-row { display: flex; align-items: center; gap: 10px; text-align: left; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); cursor: pointer; }
+.monster-row:hover { border-color: var(--accent); }
+.monster-row img, .monster-dot { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; }
+.monster-sheet { display: flex; flex-direction: column; gap: 8px; }
+.monster-pic { width: 110px; height: 110px; object-fit: cover; border-radius: 8px; }
+.stat-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.stat-box { display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--border); border-radius: 8px; padding: 4px; font-size: 12px; font-weight: 600; }
+.stat-box input { width: 48px; text-align: center; }
+.action-row { display: flex; flex-direction: column; gap: 4px; border-left: 3px solid var(--border); padding-left: 8px; }

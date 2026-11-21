@@ -90,6 +90,7 @@ Easier: pick a mode under the text box (**🗣 Speak · ✋ Act · 💭 Think ·
 - Under a reply: **Continue ▸** (keep writing), **↻** (write it again), **⏪** (rewind to there), **⑂** (start a new game from that moment).
 - Top of the chat: **↶ Undo**, **📜 Recap** ("Previously, in…"), **🎵 Music**, **Aa** (text size and colours), **🔍** (search).
 - 🎲 **roll buttons** appear when the Aedo asks for a check, and 🛒 **buy buttons** when something has a price.
+- **🐉 Bestiary** (bottom left): monster sheets for fights; create one or import a book's stat blocks. **F11** = full screen.
 - **Relationships follow fixed rules now:** what you do (defend, help, mock, betray…) always counts the same, repeating it counts less, and each level changes how the character treats you. Open someone in the People tab to see why their value changed.
 - Calíope opens on a **🏠 Main menu** with all your cards (▶ Play, ✎ Edit, ＋ New card). Start it from the desktop shortcut: no black window, just a loading screen.
 - Adventure maps: **🔍 Find the grid** lines the squares up with the map; fights happen on the map with fog of war.

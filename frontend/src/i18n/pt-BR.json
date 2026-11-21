@@ -1451,7 +1451,40 @@
 "Polite and ordinary; normal prices and small help, keeps personal matters private.": "Educado e comum; preços normais e pequenas ajudas, guarda os assuntos pessoais.",
 "Warm; small favours, rumours and advice, a little discount, hears you out.": "Caloroso; pequenos favores, boatos e conselhos, um descontinho, ouve você.",
 "Trusts you: shares personal worries and secrets when asked, takes risks for you.": "Confia em você: conta preocupações e segredos pessoais quando perguntado, se arrisca por você.",
-"Fiercely loyal: would sacrifice for you, reveals their deepest secrets, defends you anywhere.": "Leal até o fim: se sacrificaria por você, revela os segredos mais profundos, defende você em qualquer lugar."
+"Fiercely loyal: would sacrifice for you, reveals their deepest secrets, defends you anywhere.": "Leal até o fim: se sacrificaria por você, revela os segredos mais profundos, defende você em qualquer lugar.",
+"Attack": "Ataque",
+"No stat blocks were found in that text.": "Nenhum bloco de estatísticas foi encontrado nesse texto.",
+"Create monster": "Criar monstro",
+"Bestiary": "Bestiário",
+"Monster sheets for fights. An enemy with the same name (or its plural) gets these numbers: AC, HP, attack, damage, initiative and speed. Each monster is a file in": "Fichas de monstros para as lutas. Um inimigo com o mesmo nome (ou o plural) recebe estes números: CA, PV, ataque, dano, iniciativa e deslocamento. Cada monstro é um arquivo em",
+"Import stat blocks": "Importar blocos de estatísticas",
+"A book's monster appendix (or any text with stat blocks: \"Armor Class 15\", \"Hit Points 7 (2d6)\", the STR…CHA table, \"+4 to hit… Hit: 5 (1d6 + 2)\"). Monsters already here are kept.": "O apêndice de monstros de um livro (ou qualquer texto com blocos de estatísticas: \"Armor Class 15\", \"Hit Points 7 (2d6)\", a tabela FOR…CAR, \"+4 to hit… Hit: 5 (1d6 + 2)\"). Os monstros que já estão aqui são mantidos.",
+"File (.md, .txt, .pdf)": "Arquivo (.md, .txt, .pdf)",
+"…or paste the stat blocks here": "…ou cole os blocos de estatísticas aqui",
+"Read them": "Ler",
+"Nothing matches.": "Nada encontrado.",
+"No monsters yet: create one or import a book's appendix.": "Ainda sem monstros: crie um ou importe o apêndice de um livro.",
+"Type": "Tipo",
+"Armor Class": "Classe de Armadura",
+"Hit Points": "Pontos de Vida",
+"Speed": "Deslocamento",
+"Initiative": "Iniciativa",
+"Skills": "Perícias",
+"Senses": "Sentidos",
+"Languages": "Idiomas",
+"Challenge": "Nível de desafio",
+"Traits (one per line)": "Características (uma por linha)",
+"Actions": "Ações",
+"(fights use the first one with a to-hit bonus and damage)": "(as lutas usam a primeira com bônus de ataque e dano)",
+"To hit": "Acerto",
+"Range (squares)": "Alcance (quadrados)",
+"Action": "Ação",
+"Notes (tactics, lore)": "Notas (táticas, lore)",
+"A name from the 🐉 Bestiary fills in its numbers": "Um nome do 🐉 Bestiário preenche os números dele",
+"Monster sheets for fights": "Fichas de monstros para as lutas",
+"Monster sheets kept in a folder (backend/data/bestiary, one file per monster): AC, HP, speed, STR to CHA, skills, senses, challenge and XP, traits and attacks. When a fight has an enemy with the same name (or its plural), it gets these numbers. Create a monster by hand, or import the stat blocks from a book's appendix (Markdown, text or PDF); importing an adventure adds its monsters by itself.": "Fichas de monstros guardadas numa pasta (backend/data/bestiary, um arquivo por monstro): CA, PV, deslocamento, FOR a CAR, perícias, sentidos, nível de desafio e XP, características e ataques. Quando uma luta tem um inimigo com o mesmo nome (ou o plural), ele recebe esses números. Crie um monstro à mão, ou importe os blocos do apêndice de um livro (Markdown, texto ou PDF); importar uma aventura adiciona os monstros dela sozinha.",
+"Before fights in a rules campaign, so enemies use the book's numbers instead of guesses.": "Antes das lutas numa campanha com regras, para os inimigos usarem os números do livro em vez de chutes.",
+"Nothing: the AI doesn't read these sheets; the app uses them for the dice.": "Nada: a IA não lê estas fichas; o app usa nos dados."
 },
 "patterns": [
 [
@@ -1817,6 +1850,30 @@
 [
 "{0} characters",
 "{0} personagens"
+],
+[
+"Added {0}: {1}.",
+"Adicionados {0}: {1}."
+],
+[
+"Already here (kept): {0}.",
+"Já estavam aqui (mantidos): {0}."
+],
+[
+"All already here: {0}.",
+"Todos já estavam aqui: {0}."
+],
+[
+"\"{0}\" saved.",
+"\"{0}\" salvo."
+],
+[
+"Delete \"{0}\" from the Bestiary?",
+"Apagar \"{0}\" do Bestiário?"
+],
+[
+"AC {0} · HP {1}",
+"CA {0} · PV {1}"
 ]
 ]
 }

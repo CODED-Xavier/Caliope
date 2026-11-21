@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { MODE_LABELS, timeAgo } from "../utils.js";
 
-export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onRename, onDelete, onSkills, onRulebooks, onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
+export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onRename, onDelete, onSkills, onRulebooks, onBestiary, onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
   const online = health?.llm?.ok;
   const [filter, setFilter] = useState("");
   if (collapsed) return null; // fully hidden: the bubble on the chat's edge brings it back
@@ -42,6 +42,7 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onRe
           <button data-tour="muse" className="btn ghost grow muse-btn" onClick={onMuse} title="Write stories and cards with the Muse">🪶 The Muse</button>
           <button className="btn ghost grow" onClick={onSkills}>🧩 Skills</button>
           <button className="btn ghost grow" onClick={onRulebooks} title="Rulebooks">📚 Rules</button>
+          <button className="btn ghost grow" onClick={onBestiary} title="Monster sheets for fights">🐉 Bestiary</button>
           <button data-tour="models" className="btn ghost grow" onClick={onModels} title="Download and manage AI models">🧠 Models</button>
           <button data-tour="settings" className="btn ghost grow" onClick={onSettings}>⚙ Settings</button>
         </div>

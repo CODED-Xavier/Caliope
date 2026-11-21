@@ -307,3 +307,111 @@ class ReputationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(s.conversations.get_state(cid)["rep_log"]), 2)
         prompt = llm.stream_calls[-1][0]["content"]
         self.assertIn("Characters act by their level", prompt)
+
+
+STATBLOCK = """# Appendix B: Monsters
+
+# Cave Rat
+
+___
+>## Cave Rat
+>*Small Beast, Unaligned*
+>___
+>- **Armor Class** 12 (natural armor)
+>- **Hit Points** 9 (2d6 + 2)
+>- **Speed** 30 ft.
+>- **Initiative** +2 (12)
+>___
+>|STR|DEX|CON|INT|WIS|CHA|
+>|:---:|:---:|:---:|:---:|:---:|:---:|
+>|7 (-2)|15 (+2)|12 (+1)|2 (-4)|10 (+0)|4 (-3)|
+>___
+>- **Senses** Darkvision 30 ft., Passive Perception 10
+>- **Challenge** 1/8 (XP 1.100; PB +2)
+>___
+>***Pack Tactics.*** The rat has advantage when an ally is near.
+>
+>### Actions
+>***Bite.*** *Melee Weapon Attack:*  +4 to hit, reach 5 ft., one target. *Hit:* 4 (1d4 + 2) piercing damage.
+"""
+
+MDBOOK = """# Introduction
+
+### Background
+An old mine was lost.
+
+# The Road
+
+Read the boxed text when you're ready to start.
+
+>>You walk the muddy road toward the hills.
+>>
+>>Crows watch you from the trees.
+>>
+
+### Rat Den
+
+>>A low cave that smells of wet fur.
+>>
+
+Three cave rats are hiding here. Klarg will build a throne from your bones, says a goblin.
+
+**Developments**
+
+If the rats flee, award each character 25 XP.
+
+#### 1. Burrow
+
+>>A narrow burrow.
+>>
+
+#### Treasure
+
+A copper ring.
+
+# Appendix B: Monsters
+"""
+
+
+class BestiaryTests(unittest.TestCase):
+    def test_stat_blocks_become_sheets_and_fights_use_them(self):
+        import tempfile
+        from pathlib import Path
+        from app import bestiary as B
+        found = B.parse_statblocks(STATBLOCK)
+        self.assertEqual(len(found), 1)
+        rat = found[0]
+        self.assertEqual((rat["name"], rat["ac"], rat["hp"], rat["hp_dice"], rat["init_bonus"]), ("Cave Rat", 12, 9, "2d6+2", 2))
+        self.assertEqual(rat["stats"]["DEX"], 15)
+        self.assertEqual(rat["xp"], 1100)
+        self.assertEqual(rat["actions"][0]["attack_bonus"], 4)
+        self.assertEqual(rat["actions"][0]["damage"], "1d4+2")
+        self.assertIn("Pack Tactics", rat["traits"])
+        with tempfile.TemporaryDirectory() as d:
+            book = B.Bestiary(Path(d))
+            book.save(rat)
+            self.assertTrue((Path(d) / "cave-rat.json").is_file())
+            self.assertEqual(book.find("Cave Rats")["name"], "Cave Rat")
+            enemies = book.enrich([{"name": "Cave Rats", "count": 3}, {"name": "Cave Rat", "hp": 20}, {"name": "Ghost"}])
+            self.assertEqual((enemies[0]["hp"], enemies[0]["ac"], enemies[0]["attack_bonus"], enemies[0]["damage"]), (9, 12, 4, "1d4+2"))
+            self.assertEqual(enemies[1]["hp"], 20)                                 # what the fight sets stays
+            self.assertNotIn("hp", enemies[2])
+            book.save({**rat, "name": "Big Cave Rat"}, old_id="cave-rat")          # renamed
+            self.assertEqual([m["name"] for m in book.list()], ["Big Cave Rat"])
+
+
+class MarkdownBookTests(unittest.TestCase):
+    def test_a_markdown_book_uses_its_headings_and_boxes(self):
+        from app import adventure
+        r = adventure.split_adventure(MDBOOK)
+        self.assertEqual([p["title"] for p in r["parts"]], ["The Road"])
+        self.assertIn("old mine", r["background"])
+        names = [s["name"] for s in r["scenes"]]
+        self.assertEqual(names, ["The Road: the start", "Rat Den", "1. Burrow"])
+        start, den, burrow = r["scenes"]
+        self.assertEqual(start["read_aloud"], "You walk the muddy road toward the hills.\n\nCrows watch you from the trees.")
+        self.assertEqual(den["read_aloud"], "A low cave that smells of wet fur.")      # the dialogue with "your" is not read aloud
+        self.assertEqual(den["xp"], 25)
+        self.assertIn("Developments:", den["notes"])
+        self.assertIn("copper ring", burrow["treasure"])
+        self.assertEqual(burrow["group"], "Rat Den")
