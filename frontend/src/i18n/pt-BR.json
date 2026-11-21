@@ -1910,6 +1910,10 @@
 [
 "Added {0} to the folder \"{1}\": {2}.",
 "Adicionados {0} na pasta \"{1}\": {2}."
+],
+[
+"📍 Scene: {0}",
+"📍 Cena: {0}"
 ]
 ]
 }

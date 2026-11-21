@@ -747,6 +747,7 @@ class ChatEngine:
             if went:
                 st["adventure"]["fresh"] = ""  # the story already walked in: no need to read the box again
                 self.repo.save_state(conv_id, st)
+                meta["scene"] = went  # shown under the reply: "📍 Goblin Ambush"
             offer = adventure.fight_offer(adv, st, user_msg["content"], reply)
             if offer:
                 meta["fight"] = offer  # "⚔ A fight! 4 × Goblin [Start the fight]" under the reply
@@ -1044,7 +1045,7 @@ class ChatEngine:
             st_adv = new_state.get("adventure") or {}
             went = adventure.move(adv, new_state, adventure.match_scene(adv, updates["location"], reply, st_adv.get("scene", "")))
             if went:
-                changes.append(f"Scene: {went}")
+                changes.append(f"📍 Scene: {went}")
         self.repo.save_state(conv_id, new_state)
 
         for npc in updates["new_npcs"]:

@@ -174,7 +174,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
     );
   }
 
-  const changes = m.meta?.changes || [];
+  const changes = [...(m.meta?.scene ? [`📍 Scene: ${m.meta.scene}`] : []), ...(m.meta?.changes || [])];  // the adventure moved on
   const av = portraitStyle !== "off" ? speakerAvatar(m.content, speaker) : null;
   return (
     <div className={`msg assistant ${hit || ""} ${av?.url ? `with-avatar ${portraitStyle}` : ""}`} data-mid={m.id}>

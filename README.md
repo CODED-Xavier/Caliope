@@ -511,3 +511,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.22.5 | The side panel's tab row scrolls sideways (mouse wheel, drag, or the ‹ › arrows); the open tab stays in view |
 | 2.23 | Bestiary: a folder per book (imports go to bestiary/<book>/, 📂 Open folder, filter by book); adventures: the story walks into the next scene by itself, and a **⚔ A fight!** offer under the reply starts the scene's fight in one click |
 | 2.23.1 | Starts on the main menu (Settings: *Continue from the last played card*); the top bar fits narrow windows instead of spilling over the side panel |
+| 2.23.2 | The adventure's scene changes show under the reply (📍 Scene: Goblin Ambush) |
