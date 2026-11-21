@@ -10,6 +10,7 @@ import SkillsModal from "./components/SkillsModal.jsx";
 import RulebooksModal from "./components/RulebooksModal.jsx";
 import ModelsModal, { FirstModel } from "./components/ModelsModal.jsx";
 import BestiaryModal from "./components/BestiaryModal.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import MainMenu from "./components/MainMenu.jsx";
 import MuseModal from "./components/MuseModal.jsx";
 import { RecapView } from "./components/Cantos.jsx";
@@ -487,12 +488,12 @@ export default function App() {
               <button className="btn small" onClick={showRecap} disabled={busy} title="Previously, in this story… (written only when you ask; never added to the story)">📜 Recap</button>
               <button className="btn small" onClick={undo} disabled={busy} title="Remove the last exchange">↶ Undo</button>
             </div>
-            <Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
+            <ErrorBoundary label="The story" resetKey={game.conversation.id}><Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
               onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt} onSheet={sheetFrom} onEpilogue={writeEpilogue}
               follow={view.follow} portraitStyle={view.portraits} searchOpen={searchOpen}
               scenePictures={scenePictures} onPaint={paintScene} onCheck={rollCheck} onBuy={buyOffer}
-              voiceOn={!!voice.name} speaking={speaking} onSpeak={playVoice} onCloseSearch={() => setSearchOpen(false)} />
+              voiceOn={!!voice.name} speaking={speaking} onSpeak={playVoice} onCloseSearch={() => setSearchOpen(false)} /></ErrorBoundary>
           </>
         ) : (
           <div className="welcome">
@@ -513,12 +514,12 @@ export default function App() {
       </main>
       {game && panelOpen && <div className="panel-resizer" onMouseDown={startResize} title="Drag to resize the panel" />}
       {game && panelOpen && (
-        <SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onPay={payGold} onPower={usePower} onRest={restNow} busy={busy} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}
+        <ErrorBoundary label="The side panel" resetKey={`${tab}-${game.conversation.id}`}><SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onPay={payGold} onPower={usePower} onRest={restNow} busy={busy} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}
           onNpcAdd={npcAdd} onRollToChat={(expr) => send(`/roll ${expr}`)} canRoll={!busy} memoryKey={memoryKey} onClose={() => setPanelOpen(false)} onPinnedSave={savePinned}
           onStateLoaded={(st) => setGame((g) => (g ? { ...g, state: st } : g))}
           onLoreSaved={(conv) => setGame((g) => (g ? { ...g, conversation: { ...g.conversation, player_lore: conv.player_lore } } : g))}
           onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit}
-          onCantos={(list) => setGame((g) => (g ? { ...g, cantos: list } : g))} onReload={reloadGame} />
+          onCantos={(list) => setGame((g) => (g ? { ...g, cantos: list } : g))} onReload={reloadGame} /></ErrorBoundary>
       )}
       {recap && <RecapView text={recap.text} loading={recap.loading} onClose={() => setRecap(null)} onAgain={showRecap} />}
       {modal === "muse" && <MuseModal onClose={() => setModal(null)} />}

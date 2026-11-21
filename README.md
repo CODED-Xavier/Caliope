@@ -504,3 +504,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.22 | 🐉 Bestiary (Create monster, import stat blocks, fights use the sheets); Markdown books (headings and read-aloud boxes); the Status shows from the start; the window opens maximized, F11 full screen; the icon is back on the game window |
 | 2.22.1 | Big map pictures (20+ MB PNGs) are turned into WebP when uploaded |
 | 2.22.2 | Fix: the app window froze at start (the F11 helper exposed the whole window to the page) |
+| 2.22.3 | Fix: the Status tab blanked the screen before the first reply; an error in one part of the screen no longer blanks the whole app |

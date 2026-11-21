@@ -35,7 +35,7 @@ function GameSheet({ convId, current, onReload, onDone }) {
 }
 
 function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, picked, convId, onReload, now }) {
-  const status = latestStatus(messages) || (byApp ? now : "");  // before the first reply: the sheet as it stands
+  const status = latestStatus(messages) || (byApp && now ? { text: now, messageId: null } : null);  // before the first reply: the sheet as it stands
   const [editing, setEditing] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [draft, setDraft] = useState({});

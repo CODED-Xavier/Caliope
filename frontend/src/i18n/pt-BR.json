@@ -1484,7 +1484,12 @@
 "Monster sheets for fights": "Fichas de monstros para as lutas",
 "Monster sheets kept in a folder (backend/data/bestiary, one file per monster): AC, HP, speed, STR to CHA, skills, senses, challenge and XP, traits and attacks. When a fight has an enemy with the same name (or its plural), it gets these numbers. Create a monster by hand, or import the stat blocks from a book's appendix (Markdown, text or PDF); importing an adventure adds its monsters by itself.": "Fichas de monstros guardadas numa pasta (backend/data/bestiary, um arquivo por monstro): CA, PV, deslocamento, FOR a CAR, perícias, sentidos, nível de desafio e XP, características e ataques. Quando uma luta tem um inimigo com o mesmo nome (ou o plural), ele recebe esses números. Crie um monstro à mão, ou importe os blocos do apêndice de um livro (Markdown, texto ou PDF); importar uma aventura adiciona os monstros dela sozinha.",
 "Before fights in a rules campaign, so enemies use the book's numbers instead of guesses.": "Antes das lutas numa campanha com regras, para os inimigos usarem os números do livro em vez de chutes.",
-"Nothing: the AI doesn't read these sheets; the app uses them for the dice.": "Nada: a IA não lê estas fichas; o app usa nos dados."
+"Nothing: the AI doesn't read these sheets; the app uses them for the dice.": "Nada: a IA não lê estas fichas; o app usa nos dados.",
+"The rest of Calíope keeps working.": "O resto da Calíope continua funcionando.",
+"Try again": "Tentar de novo",
+"The side panel": "O painel lateral",
+"The story": "A história",
+"This part": "Esta parte"
 },
 "patterns": [
 [
@@ -1874,6 +1879,10 @@
 [
 "AC {0} · HP {1}",
 "CA {0} · PV {1}"
+],
+[
+"{0} hit an error.",
+"{0} deu um erro."
 ]
 ]
 }
