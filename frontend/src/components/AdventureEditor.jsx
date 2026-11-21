@@ -3,6 +3,7 @@ import { ask } from "../dialogs.jsx";
 import { api } from "../api.js";
 import HelpTip from "./HelpTip.jsx";
 import { portraitSrc } from "../portraits.js";
+import { findGrid, gridSize } from "../gridfind.js";
 
 const MUSIC = ["", "calm", "tavern", "exploration", "town", "forest", "dungeon", "mystery", "tension", "combat", "boss", "victory", "sad", "romantic", "horror", "epic"];
 const ENEMY_FIELDS = [["count", "×", 34], ["hp", "HP", 44], ["ac", "AC", 40], ["attack_bonus", "Atk", 40], ["damage", "Damage", 62], ["init_bonus", "Init", 40]];
@@ -69,16 +70,20 @@ function SceneEdit({ scene, scenes, maps, onChange, onRemove, onMerge }) {
   );
 }
 
-/** A location's map: GM and player pictures, the grid size, and a marker per scene (click the picture to place it). */
+/** A location's map: GM and player pictures, its grid (found on the picture, like Foundry VTT or Roll20), the fog,
+ * and a marker per scene (click the picture to place it). */
 function MapEdit({ map, scenes, onChange, onRemove }) {
   const [placing, setPlacing] = useState("");
-  const [aspect, setAspect] = useState(0);  // picture height / width: the grid's rows follow it
+  const [aspect, setAspect] = useState(0);  // picture height / width: the rows follow it when there is no grid
+  const [finding, setFinding] = useState(false);
+  const [found, setFound] = useState(null);
+  const [showGrid, setShowGrid] = useState(true);
   const set = (k, v) => onChange({ ...map, [k]: v });
-  const rowsFor = (cols, a = aspect) => (a ? Math.max(4, Math.min(48, Math.round(cols * a))) : map.rows || 20);
-  const setCols = (v) => { const cols = Math.max(6, Math.min(48, parseInt(v, 10) || 6)); onChange({ ...map, cols, rows: rowsFor(cols) }); };
+  const rowsFor = (cols, a = aspect) => (a ? Math.max(4, Math.min(80, Math.round(cols * a))) : map.rows || 20);
+  const setCols = (v) => { const cols = Math.max(6, Math.min(80, parseInt(v, 10) || 6)); onChange({ ...map, cols, rows: rowsFor(cols) }); };
   const upload = async (k, file) => {
     if (!file) return;
-    try { const r = await api.uploadPicture(file); set(k, r.url); } catch (e) { ask.alert(e.message); }
+    try { const r = await api.uploadPicture(file); onChange({ ...map, [k]: r.url, ...(k === "player_picture" || !map.player_picture ? { grid: {} } : {}) }); } catch (e) { ask.alert(e.message); }
   };
   const mine = scenes.filter((s) => s.map === map.id);
   const click = (e) => {
@@ -90,6 +95,20 @@ function MapEdit({ map, scenes, onChange, onRemove }) {
     setPlacing(next ? next.id : "");
   };
   const pic = map.picture || map.player_picture;
+  const battlePic = map.player_picture || map.picture;      // fights use this one, so its squares are the ones measured
+  const g = map.grid?.size ? map.grid : null;
+  const withGrid = (grid) => {
+    const n = gridSize(grid);
+    onChange({ ...map, grid, ...(n ? { cols: Math.min(80, n.cols), rows: Math.min(80, n.rows) } : {}) });
+  };
+  const find = async () => {
+    setFinding(true); setFound(null);
+    try { const r = await findGrid(portraitSrc(battlePic)); setFound(r); withGrid({ size: r.size, ox: r.ox, oy: r.oy, nat_w: r.nat_w, nat_h: r.nat_h }); }
+    catch (e) { ask.alert(e.message); }
+    setFinding(false);
+  };
+  const nudge = (k, v) => withGrid({ ...g, [k]: Math.max(k === "size" ? 4 : 0, parseFloat(v) || 0) });
+  const counts = gridSize(g);
   return (
     <div className="card map-edit">
       <div className="row gap center">
@@ -99,12 +118,37 @@ function MapEdit({ map, scenes, onChange, onRemove }) {
       <div className="row gap center wrap">
         <label className="btn small">⬆ GM map<input type="file" accept="image/*" hidden onChange={(e) => upload("picture", e.target.files?.[0])} /></label>
         <label className="btn small">⬆ Player map<input type="file" accept="image/*" hidden onChange={(e) => upload("player_picture", e.target.files?.[0])} /></label>
-        <span className="tiny muted">Squares</span>
-        <input className="field num" style={{ width: 44 }} value={map.cols || 30} onChange={(e) => setCols(e.target.value)} />
-        <span className="muted tiny">{`× ${map.rows || 20} (5-ft squares)`}</span>
       </div>
       {pic ? (
         <>
+          <div className="grid-tools">
+            <div className="row gap center wrap">
+              <button className="btn small primary" disabled={finding} onClick={find}>{finding ? "Looking for the squares…" : "🔍 Find the grid"}</button>
+              {g && <label className="check small"><input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />Show the grid</label>}
+              {g && <button className="link-btn tiny" onClick={() => onChange({ ...map, grid: {} })}>Clear the grid</button>}
+              {counts && <span className="muted tiny">{`${counts.cols} × ${counts.rows} squares`}</span>}
+              {found && <span className={`tiny ${found.confidence > 0.35 ? "ok-text" : "muted"}`}>{found.confidence > 0.35 ? "Grid found: check that the lines sit on the map's squares." : "Not sure: line it up with the sliders."}</span>}
+            </div>
+            {g ? (
+              <div className="grid-sliders">
+                <label className="tiny">Square size<input type="range" min="8" max={Math.max(300, g.size * 1.5)} step="0.1" value={g.size} onChange={(e) => nudge("size", e.target.value)} />
+                  <input className="field num" style={{ width: 64 }} value={g.size} onChange={(e) => nudge("size", e.target.value)} /></label>
+                <label className="tiny">Move left/right<input type="range" min="0" max={g.size} step="0.5" value={g.ox} onChange={(e) => nudge("ox", e.target.value)} /></label>
+                <label className="tiny">Move up/down<input type="range" min="0" max={g.size} step="0.5" value={g.oy} onChange={(e) => nudge("oy", e.target.value)} /></label>
+              </div>
+            ) : (
+              <div className="row gap center">
+                <span className="tiny muted">Or by hand: squares across</span>
+                <input className="field num" style={{ width: 44 }} value={map.cols || 30} onChange={(e) => setCols(e.target.value)} />
+                <span className="muted tiny">{`× ${map.rows || 20}`}</span>
+              </div>
+            )}
+            <div className="row gap center">
+              <span className="tiny muted">Fog of war: clear for</span>
+              <input className="field num" style={{ width: 44 }} value={map.reveal ?? 6} onChange={(e) => set("reveal", Math.max(0, Math.min(40, parseInt(e.target.value, 10) || 0)))} />
+              <span className="tiny muted">squares around each place visited (0 = no fog)</span>
+            </div>
+          </div>
           <div className="row gap center">
             <span className="small">Place a marker for</span>
             <select className="field grow" value={placing} onChange={(e) => setPlacing(e.target.value)}>
@@ -117,18 +161,33 @@ function MapEdit({ map, scenes, onChange, onRemove }) {
               const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
               if (!w || !h) return;
               setAspect(h / w);
-              const rows = rowsFor(map.cols || 30, h / w);
-              if (rows !== map.rows) onChange({ ...map, rows });
+              if (!g) { const rows = rowsFor(map.cols || 30, h / w); if (rows !== map.rows) onChange({ ...map, rows }); }
             }} />
+            {g && showGrid && <GridOverlay grid={g} />}
             {mine.map((s) => (map.markers || {})[s.id] && (
               <span key={s.id} className={`adv-pin ${placing === s.id ? "on" : ""}`} style={{ left: `${map.markers[s.id][0] * 100}%`, top: `${map.markers[s.id][1] * 100}%` }}
                 title={s.name}>{(s.name.match(/^[A-Z]?\d+[a-z]?/) || ["•"])[0]}</span>
             ))}
           </div>
-          <div className="muted tiny">The player map (if you add one) is what the player sees in the Adventure tab and under fights; the GM map is used when there is no player map. Squares: how many 5-ft squares the picture is wide (the height follows the picture), so fights on this map line up with its grid.</div>
+          <div className="muted tiny">🔍 Find the grid reads the picture and lines Calíope's squares up with the map's own (each square is 5 ft), like Foundry VTT or Roll20; fine-tune with the sliders. Fights here then happen on this map, square for square, with the fog hiding what you haven't explored. The player map (if you add one) is what the player sees; the GM map is used when there is none.</div>
         </>
       ) : <div className="muted tiny">Add the map picture (the GM version, and the player version if the book has one).</div>}
     </div>
+  );
+}
+
+/** The grid drawn over a map picture, in the picture's own pixels (so it scales with it). */
+export function GridOverlay({ grid, color = "rgba(255,60,60,.85)" }) {
+  const id = React.useId().replace(/:/g, "");
+  return (
+    <svg className="grid-overlay" viewBox={`0 0 ${grid.nat_w} ${grid.nat_h}`} preserveAspectRatio="none">
+      <defs>
+        <pattern id={`g${id}`} x={grid.ox} y={grid.oy} width={grid.size} height={grid.size} patternUnits="userSpaceOnUse">
+          <path d={`M ${grid.size} 0 L 0 0 0 ${grid.size}`} fill="none" stroke={color} strokeWidth={Math.max(1, grid.nat_w / 900)} />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width={grid.nat_w} height={grid.nat_h} fill={`url(#g${id})`} />
+    </svg>
   );
 }
 

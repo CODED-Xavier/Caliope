@@ -8,6 +8,7 @@ import CombatTab from "./CombatTab.jsx";
 import { abilityMod, clamp, fmtMod, relationshipColor, relationshipLabel } from "../utils.js";
 import { latestStatus, portraitSrc } from "../portraits.js";
 import SheetPicker from "./SheetPicker.jsx";
+import { GridOverlay } from "./AdventureEditor.jsx";
 import PlayerLore from "./PlayerLore.jsx";
 import { CalendarBox } from "./Calendar.jsx";
 import { CantosBox, MapBag } from "./Cantos.jsx";
@@ -600,6 +601,25 @@ function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinned
 }
 
 /* -------------------------------------------------------------- Adventure */
+/** Fog of war over an adventure map: dark except around the places already visited. */
+function FogOverlay({ map, clear }) {
+  const id = React.useId().replace(/:/g, "");
+  const g = map.grid?.size ? map.grid : null;
+  const W = g ? g.nat_w / g.size : map.cols || 30, H = g ? g.nat_h / g.size : map.rows || 20;  // in squares
+  return (
+    <svg className="fog-overlay" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      <defs>
+        <filter id={`b${id}`}><feGaussianBlur stdDeviation="0.8" /></filter>
+        <mask id={`m${id}`}>
+          <rect x="0" y="0" width={W} height={H} fill="white" />
+          <g filter={`url(#b${id})`}>{clear.map(([fx, fy], i) => <circle key={i} cx={fx * W} cy={fy * H} r={map.reveal} fill="black" />)}</g>
+        </mask>
+      </defs>
+      <rect x="0" y="0" width={W} height={H} fill="#0b0912" opacity="0.9" mask={`url(#m${id})`} />
+    </svg>
+  );
+}
+
 function AdventureTab({ adventure, state, convId, onState, onFight, busy }) {
   const st = state.adventure || {};
   const scenes = adventure.scenes || [];
@@ -625,6 +645,8 @@ function AdventureTab({ adventure, state, convId, onState, onFight, busy }) {
           {pic && (
             <div className="adv-map small-map">
               <img src={portraitSrc(pic)} alt="" />
+              {map.grid?.size && <GridOverlay grid={map.grid} color="rgba(255,255,255,.25)" />}
+              {map.reveal > 0 && <FogOverlay map={map} clear={scenes.filter((s) => visited.has(s.id) && map.markers?.[s.id]).map((s) => map.markers[s.id])} />}
               {scenes.filter((s) => s.map === map.id && map.markers?.[s.id] && (visited.has(s.id) || leads.includes(s))).map((s) => (
                 <button key={s.id} className={`adv-pin ${s.id === cur.id ? "on" : visited.has(s.id) ? "seen" : "lead"}`}
                   style={{ left: `${map.markers[s.id][0] * 100}%`, top: `${map.markers[s.id][1] * 100}%` }}

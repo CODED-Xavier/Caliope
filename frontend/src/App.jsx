@@ -9,6 +9,7 @@ import SettingsModal from "./components/SettingsModal.jsx";
 import SkillsModal from "./components/SkillsModal.jsx";
 import RulebooksModal from "./components/RulebooksModal.jsx";
 import ModelsModal, { FirstModel } from "./components/ModelsModal.jsx";
+import MainMenu from "./components/MainMenu.jsx";
 import MuseModal from "./components/MuseModal.jsx";
 import { RecapView } from "./components/Cantos.jsx";
 import Tour from "./components/Tour.jsx";
@@ -94,6 +95,8 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [modal, setModal] = useState(null); // "new" | "settings" | "skills"
+  const [menuInit, setMenuInit] = useState(null);  // the main menu opens the card window on play/edit/new/import
+  const [menuKey, setMenuKey] = useState(0);
   const [panelOpen, setPanelOpenState] = useState(() => !loadView().panelHidden);
   const [tab, setTab] = useState("sheet");
   const [health, setHealth] = useState(null);
@@ -441,7 +444,8 @@ export default function App() {
         ...(view.narr ? { "--narr": view.narr } : {}), ...(view.say ? { "--say": view.say } : {}), ...(view.think ? { "--think": view.think } : {}) }}
       data-story-colors={view.storyColors === false ? "off" : "on"}>
       <Sidebar
-        convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => setModal("new")}
+        convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => { setMenuInit(null); setModal("new"); }}
+        onHome={() => { if (!busy) { setActiveId(null); setGame(null); localStorage.removeItem("activeConv"); } }}
         onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         collapsed={view.sideCollapsed} onCollapse={setSideCollapsed}
@@ -481,12 +485,18 @@ export default function App() {
           </>
         ) : (
           <div className="welcome">
-            <img className="welcome-dice" src="/favicon.png" alt="" />
-            <h1 className="brand-name">Calíope</h1>
-            <p className="muted">Roleplay and tabletop adventures that run entirely on your PC.<br />No tokens, no limits, and it remembers everything.</p>
-            <button className="btn primary big" onClick={() => setModal("new")}>＋ Start a new game</button>
+            <div className="row gap center welcome-head">
+              <img className="welcome-dice small" src="/favicon.png" alt="" />
+              <div className="grow"><h1 className="brand-name">Calíope</h1>
+                <p className="muted small">Roleplay and tabletop adventures that run entirely on your PC. No tokens, no limits, and it remembers everything.</p></div>
+            </div>
             {!online && <FirstModel onOpen={(init) => { setModelsInit({ tab: init.tab, query: init.query || "" }); setModal("models"); }} />}
             {error && <p className="error-text small">{error}</p>}
+            <MainMenu refreshKey={menuKey}
+              onPlay={(id) => { setMenuInit({ action: "play", id }); setModal("new"); }}
+              onEdit={(id) => { setMenuInit({ action: "edit", id }); setModal("new"); }}
+              onCreate={() => { setMenuInit({ action: "create" }); setModal("new"); }}
+              onImport={() => { setMenuInit({ action: "import" }); setModal("new"); }} />
           </div>
         )}
       </main>
@@ -504,7 +514,7 @@ export default function App() {
       {modal === "models" && <ModelsModal initialTab={modelsInit.tab} initialQuery={modelsInit.query} onClose={() => { setModal(null); refreshHealth(); }} />}
       <DialogHost />
       {tour && <Tour hidden={!!modal} onDone={endTour} onGetModel={(q) => openModels(q)} />}
-      {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
+      {modal === "new" && <ScenarioModal initial={menuInit} onClose={() => { setModal(null); setMenuKey((k) => k + 1); }} onStart={startGame} />}
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} onTour={() => { setModal(null); setTour(true); }} />}
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}
       {modal === "rulebooks" && <RulebooksModal onClose={() => setModal(null)} />}

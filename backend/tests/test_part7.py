@@ -247,3 +247,28 @@ class WikiResearchTests(unittest.IsolatedAsyncioTestCase):
         from app import wikiresearch as W
         with self.assertRaises(W.ResearchError):
             W.wiki_candidates("  ")
+
+
+class MapGridTests(unittest.TestCase):
+    def test_a_map_lined_up_with_its_squares_gives_the_battle_grid_and_fog(self):
+        from app import adventure
+        from app.combat import CombatEngine
+        adv = adventure.normalize_adventure({
+            "scenes": [{"name": "1. Yard", "map": "m"}, {"name": "2. Cellar", "map": "m"}],
+            "maps": [{"id": "m", "name": "Mill", "picture": "/api/images/x.png", "markers": {"1-yard": [0.5, 0.5]},
+                      "grid": {"size": 40, "ox": 10, "oy": 50, "nat_w": 2010, "nat_h": 1210}, "reveal": 5}]})
+        m = adv["maps"][0]
+        self.assertEqual(m["grid"]["oy"], 10)                                # offsets kept inside one square
+        st = {"adventure": {"scene": "1-yard", "visited": ["1-yard"]}}
+        b = adventure.battle_map(adv, st)
+        self.assertEqual((b["w"], b["h"]), (50, 30))
+        self.assertEqual(b["near"], [24, 14])                                # (1005-10)/40, (605-10)/40
+        self.assertEqual(b["fog"][0]["r"], 5)
+        self.assertAlmostEqual(b["fog"][0]["x"], 24.88, places=2)
+        state, _ = CombatEngine().start({"player": {"name": "Me", "hp": {"current": 9, "max": 9}, "stats": {}}},
+                                              "d20", [{"name": "Goblin", "count": 1}], grid={"w": b["w"], "h": b["h"]},
+                                              battle_map=b, near=b["near"])
+        grid = state["combat"]["grid"]
+        self.assertEqual(grid["geom"]["size"], 40.0)
+        self.assertEqual(len(grid["fog"]), 1)
+        self.assertEqual((grid["w"], grid["h"]), (50, 30))

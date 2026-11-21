@@ -29,7 +29,27 @@ APP_URL = "http://127.0.0.1:8000"
 
 
 def say(msg: str = "") -> None:
-    print(msg, flush=True)
+    try:
+        print(msg, flush=True)
+    except (OSError, ValueError):  # started without a console (hidden): nothing to print to
+        pass
+
+
+def progress(percent: int, text: str = "") -> None:
+    """Tell the loading screen (splash.py) how far the start is: '<percent>;<text>', 'done' or 'error;<text>'."""
+    try:
+        DATA.mkdir(parents=True, exist_ok=True)
+        line = "done" if percent >= 100 and not text else f"{percent};{text}"
+        (DATA / "splash.txt").write_text(line + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def failed(text: str) -> None:
+    try:
+        (DATA / "splash.txt").write_text("error;" + text.replace("\n", "\\n") + "\n", encoding="utf-8")
+    except OSError:
+        pass
 
 
 # ------------------------------------------------------------------ interface build
@@ -77,13 +97,16 @@ def build_interface(frontend: Path = FRONTEND) -> bool:
             say("  ! The interface code changed, but Node.js is not installed, so the previous build is used.")
             return True
         say("  ! Node.js is needed once to build the interface. Install the LTS version from https://nodejs.org and run Play.bat again.")
+        failed("Node.js is needed once to build the interface. Install the LTS version from https://nodejs.org and start Calíope again.")
         return False
     if needs_npm_install(frontend):
         say("  Installing interface packages (first time only, needs internet)...")
+        progress(36, "Installing the interface's packages (first time only, needs internet)…")
         if subprocess.call([npm, "install", "--no-fund", "--no-audit"], cwd=frontend) != 0:
             say("  ! npm install failed.")
             return has_old
     say("  Building the interface...")
+    progress(42, "Building the interface (after an update; about a minute)…")
     if subprocess.call([npm, "run", "build"], cwd=frontend) != 0:
         say("  ! The interface build failed." + (" Using the previous build." if has_old else ""))
         return has_old
@@ -110,16 +133,19 @@ def wait_for(fn, seconds: float, step: float = 0.5):
 
 
 def create_shortcut(only_if_missing: bool = False) -> bool:
-    """Shortcuts on the desktop and in the Start menu: Calíope's icon, the black window starts minimized."""
+    """Shortcuts on the desktop and in the Start menu: Calíope's icon; they start it hidden through Caliope.vbs (no black
+    window, a loading screen instead). An older shortcut that opened Play.bat directly is replaced."""
     if os.name != "nt":
         return False
-    target = ROOT / "Play.bat"
+    vbs = ROOT / "Caliope.vbs"
+    target, args = ("wscript.exe", f'"{vbs}"') if vbs.is_file() else (str(ROOT / "Play.bat"), "")
     icon = ROOT / "assets" / "icon.ico"
     icon_loc = str(icon) if icon.is_file() else "%SystemRoot%\\System32\\imageres.dll,76"
     one = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($p);"
-           f"$s.TargetPath='{target}';$s.WorkingDirectory='{ROOT}';$s.IconLocation='{icon_loc}';$s.WindowStyle=7;"
+           f"$s.TargetPath='{target}';$s.Arguments='{args}';$s.WorkingDirectory='{ROOT}';$s.IconLocation='{icon_loc}';$s.WindowStyle=7;"
            "$s.Description='Caliope: roleplay and tabletop stories on this PC';$s.Save();")
-    skip = "if(-not (Test-Path $p)){" if only_if_missing else "if($true){"
+    old = "(New-Object -ComObject WScript.Shell).CreateShortcut($p).TargetPath -notlike '*wscript*'" if vbs.is_file() else "$false"
+    skip = f"if(-not (Test-Path $p) -or ({old})){{" if only_if_missing else "if($true){"
     script = (f"$p=[Environment]::GetFolderPath('Desktop')+'\\Caliope.lnk';{skip}{one}}};"
               f"$p=[Environment]::GetFolderPath('Programs')+'\\Caliope.lnk';{skip}{one}}}")
     try:
@@ -229,6 +255,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Start Caliope")
     ap.add_argument("--no-browser", action="store_true", help="do not open the browser")
     ap.add_argument("--shortcut", action="store_true", help="create the desktop shortcut and exit")
+    ap.add_argument("--quiet", action="store_true", help="started hidden by the shortcut: no black window, a loading screen")
     args = ap.parse_args()
 
     if args.shortcut:
@@ -239,15 +266,21 @@ def main() -> int:
     say("=== Caliope ===")
     if get_json(APP_URL + "/api/health"):
         say("  The app is already running. Opening it...")
+        progress(90, "Calíope is already running: opening it…")
         if not args.no_browser:
             show_app(get_json(APP_URL + "/api/settings") or {})
+        progress(100)
         return 0
 
     first_run_questions()
+    progress(35, "Checking the interface…")
     if not build_interface():
+        if "error;" not in (DATA / "splash.txt").read_text("utf-8", errors="replace") if (DATA / "splash.txt").is_file() else True:
+            failed("The interface could not be built. Start Play.bat directly to see why.")
         return 1
 
     say("  Starting the app...")
+    progress(55, "Starting the story engine…")
     DATA.mkdir(parents=True, exist_ok=True)
     log_path = DATA / "caliope.log"
     if log_path.is_file() and log_path.stat().st_size > 2_000_000:
@@ -257,24 +290,28 @@ def main() -> int:
     log.flush()
     server = subprocess.Popen([sys.executable, "run.py"], cwd=BACKEND, stdout=log, stderr=subprocess.STDOUT)
     try:
-        if not wait_for(lambda: get_json(APP_URL + "/api/health") or server.poll() is not None, 60) \
+        if not wait_for(lambda: get_json(APP_URL + "/api/health") or server.poll() is not None, 90) \
                 or server.poll() is not None:
             say("  ! The app did not start. The reason (last lines of backend\\data\\caliope.log):\n")
             log.flush()
-            say("\n".join(log_path.read_text("utf-8", errors="replace").splitlines()[-25:]))
+            tail = "\n".join(log_path.read_text("utf-8", errors="replace").splitlines()[-25:])
+            say(tail)
+            failed("Calíope did not start. The last lines of backend\\data\\caliope.log:\n" + "\n".join(tail.splitlines()[-8:]))
             server.terminate()
             return 1
+        progress(85, "Opening the window…")
         settings = get_json(APP_URL + "/api/settings") or {}
         if settings.get("ai_engine") == "builtin":
             say("  The AI model loads in the background (Models window).")
         say(f"\n  Ready: {APP_URL}")
         win = None if args.no_browser else show_app(settings)
+        progress(100)
         if win:
             say("  The game opened in its own window. Closing that window stops everything.")
             say("  (The app's messages and errors go to backend\\data\\caliope.log.)\n")
             minimize_console(hide=True)  # only Calíope's window stays on the taskbar
             handed_over = not wait_window(win)
-            if handed_over:
+            if handed_over and not args.quiet:
                 show_console()  # the window joined one already open: this window must stay to stop the app
             else:
                 say("  Window closed: stopping...")
@@ -297,4 +334,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as exc:  # hidden start: the loading screen is the only place to tell
+        failed(f"Calíope could not start: {exc}")
+        raise

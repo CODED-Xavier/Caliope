@@ -485,7 +485,7 @@ function Editor({ initial, id, onCancel, onSaved }) {
   );
 }
 
-export default function ScenarioModal({ onClose, onStart }) {
+export default function ScenarioModal({ onClose, onStart, initial }) {
   const [list, setList] = useState([]);
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState("pick"); // pick | edit | import | setup | cast
@@ -498,6 +498,13 @@ export default function ScenarioModal({ onClose, onStart }) {
   };
   useEffect(() => { load(); }, []);
   const sel = list.find((s) => s.id === selected);
+  useEffect(() => { // opened from the main menu: go straight to playing, editing, making or importing a card
+    if (!initial) return;
+    if (initial.action === "edit" && initial.id) edit(initial.id);
+    else if (initial.action === "create") create();
+    else if (initial.action === "import") setView("import");
+    else if (initial.action === "play" && initial.id) { setSelected(initial.id); setView("setup"); }
+  }, []); // eslint-disable-line
 
   const edit = async (id) => {
     try { const full = await api.scenario(id); setEditing({ id, initial: full.data }); setView("edit"); } catch (e) { setError(e.message); }

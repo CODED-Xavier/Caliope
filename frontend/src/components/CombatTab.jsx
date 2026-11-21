@@ -51,7 +51,7 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
   }, [mapMode, savedId, saved]);
   useEffect(() => { if (mapMode === "empty") setPreview(null); }, [mapMode]);
   useEffect(() => {
-    if (mapMode === "scene" && battle) { setGrid({ w: battle.w, h: battle.h }); setPreview({ tiles: [], background: battle.background, name: battle.name }); }
+    if (mapMode === "scene" && battle) { setGrid({ w: battle.w, h: battle.h }); setPreview({ tiles: [], background: battle.background, name: battle.name, geom: battle.geom, fog: battle.fog }); }
   }, [mapMode, battle]);
   useEffect(() => { if (sceneFight) suggest(); }, [sceneFight]); // eslint-disable-line
   const switchSystem = (s) => { setSystem(s); setEnemies(enemies.map((e) => ({ ...BLANK[s], name: e.name, count: e.count }))); };
@@ -162,6 +162,7 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
         </div>
       )}
       {preview && <BattleMap w={preview.tiles[0]?.length || grid.w} h={preview.tiles.length || grid.h} tiles={preview.tiles} background={preview.background}
+        geom={preview.geom} fog={preview.fog}
         cell={mapMode === "scene" ? Math.max(8, Math.floor(360 / grid.w)) : 20} className="preview" />}
       {editor && <MapEditor onClose={() => { setEditor(false); loadSaved(); }}
         onPicked={(m) => { setEditor(false); loadSaved(); setPreview({ tiles: m.tiles, background: m.background, name: m.name }); setMapMode(m.id ? "saved" : "gen-custom"); if (m.id) setSavedId(String(m.id)); }} />}
@@ -174,7 +175,7 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
 
 /* ---------------------------------------------------------------- grid */
 function Grid({ combat, selected, onSelect, onMove }) {
-  const { w, h, tiles = [], background = "", name = "" } = combat.grid;
+  const { w, h, tiles = [], background = "", name = "", geom = null, fog = null } = combat.grid;
   const people = combat.combatants;
   const sel = people.find((c) => c.id === selected);
   const [hover, setHover] = useState(null);
@@ -184,7 +185,9 @@ function Grid({ combat, selected, onSelect, onMove }) {
   const hoverTile = hover ? TILE_STYLE[tiles[hover.y]?.[hover.x] || "."] : null;
   return (
     <div className="grid-wrap">
-      <BattleMap w={w} h={h} tiles={tiles} background={background} tokens={people} selected={selected}
+      <BattleMap w={w} h={h} tiles={tiles} background={background} tokens={people} selected={selected} geom={geom} cell={geom ? 28 : 30}
+        // fog of war: the places already visited stay clear, and your side sees around itself
+        fog={fog ? [...fog, ...people.filter((c) => c.side !== "enemy" && c.hp > 0).map((c) => ({ x: c.x + 0.5, y: c.y + 0.5, r: 4 }))] : null}
         onToken={onSelect} onLeave={() => setHover(null)} onCellEnter={(x, y) => setHover({ x, y })}
         onCell={(x, y) => { if (sel && !occupied(x, y) && !blockedAt(x, y)) onMove(sel.id, x, y); }} />
       <div className="muted tiny">

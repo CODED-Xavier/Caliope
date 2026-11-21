@@ -23,6 +23,7 @@ from .portraits import _url
 from .util import truncate
 
 MAX_SCENES = 200
+MAP_MAX = 80  # squares across an adventure map (the battle grid follows it)
 MAX_MAPS = 30
 TEXT_LIMIT = 6000
 
@@ -99,6 +100,22 @@ def _check(raw) -> dict | None:
             "dc": _int(raw.get("dc"), 10, 1, 40)}
 
 
+def _grid(raw) -> dict:
+    """Where the map picture's own squares are, in the picture's pixels: square size and the first line's offset (as
+    Foundry VTT and Roll20 align a map). Empty when not set: then the squares just divide the picture evenly."""
+    if not isinstance(raw, dict):
+        return {}
+    try:
+        g = {k: float(raw.get(k) or 0) for k in ("size", "ox", "oy", "nat_w", "nat_h")}
+    except (TypeError, ValueError):
+        return {}
+    if not (4 <= g["size"] <= 1000 and g["nat_w"] > 0 and g["nat_h"] > 0):
+        return {}
+    g["ox"] %= g["size"]
+    g["oy"] %= g["size"]
+    return {k: round(v, 2) for k, v in g.items()}
+
+
 def normalize_adventure(raw) -> dict:
     raw = raw if isinstance(raw, dict) else {}
     parts, part_ids = [], set()
@@ -151,8 +168,9 @@ def normalize_adventure(raw) -> dict:
                 except (TypeError, ValueError):
                     pass
         maps.append({"id": mid, "name": truncate(str(m["name"]).strip(), 80), "picture": _url(m.get("picture")),
-                     "player_picture": _url(m.get("player_picture")), "cols": _int(m.get("cols"), 30, 6, 48),
-                     "rows": _int(m.get("rows"), 20, 4, 48), "markers": markers})
+                     "player_picture": _url(m.get("player_picture")), "cols": _int(m.get("cols"), 30, 6, MAP_MAX),
+                     "rows": _int(m.get("rows"), 20, 4, MAP_MAX), "markers": markers, "grid": _grid(m.get("grid")),
+                     "reveal": _int(m.get("reveal"), 6, 0, 40)})
     for s in scenes:
         if s["map"] and s["map"] not in map_ids:
             s["map"] = ""
@@ -590,5 +608,20 @@ def battle_map(adv: dict, state: dict) -> dict | None:
     if not m or not (m["picture"] or m["player_picture"]):
         return None
     mark = m["markers"].get(s["id"])
-    return {"background": m["player_picture"] or m["picture"], "name": truncate(s["name"], 60), "w": m["cols"], "h": m["rows"],
-            "near": [int(mark[0] * m["cols"]), int(mark[1] * m["rows"])] if mark else None}
+    g = m.get("grid") or {}
+    if g:  # the battle grid is the picture's own squares
+        cols = max(6, min(MAP_MAX, int((g["nat_w"] - g["ox"]) // g["size"])))
+        rows = max(4, min(MAP_MAX, int((g["nat_h"] - g["oy"]) // g["size"])))
+        to_cell = lambda fx, fy: [(fx * g["nat_w"] - g["ox"]) / g["size"], (fy * g["nat_h"] - g["oy"]) / g["size"]]  # noqa: E731
+    else:
+        cols, rows = m["cols"], m["rows"]
+        to_cell = lambda fx, fy: [fx * cols, fy * rows]  # noqa: E731
+    near = None
+    if mark:
+        cx, cy = to_cell(*mark)
+        near = [max(0, min(cols - 1, int(cx))), max(0, min(rows - 1, int(cy)))]
+    visited = set((state.get("adventure") or {}).get("visited") or []) | {s["id"]}
+    fog = [{"x": round(to_cell(*m["markers"][sid])[0], 2), "y": round(to_cell(*m["markers"][sid])[1], 2), "r": m["reveal"]}
+           for sid in visited if sid in m["markers"]] if m.get("reveal") else []
+    return {"background": m["player_picture"] or m["picture"], "name": truncate(s["name"], 60), "w": cols, "h": rows,
+            "near": near, "geom": g or None, "fog": fog}

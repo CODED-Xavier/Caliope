@@ -23,8 +23,32 @@ from .util import as_int, clamp, truncate
 SYSTEMS = ("d20", "pool")
 SIDES = ("player", "ally", "enemy")
 MAX_COMBATANTS = 16
-GRID_MAX = 48  # an adventure's map picture can hold a big grid
+GRID_MAX = 80  # an adventure's map picture can hold a big grid
 CONDITIONS = ("prone", "grappled", "restrained", "poisoned", "stunned", "blinded", "frightened", "invisible", "dodging")
+
+
+def _picture_geometry(battle_map: dict | None) -> dict:
+    """An adventure map lined up with its own squares (geom) and the fog over the places not visited yet."""
+    out: dict = {}
+    g = (battle_map or {}).get("geom")
+    if isinstance(g, dict):
+        try:
+            geom = {k: float(g[k]) for k in ("size", "ox", "oy", "nat_w", "nat_h")}
+            if geom["size"] > 0 and geom["nat_w"] > 0 and geom["nat_h"] > 0:
+                out["geom"] = geom
+        except (KeyError, TypeError, ValueError):
+            pass
+    fog = (battle_map or {}).get("fog")
+    if isinstance(fog, list):
+        clean = []
+        for f in fog[:100]:
+            try:
+                clean.append({"x": float(f["x"]), "y": float(f["y"]), "r": max(0.0, min(40.0, float(f["r"])))})
+            except (KeyError, TypeError, ValueError):
+                continue
+        if clean:
+            out["fog"] = clean
+    return out
 
 
 class CombatError(ValueError):
@@ -155,7 +179,8 @@ class CombatEngine:
         combat = {"active": True, "system": system, "round": 1, "turn": 0, "order": [c["id"] for c in people],
                   "combatants": people, "grid": {"w": w, "h": h, "tiles": tiles,
                                                  "background": str((battle_map or {}).get("background") or "")[:600],
-                                                 "name": truncate(str((battle_map or {}).get("name") or ""), 60)},
+                                                 "name": truncate(str((battle_map or {}).get("name") or ""), 60),
+                                                 **_picture_geometry(battle_map)},
                   "log": log[-30:]}
         state["combat"] = combat
         order = ", ".join(c["name"] for c in people)

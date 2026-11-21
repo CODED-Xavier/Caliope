@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { MODE_LABELS, timeAgo } from "../utils.js";
 
-export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, onDelete, onSkills, onRulebooks, onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
+export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onRename, onDelete, onSkills, onRulebooks, onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
   const online = health?.llm?.ok;
   const [filter, setFilter] = useState("");
   if (collapsed) return null; // fully hidden: the bubble on the chat's edge brings it back
@@ -13,6 +13,7 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, on
         <button className="icon-btn theme-btn" onClick={onToggleTheme} title="Toggle light/dark">{theme === "dark" ? "☀" : "☾"}</button>
         <button className="icon-btn" onClick={() => onCollapse(true)} title="Hide the games list">«</button>
       </div>
+      <button className={`btn wide home-btn ${activeId ? "" : "on"}`} onClick={onHome} title="All your cards">🏠 Main menu</button>
       <button data-tour="new" className="btn primary wide" onClick={onNew}>＋ New game</button>
       <div className="side-label">Your games</div>
       {convs.length > 6 && <input className="field side-search" placeholder="Find a game…" value={filter} onChange={(e) => setFilter(e.target.value)} />}

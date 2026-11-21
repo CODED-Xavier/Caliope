@@ -311,7 +311,7 @@
 "🎵 Music": "🎵 Música",
 "Pause": "Pausar",
 "Click to start the music": "Clique para começar a música",
-"Play": "Tocar",
+"Play": "Jogar",
 "Next song": "Próxima música",
 "Music library": "Biblioteca de músicas",
 "Click ▶ for music": "Clique ▶ para música",
@@ -1424,7 +1424,27 @@
 "No parts yet: type the chapter's name above (for example \"Part 1: Goblin Arrows\") and import its text.": "Ainda sem partes: escreva o nome do capítulo acima (por exemplo \"Parte 1: Flechas Goblins\") e importe o texto dele.",
 "The scenes appear here after the first import.": "As cenas aparecem aqui depois da primeira importação.",
 "Looping this song (click to stop)": "Repetindo esta música (clique para parar)",
-"Loop this song": "Repetir esta música"
+"Loop this song": "Repetir esta música",
+"Roleplay and tabletop adventures that run entirely on your PC. No tokens, no limits, and it remembers everything.": "Roleplay e aventuras de mesa que rodam inteiras no seu PC. Sem tokens, sem limites, e ela lembra de tudo.",
+"Looking for the squares…": "Procurando os quadrados…",
+"Find the grid": "Achar a grade",
+"Show the grid": "Mostrar a grade",
+"Clear the grid": "Apagar a grade",
+"Grid found: check that the lines sit on the map's squares.": "Grade encontrada: confira se as linhas caem nos quadrados do mapa.",
+"Not sure: line it up with the sliders.": "Não tenho certeza: alinhe com os controles deslizantes.",
+"Square size": "Tamanho do quadrado",
+"Move left/right": "Mover esquerda/direita",
+"Move up/down": "Mover cima/baixo",
+"Or by hand: squares across": "Ou à mão: quadrados na largura",
+"Fog of war: clear for": "Névoa de guerra: limpa por",
+"squares around each place visited (0 = no fog)": "quadrados em volta de cada lugar visitado (0 = sem névoa)",
+"🔍 Find the grid reads the picture and lines Calíope's squares up with the map's own (each square is 5 ft), like Foundry VTT or Roll20; fine-tune with the sliders. Fights here then happen on this map, square for square, with the fog hiding what you haven't explored. The player map (if you add one) is what the player sees; the GM map is used when there is none.": "🔍 Achar a grade lê a imagem e alinha os quadrados da Calíope com os do próprio mapa (cada quadrado é 1,5 m), como no Foundry VTT ou Roll20; ajuste fino com os controles. As lutas aqui acontecem neste mapa, quadrado por quadrado, com a névoa escondendo o que você não explorou. O mapa do jogador (se você adicionar) é o que o jogador vê; sem ele, usa-se o mapa do mestre.",
+"Your cards": "Seus cards",
+"Search cards…": "Buscar cards…",
+"Edit the card": "Editar o card",
+"No cards yet: make one, import one, or ask the Muse.": "Ainda sem cards: crie um, importe um, ou peça à Musa.",
+"All your cards": "Todos os seus cards",
+"Main menu": "Menu principal"
 },
 "patterns": [
 [
@@ -1782,6 +1802,14 @@
 [
 "({0})",
 "({0})"
+],
+[
+"{0} × {1} squares",
+"{0} × {1} quadrados"
+],
+[
+"{0} characters",
+"{0} personagens"
 ]
 ]
 }

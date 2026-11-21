@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.19**. The version history is at the end of this file.
+Current version: **v2.20**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -44,10 +44,14 @@ Current version: **v2.19**. The version history is at the end of this file.
 3. starts the app and Calíope's own AI engine (the model loads in the background)
 4. opens Calíope in **its own window**: a real app window (it uses Windows' built-in WebView2). If that can't start, it uses an Edge window without tabs or address bar instead
 
-While Calíope's window is open, the black window is hidden (the app's messages and errors go to `backend\data\caliope.log`). **Closing the game window stops everything.** The desktop shortcut starts the black window minimized, so you only see it during the first setup.
-The first run offers a **Caliope** desktop shortcut (or run `Play.bat --shortcut` any time).
+**The desktop shortcut** (and the Start menu one) starts Calíope through `Caliope.vbs`: no black window at all, on the
+screen or in the taskbar. A small **loading screen** with Calíope's icon and a progress bar shows what is happening (first
+setup, an interface update, starting the engine) and closes when the game window opens. If something goes wrong, the loading
+screen shows the reason, with a button to open the log (`backend\data\caliope.log`). Shortcuts made by older versions are
+updated by themselves. Double-clicking `Play.bat` still works, with the black window, which is handy to see what happens.
+**Closing the game window stops everything.** Run `Play.bat --shortcut` to make the shortcuts again.
 
-Options: `Play.bat --no-browser`, `Play.bat --no-lmstudio`.
+Options: `Play.bat --no-browser`.
 
 The first time, a short **tour** shows the main functions (skip it any time; Settings > *Show the tour again*). Its first step lets you pick the language: **English** or **Português (Brasil)**, for the menus and the stories. It ends by offering to get **Stheno 8B**.
 
@@ -83,7 +87,10 @@ Settings > *API key* also works with services that speak the same language (Open
 ## 3. Playing a game
 
 ### Starting
-1. **＋ New game** → pick a card. 👥 shows its characters with picture, name and role.
+Calíope opens on the **🏠 Main menu**: all your cards as tiles with their pictures, **▶ Play**, **✎ Edit**, **＋ New card**
+and **⤒ Import a card**. The 🏠 button at the top of the left column brings you back to it from a game.
+
+1. **▶ Play** on a card (or **＋ New game** → pick a card). 👥 shows its characters with picture, name and role.
 2. If the card has several starts, choose one in **Choose your start** (for example, Lumencia's default start or another route).
 3. **Create your sheet** (Adventure cards) or **Who are you?** (Roleplay cards).
    - Or choose *Let the story ask me* for cards that create your character in the chat (like Lumencia). When you answer with your sheet (name, origin, department, attributes…), the app reads it once and fills your **Sheet** tab.
@@ -210,14 +217,17 @@ For adventure cards that follow a book (*Lost Mine of Phandelver*, any module, y
   - **enemies** with their numbers (common monsters get their SRD numbers automatically), **treasure** and an **XP award**;
   - the **ways on** (the areas it leads to).
 - The splitting is automatic, so check each scene once: rename, **⤴ Join to the scene above**, or remove.
-- **Maps:** add the map picture (the GM version, and the player version if the book has one), set how many 5-ft squares wide
-  it is, then choose a scene and click its spot on the map.
+- **Maps:** add the map picture (the GM version, and the player version if the book has one), then **🔍 Find the grid**:
+  Calíope reads the picture and lines its squares up with the map's own 5-ft squares, like Foundry VTT or Roll20 (fine-tune
+  with *Square size* and the two *Move* sliders; *Show the grid* draws it over the map). Choose a scene and click its spot.
+  **Fog of war:** how many squares stay clear around each place visited (0 turns the fog off).
 - "Roleplaying ..." sections become characters (not met yet), and the Background and Overview go to the Aedo's notes.
 - The book stays on your PC; only the current scene is sent with each reply.
 
 In play, the **📕 Adventure** tab shows the scene you are in (📖 *What you see*), the map with the places you have visited,
 the ways on, **🏅 Give the XP** (added to the sheet's XP), and **⚔ Fight here**: the Combat tab opens with the scene's enemies
-and starts the fight on the adventure's map, with the enemies around the scene's spot. The scene changes when the story
+and starts the fight on the adventure's map, square for square with the map's own grid, the enemies around the scene's spot,
+and the fog hiding what you haven't explored (your side sees 4 squares around itself). The scene changes when the story
 moves on (the place the tracker notes, or when you say where you go), or when you pick one in the tab.
 
 ### Character pictures from a folder
@@ -473,3 +483,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.17 | Sheet library: ready character sheets (D&D 5e, Pathfinder 2e, Tormenta20, Vampire V5, Call of Cthulhu, Cyberpunk RED, academy, slice of life) for the Status tab, per card or per game |
 | 2.18 | Adventures: import a published adventure (PDF or text) as scenes with read-aloud text, GM notes, checks with DC, enemies, treasure, XP and maps; the 📕 Adventure tab; fights on the adventure's map; dark route for Lumencia |
 | 2.19 | The Muse researches a work on its fan wiki (📚 Research a work); 🔁 loop a song in the music controls; adventure Parts list |
+| 2.20 | Main menu with all your cards; loading screen and no black window (Caliope.vbs); 🔍 Find the grid on adventure maps (Foundry/Roll20-style), fights on the map's own squares, fog of war |

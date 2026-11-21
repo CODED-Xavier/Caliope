@@ -20,11 +20,17 @@ const initials = (name) => name.split(/\s+/).map((w) => w[0]).join("").slice(0, 
  * A battle map: terrain squares (+ an optional picture underneath) and tokens.
  * onCell(x, y) is called on click; onCellEnter(x, y) while the mouse moves (used for painting and distances).
  */
-export default function BattleMap({ w, h, tiles = [], background = "", tokens = [], selected, onCell, onCellEnter, onToken, onLeave, cell = 30, className = "" }) {
+export default function BattleMap({ w, h, tiles = [], background = "", tokens = [], selected, onCell, onCellEnter, onToken, onLeave, cell = 30, className = "", geom = null, fog = null }) {
   const bg = background ? portraitSrc(background) : "";
+  const maskId = React.useId().replace(/:/g, "");
   return (
-    <svg viewBox={`0 0 ${w * cell} ${h * cell}`} className={`battle-grid ${className}`} onMouseLeave={onLeave}>
-      {bg && <image href={bg} x="0" y="0" width={w * cell} height={h * cell} preserveAspectRatio="xMidYMid slice" opacity="0.85" />}
+    <svg viewBox={`0 0 ${w * cell} ${h * cell}`} className={`battle-grid ${className} ${geom ? "on-map" : ""}`} onMouseLeave={onLeave}
+      style={geom && !className.includes("preview") ? { width: w * cell, maxWidth: "none" } : undefined}>
+      {bg && (geom
+        // an adventure map lined up with its own squares: the picture is placed so its squares are the grid's
+        ? <image href={bg} x={(-geom.ox / geom.size) * cell} y={(-geom.oy / geom.size) * cell} width={(geom.nat_w / geom.size) * cell}
+            height={(geom.nat_h / geom.size) * cell} preserveAspectRatio="none" />
+        : <image href={bg} x="0" y="0" width={w * cell} height={h * cell} preserveAspectRatio="xMidYMid slice" opacity="0.85" />)}
       {Array.from({ length: w * h }, (_, i) => {
         const x = i % w, y = Math.floor(i / w);
         const ch = tiles[y]?.[x] || ".";
@@ -37,6 +43,18 @@ export default function BattleMap({ w, h, tiles = [], background = "", tokens = 
           </g>
         );
       })}
+      {fog?.length > 0 && (
+        <>
+          <defs>
+            <mask id={`fog-${maskId}`}>
+              <rect x="0" y="0" width={w * cell} height={h * cell} fill="white" />
+              <g filter={`url(#soft-${maskId})`}>{fog.map((f, i) => <circle key={i} cx={f.x * cell} cy={f.y * cell} r={f.r * cell} fill="black" />)}</g>
+            </mask>
+            <filter id={`soft-${maskId}`} x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation={cell * 0.6} /></filter>
+          </defs>
+          <rect x="0" y="0" width={w * cell} height={h * cell} fill="#0b0912" opacity="0.88" mask={`url(#fog-${maskId})`} pointerEvents="none" />
+        </>
+      )}
       {tokens.map((c) => (
         <g key={c.id} transform={`translate(${c.x * cell + cell / 2},${c.y * cell + cell / 2})`} className="token"
           onMouseDown={(e) => { e.stopPropagation(); onToken?.(c.id); }}>

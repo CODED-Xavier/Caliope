@@ -593,3 +593,29 @@ body.resizing { user-select: none; cursor: col-resize; }
 .research-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .research-cols > div { min-width: 0; }
 .jukebox .icon-btn.on { color: var(--accent); text-shadow: 0 0 6px var(--accent); }
+/* Main menu */
+.welcome:has(.main-menu) { max-width: none; width: 100%; margin: 0; justify-content: flex-start; align-items: stretch; text-align: left; overflow-y: auto; }
+.welcome-head { max-width: 1100px; width: 100%; margin: 0 auto; }
+.welcome-dice.small { width: 56px; height: 56px; }
+.main-menu { max-width: 1100px; width: 100%; margin: 12px auto 24px; }
+.main-menu .menu-head h2 { margin: 0; font-size: 18px; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; margin-top: 12px; }
+.card-tile { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; min-height: 250px; }
+.card-tile .tile-art { height: 130px; display: flex; cursor: pointer; background: var(--bg3, #0002); align-items: center; justify-content: center; }
+.card-tile .tile-art img { flex: 1; min-width: 0; height: 100%; object-fit: cover; object-position: top; }
+.card-tile .tile-letter { font-size: 48px; opacity: .35; font-family: var(--serif); }
+.card-tile .tile-body { padding: 8px 10px 4px; flex: 1; min-height: 0; }
+.card-tile .tile-name { font-weight: 600; }
+.card-tile .tile-desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px; opacity: .85; }
+.card-tile .tile-actions { padding: 8px 10px 10px; }
+.card-tile.new-tile { align-items: center; justify-content: center; gap: 6px; cursor: pointer; border-style: dashed; color: var(--accent); font-size: 15px; }
+.card-tile.new-tile .new-plus { font-size: 40px; line-height: 1; }
+.card-tile.new-tile:hover { background: var(--bg3, #0002); }
+.home-btn.on { border-color: var(--accent); }
+.grid-wrap { overflow: auto; max-height: 70vh; }
+.grid-tools { display: flex; flex-direction: column; gap: 6px; padding: 6px 0; }
+.grid-sliders { display: grid; grid-template-columns: 1fr; gap: 4px; }
+.grid-sliders label { display: flex; align-items: center; gap: 8px; }
+.grid-sliders input[type=range] { flex: 1; }
+.adv-map .grid-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.adv-map .fog-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
