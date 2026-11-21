@@ -131,7 +131,7 @@ The message box checks your spelling as you type (red underline; right-click for
 - The **date and hour** of the story.
 
 ### The side panel
-Tabs appear when the card uses them. Drag the panel's edge to resize it. The small **‹ ›** bubbles on the chat's edges hide the games list or the panel completely, giving the story the whole window; click them again to bring the columns back.
+Tabs appear when the card uses them. When there are more tabs than room, the tab row scrolls sideways: use the mouse wheel over it, drag it, or click the ‹ › arrows at its ends. Drag the panel's edge to resize it. The small **‹ ›** bubbles on the chat's edges hide the games list or the panel completely, giving the story the whole window; click them again to bring the columns back.
 - **Sheet**: HP, attributes, money, place, time and weather, resource bars (Mana, Aura…), powers with **Use**, short and long rest.
 - **Bag**: items, quests (when a quest seems finished, you confirm it), **Pay** box.
 - **People**: everyone you have met, with relationships from −100 to +100. Characters count as met only when they actually interact with you.
@@ -506,3 +506,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.22.2 | Fix: the app window froze at start (the F11 helper exposed the whole window to the page) |
 | 2.22.3 | Fix: the Status tab blanked the screen before the first reply; an error in one part of the screen no longer blanks the whole app |
 | 2.22.4 | The top bar no longer moves when the mouse is over the music controls; the game's title stays on one line (full name on hover) |
+| 2.22.5 | The side panel's tab row scrolls sideways (mouse wheel, drag, or the ‹ › arrows); the open tab stays in view |

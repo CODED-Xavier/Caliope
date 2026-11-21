@@ -609,6 +609,55 @@ function JournalTab({ convId, summary, refreshKey, pinned, pinnedLimit, onPinned
   );
 }
 
+/* -------------------------------------------------------------- tab strip */
+/** The tab row scrolls sideways: the mouse wheel, dragging, or the ‹ › arrows; the open tab is kept in view. */
+function TabStrip({ active, children }) {
+  const ref = useRef(null);
+  const drag = useRef(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const measure = () => {
+    const el = ref.current;
+    if (el) setEdges({ left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 });
+  };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const wheel = (e) => { // a vertical wheel scrolls the row sideways
+      if (el.scrollWidth <= el.clientWidth) return;
+      e.preventDefault();
+      el.scrollLeft += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => { el.removeEventListener("wheel", wheel); ro.disconnect(); };
+  }, []);
+  useEffect(() => { // the open tab stays visible
+    const t = ref.current?.querySelector(`[data-tab="${active}"]`);
+    t?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  }, [active]);
+  const by = (d) => ref.current?.scrollBy({ left: d * 160, behavior: "smooth" });
+  return (
+    <div className="tab-strip-wrap">
+      {edges.left && <button className="tab-arrow left" onClick={() => by(-1)} aria-label="Scroll left">‹</button>}
+      <div className="tab-strip" ref={ref} onScroll={measure}
+        onMouseDown={(e) => { drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }; }}
+        onMouseMove={(e) => {
+          const d = drag.current;
+          if (!d || !(e.buttons & 1)) return;
+          if (Math.abs(e.clientX - d.x) > 4) d.moved = true;
+          if (d.moved) ref.current.scrollLeft = d.left - (e.clientX - d.x);
+        }}
+        onClickCapture={(e) => { if (drag.current?.moved) { e.stopPropagation(); e.preventDefault(); } drag.current = null; }}
+        onMouseLeave={() => { drag.current = null; }}>
+        {children}
+      </div>
+      {edges.right && <button className="tab-arrow right" onClick={() => by(1)} aria-label="Scroll right">›</button>}
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------- Adventure */
 /** Fog of war over an adventure map: dark except around the places already visited. */
 function FogOverlay({ map, clear }) {
@@ -722,11 +771,13 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
   return (
     <aside className="side-panel">
       <div className="tabs">
-        {tabs.map(([k, icon, label]) => (
-          <button key={k} className={`tab ${active === k ? "active" : ""}`} onClick={() => onTab(k)}>
-            <span>{icon}</span><span className="tab-label">{label}</span>
-          </button>
-        ))}
+        <TabStrip active={active}>
+          {tabs.map(([k, icon, label]) => (
+            <button key={k} data-tab={k} className={`tab ${active === k ? "active" : ""}`} onClick={() => onTab(k)}>
+              <span>{icon}</span><span className="tab-label">{label}</span>
+            </button>
+          ))}
+        </TabStrip>
         <button className="icon-btn close-panel" onClick={onClose} title="Hide panel">✕</button>
       </div>
       <div className="tab-scroll">
