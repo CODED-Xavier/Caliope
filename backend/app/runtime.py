@@ -2,7 +2,7 @@
 
 - The engine (llama-server, Vulkan build for AMD/NVIDIA/Intel GPUs) is downloaded once from llama.cpp's
   official GitHub releases into the `engine` folder next to the app.
-- Your model is a .gguf file. The app lists the ones LM Studio already downloaded, so nothing is copied.
+- Your model is a .gguf file in Calíope's own models folder (backend/data/models), or in a folder you added.
 - A second small server runs the embedding model, if you chose one (for meaning-based memory search).
 - The engine is stopped when the app stops. On Windows the engine is tied to the app's process, so it also
   stops if the app's window is closed abruptly.
@@ -33,7 +33,7 @@ PINNED_TAG = "b12380"  # known-good fallback
 ASSET = "llama-{tag}-bin-win-vulkan-x64.zip"
 DOWNLOAD = "https://github.com/ggml-org/llama.cpp/releases/download/{tag}/{asset}"
 ENGINE_KEYS = ("ai_engine", "engine_model_path", "engine_embedding_path", "engine_port", "engine_gpu_layers", "context_window")
-MODEL_DIRS = [Path.home() / ".lmstudio" / "models", Path.home() / ".cache" / "lm-studio" / "models", DATA_DIR / "models"]
+MODEL_DIRS = [DATA_DIR / "models"]  # Calíope's own folder (more can be added in Models > Browse this PC)
 
 
 class EngineError(RuntimeError):
@@ -51,7 +51,7 @@ def server_binary(engine_dir: Path | None = None) -> Path | None:
 
 
 def find_models(dirs: list[Path] | None = None) -> list[dict]:
-    """GGUF files already on this PC (LM Studio's folder and the app's own), largest first."""
+    """GGUF files in Calíope's models folder (and the folders you added), largest first."""
     out, seen = [], set()
     for d in dirs or MODEL_DIRS:
         if not d.exists():
@@ -83,20 +83,6 @@ def fit_ladder(layers: str) -> list[tuple[int, str]]:
 def out_of_memory(log_text: str) -> bool:
     t = log_text.lower()
     return any(k in t for k in ("outofdevicememory", "out of memory", "failed to allocate", "unable to allocate"))
-
-
-def free_lmstudio() -> None:
-    """Ask LM Studio (if it is installed) to unload its models, so its copy does not fill the graphics card."""
-    lms = shutil.which("lms") or next((str(p) for p in (Path.home() / ".lmstudio" / "bin" / "lms.exe",
-                                                       Path.home() / ".lmstudio" / "bin" / "lms") if p.is_file()), None)
-    if not lms:
-        return
-    try:
-        flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
-        subprocess.run([lms, "unload", "--all"], capture_output=True, timeout=20, creationflags=flags)
-    except (OSError, subprocess.SubprocessError):
-        pass
-STORY_SLOT, HELPER_SLOT = 0, 1
 
 
 def build_command(binary: Path, model: str, ctx: int, port: int, gpu_layers: str, embedding: bool = False,
@@ -168,7 +154,7 @@ class EngineManager:
         binary = server_binary()
         if self.state == "ready" and self.chat is not None and self.chat.poll() is not None:
             self._set("error", "The engine stopped unexpectedly. Read the engine log, then press Start.")
-        out = {"mode": s.get("ai_engine", "lmstudio"), "installed": binary is not None, "binary": str(binary or ""),
+        out = {"mode": s.get("ai_engine", "builtin"), "installed": binary is not None, "binary": str(binary or ""),
                "state": self.state, "message": self.message, "progress": round(self.progress, 3),
                "model": s.get("engine_model_path", "")}
         if with_log:
@@ -230,7 +216,6 @@ class EngineManager:
             layers = str(s.get("engine_gpu_layers", "auto"))
             self._kill_stale()
             self._rotate_log()
-            await asyncio.to_thread(free_lmstudio)  # LM Studio's own copy of a model would take the video memory
             emb = s.get("engine_embedding_path", "")
             if emb and Path(emb).is_file():
                 self.embed = self._spawn(build_command(binary, emb, 2048, port + 1, "all", embedding=True))

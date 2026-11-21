@@ -2,9 +2,8 @@
 
 1. Builds the interface when it is missing or its code changed (needs Node.js only for that).
 2. Starts the app (backend + interface at http://127.0.0.1:8000).
-3. Starts LM Studio's server and loads your model when they are not running yet (if LM Studio's
-   command-line tool "lms" is installed, which it is with any recent LM Studio).
-4. Opens the app in your browser.
+3. Makes sure the shortcuts exist (desktop and Start menu).
+4. Opens the app in its own window (the AI model loads in the background, with the built-in engine).
 
 Close the window or press Ctrl+C to stop everything this script started.
 """
@@ -110,96 +109,29 @@ def wait_for(fn, seconds: float, step: float = 0.5):
     return None
 
 
-# ------------------------------------------------------------------ LM Studio
-def find_lms() -> str | None:
-    found = shutil.which("lms")
-    if found:
-        return found
-    for name in ("lms.exe", "lms"):
-        p = Path.home() / ".lmstudio" / "bin" / name
-        if p.is_file():
-            return str(p)
-    return None
-
-
-def lmstudio_root(base_url: str) -> str:
-    """http://localhost:1234/v1 -> http://localhost:1234"""
-    base = (base_url or "http://localhost:1234/v1").rstrip("/")
-    return base[:-3] if base.endswith("/v1") else base
-
-
-def loaded_models(base_url: str) -> list[str] | None:
-    """Models LM Studio has in memory right now (None when it cannot tell)."""
-    data = get_json(lmstudio_root(base_url) + "/api/v0/models")
-    if not isinstance(data, dict) or not isinstance(data.get("data"), list):
-        return None
-    return [m.get("id", "") for m in data["data"] if m.get("state") == "loaded" and m.get("type") != "embeddings"]
-
-
-def prepare_lmstudio(settings: dict) -> None:
-    base = settings.get("llm_base_url", "http://localhost:1234/v1")
-    if "localhost" not in base and "127.0.0.1" not in base:
-        return  # a server on another machine: not ours to start
-    lms = find_lms()
-    health = get_json(APP_URL + "/api/health") or {}
-    if not (health.get("llm") or {}).get("ok"):
-        if not lms:
-            say("  ! LM Studio's server is not running. Open LM Studio > Developer > Start Server.")
-            return
-        say("  Starting LM Studio's server...")
-        subprocess.call([lms, "server", "start"], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-        ok = wait_for(lambda: ((get_json(APP_URL + "/api/health") or {}).get("llm") or {}).get("ok"), 25)
-        if not ok:
-            say("  ! LM Studio did not answer. Open LM Studio and start the server there.")
-            return
-    model = settings.get("model") or ""
-    loaded = loaded_models(base)
-    if loaded is None or loaded or not model or not lms:
-        if loaded == [] and not model:
-            say("  i No model is loaded. Choose one in Settings, or load it in LM Studio (it also loads by itself on the first message).")
-        return
-    ctx = int(settings.get("context_window") or 8192)
-    say(f"  Loading {model} with a {ctx}-token context window (can take a minute)...")
-    code = subprocess.call([lms, "load", model, "--context-length", str(ctx), "-y"])
-    if code != 0:
-        say("  ! Could not load the model. Load it in LM Studio; the app will use it.")
-
-
-# ------------------------------------------------------------------ desktop shortcut
-def create_shortcut(only_if_there: bool = False) -> bool:
-    """The desktop shortcut: Calíope's icon, and the black window starts minimized (WindowStyle 7)."""
+def create_shortcut(only_if_missing: bool = False) -> bool:
+    """Shortcuts on the desktop and in the Start menu: Calíope's icon, the black window starts minimized."""
     if os.name != "nt":
         return False
     target = ROOT / "Play.bat"
     icon = ROOT / "assets" / "icon.ico"
     icon_loc = str(icon) if icon.is_file() else "%SystemRoot%\\System32\\imageres.dll,76"
-    script = (
-        "$p=[Environment]::GetFolderPath('Desktop')+'\\Caliope.lnk';"
-        + ("if(-not (Test-Path $p)){exit 0};" if only_if_there else "")
-        + "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($p);"
-        f"$s.TargetPath='{target}';$s.WorkingDirectory='{ROOT}';$s.IconLocation='{icon_loc}';$s.WindowStyle=7;$s.Save()"
-    )
-    return subprocess.call(["powershell", "-NoProfile", "-Command", script]) == 0
+    one = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($p);"
+           f"$s.TargetPath='{target}';$s.WorkingDirectory='{ROOT}';$s.IconLocation='{icon_loc}';$s.WindowStyle=7;"
+           "$s.Description='Caliope: roleplay and tabletop stories on this PC';$s.Save();")
+    skip = "if(-not (Test-Path $p)){" if only_if_missing else "if($true){"
+    script = (f"$p=[Environment]::GetFolderPath('Desktop')+'\\Caliope.lnk';{skip}{one}}};"
+              f"$p=[Environment]::GetFolderPath('Programs')+'\\Caliope.lnk';{skip}{one}}}")
+    try:
+        return subprocess.call(["powershell", "-NoProfile", "-Command", script],
+                               creationflags=0x08000000) == 0  # no extra window
+    except OSError:
+        return False
 
 
 def first_run_questions() -> None:
-    flag = DATA / "launcher.json"
-    try:
-        state = json.loads(flag.read_text("utf-8")) if flag.is_file() else {}
-    except ValueError:
-        state = {}
-    if os.name == "nt" and state.get("asked_shortcut") and not state.get("shortcut_v2"):
-        create_shortcut(only_if_there=True)  # older shortcuts opened the black window in front: start it minimized
-        DATA.mkdir(parents=True, exist_ok=True)
-        state["shortcut_v2"] = True
-        flag.write_text(json.dumps(state), "utf-8")
-    if state.get("asked_shortcut") or os.name != "nt" or not sys.stdin.isatty():
-        return
-    answer = input("  Create a 'Caliope' shortcut on your desktop? (y/n) ").strip().lower()
-    if answer.startswith(("y", "s")):
-        say("  Shortcut created." if create_shortcut() else "  ! Could not create the shortcut.")
-    DATA.mkdir(parents=True, exist_ok=True)
-    flag.write_text(json.dumps({**state, "asked_shortcut": True, "shortcut_v2": True}), "utf-8")
+    """Calíope always has its shortcuts (desktop and Start menu); a missing one is made again at every start."""
+    create_shortcut(only_if_missing=True)
 
 
 # ------------------------------------------------------------------ main
@@ -296,13 +228,12 @@ def wait_window(win) -> bool:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Start Caliope")
     ap.add_argument("--no-browser", action="store_true", help="do not open the browser")
-    ap.add_argument("--no-lmstudio", action="store_true", help="do not start LM Studio or load the model")
     ap.add_argument("--shortcut", action="store_true", help="create the desktop shortcut and exit")
     args = ap.parse_args()
 
     if args.shortcut:
         ok = create_shortcut()
-        say("Shortcut created on your desktop." if ok else "Could not create the shortcut (Windows only).")
+        say("Shortcuts created (desktop and Start menu)." if ok else "Could not create the shortcuts (Windows only).")
         return 0 if ok else 1
 
     say("=== Caliope ===")
@@ -335,9 +266,7 @@ def main() -> int:
             return 1
         settings = get_json(APP_URL + "/api/settings") or {}
         if settings.get("ai_engine") == "builtin":
-            say("  Built-in AI engine: the model loads in the background (see Settings > Model).")
-        elif not args.no_lmstudio:
-            prepare_lmstudio(settings)
+            say("  The AI model loads in the background (Models window).")
         say(f"\n  Ready: {APP_URL}")
         win = None if args.no_browser else show_app(settings)
         if win:

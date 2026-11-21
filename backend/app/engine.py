@@ -141,6 +141,8 @@ class ChatEngine:
     def _lock(self, conv_id: int) -> asyncio.Lock:
         return self._locks.setdefault(conv_id, asyncio.Lock())
 
+    _warming: dict = {}
+
     # ------------------------------------------------------------------ public
     async def send(self, conv_id: int, text: str, prepare=None, kind: str = "combat") -> AsyncIterator[dict]:
         """`prepare(state) -> (state, text)` runs inside the turn lock before the message is saved (used by
@@ -193,6 +195,19 @@ class ChatEngine:
             async with aclosing(self._reply(conv_id, user_msg)) as turn:
                 async for event in turn:
                     yield event
+        self._warm_later(conv_id)  # the new reply joins the story's memory while the player reads it
+
+    _tasks: set = set()
+
+    def _warm_later(self, conv_id: int) -> None:
+        if self.settings.get("ai_engine") != "builtin":
+            return
+        try:
+            task = asyncio.get_running_loop().create_task(self.warm(conv_id))
+        except RuntimeError:
+            return
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     async def _aedo_answer(self, conv_id: int, user_msg: dict) -> AsyncIterator[dict]:
         """A short answer out of character, from its own small prompt (the story's memory slot is not touched)."""
@@ -306,22 +321,8 @@ class ChatEngine:
                 yield {"type": "error", "message": "Only the last reply can be continued."}
                 return
             settings = self.settings.all()
-            conv = self.repo.get(conv_id)
-            scenario = conv["scenario"]
-            state = self.repo.get_state(conv_id)
             npcs = self.repo.list_npcs(conv_id)
-            history = self.repo.list_messages(conv_id, after_id=conv["summary_upto"])
-            recent = [m["content"] for m in reversed(history)]
-            lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
-            _, house = await self._rules_for(scenario, "", settings)
-            tpl = self._status_template(scenario, settings)
-            messages, _debug = self.prompts.build(
-                scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=[],
-                skills=self.skills.attached((scenario.get("skills") or {}).get("attached", [])),
-                history=history if tpl else with_latest_status(history), settings=settings,
-                app_status=statusbook.render(tpl, state, npcs) if tpl else None, pinned=conv.get("pinned_memory", ""), player_lore=conv.get("player_lore"),
-                lore=lore, player_name=state["player"].get("name") or "", house_rules=house,
-            )
+            messages = await self._story_prompt(conv_id, settings)
             messages.append({"role": "user", "content": CONTINUE_PROMPT})
             yield {"type": "continue_start", "message_id": last["id"]}
             partial: list[str] = []
@@ -353,6 +354,88 @@ class ChatEngine:
             yield {"type": "done"}
 
     # ------------------------------------------------------- editing history
+    async def _story_prompt(self, conv_id: int, settings: dict, extra_user: str | None = None) -> list[dict]:
+        """The story's prompt as it stands (no memory search), used by Continue and by the warm-up."""
+        conv = self.repo.get(conv_id)
+        scenario = conv["scenario"]
+        state = self.repo.get_state(conv_id)
+        npcs = self.repo.list_npcs(conv_id)
+        history = aedo_desk.without_ooc(self.repo.list_messages(conv_id, after_id=conv["summary_upto"]))
+        if extra_user is not None:
+            history = [*history, {"role": "user", "content": extra_user, "meta": {}}]
+        recent = [m["content"] for m in reversed(history)]
+        lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
+        _, house = await self._rules_for(scenario, "", settings)
+        tpl = self._status_template(scenario, settings)
+        messages, _debug = self.prompts.build(
+            scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=[],
+            skills=self.skills.attached((scenario.get("skills") or {}).get("attached", [])),
+            history=history if tpl else with_latest_status(history), settings=settings,
+            app_status=statusbook.render(tpl, state, npcs) if tpl else None, pinned=conv.get("pinned_memory", ""),
+            player_lore=conv.get("player_lore"), lore=lore, player_name=state["player"].get("name") or "", house_rules=house,
+            cantos=self.cantos.prompt_section(conv_id, int(settings["context_window"]) * 3 // 10) if self.cantos else "",
+        )
+        return messages
+
+    async def warm(self, conv_id: int) -> bool:
+        """Read the story's prompt ahead of time (built-in engine only), while the player reads and types: the
+        engine keeps it in the story's memory slot, so the next reply only reads the new message.
+        Without this, the first reply after opening a game rereads everything (about a minute on an RX 580)."""
+        settings = self.settings.all()
+        if settings.get("ai_engine") != "builtin" or self.is_busy(conv_id):
+            return False
+        # No turn lock: if the player sends a message meanwhile, the engine finishes this first and reuses it.
+        if self._warming.get(conv_id):
+            return False
+        self._warming[conv_id] = True
+        try:
+            messages = await self._story_prompt(conv_id, settings, extra_user="…")
+            async with aclosing(self.llm.stream_chat(messages, max_tokens=1, story=True)) as pieces:
+                async for _ in pieces:
+                    pass
+        except Exception as exc:  # only a head start: nothing is lost if it fails
+            log.info("Warm-up skipped: %s", exc)
+            return False
+        finally:
+            self._warming.pop(conv_id, None)
+        return True
+
+    async def _sheet_from_text(self, conv_id: int, text: str, tpl: str | None) -> tuple[dict, list[str]]:
+        """Read a character sheet written in the chat into the Sheet tab and the card's status block."""
+        st = self.repo.get_state(conv_id)
+        fields = statusbook.custom_fields(tpl) if tpl else []
+        opening = next((m["content"] for m in self.repo.list_messages(conv_id) if m["role"] == "assistant"), "")
+        try:
+            sheet = await sheetchat.read_sheet(self.llm, opening, text, fields, st.get("card_status"))
+        except Exception as exc:  # the sheet stays as it was; the story goes on
+            log.warning("Reading the sheet from the chat failed: %s", exc)
+            return st, []
+        if not sheet:
+            return st, []
+        st = self.repo.get_state(conv_id)
+        got = sheetchat.apply_sheet(st, sheet, keep_existing=st.get("setup") != "card")
+        if fields:
+            got += statusbook.apply_changes(st, tpl, [x for x in sheet.get("status") or [] if isinstance(x, dict)])
+        if got:
+            st["sheet_from_chat"] = True
+            self.repo.save_state(conv_id, st)
+        return st, got
+
+    async def sheet_from_message(self, conv_id: int, message_id: int) -> dict:
+        """"📋 Use as my sheet" on one of your messages: read it again into the Sheet tab and the status."""
+        msg = self.repo.get_message(message_id)
+        if not msg or msg["conversation_id"] != conv_id or msg["role"] != "user":
+            raise ValueError("Only your own messages can be used as your sheet.")
+        if self.is_busy(conv_id):
+            raise ValueError("This conversation is still busy with the previous turn.")
+        async with self._lock(conv_id):
+            conv = self.repo.get(conv_id)
+            tpl = self._status_template(conv["scenario"], self.settings.all())
+            st, got = await self._sheet_from_text(conv_id, msg["content"], tpl)
+        if not got:
+            raise ValueError("No sheet details were found in that message.")
+        return {"state": st, "npcs": self.repo.list_npcs(conv_id), "changes": ["Your sheet: " + "; ".join(got)]}
+
     def is_busy(self, conv_id: int) -> bool:
         return self._lock(conv_id).locked()
 
@@ -648,20 +731,12 @@ class ChatEngine:
                     yield {"type": "state", **result}
 
         st_now = self.repo.get_state(conv_id)
-        if sheetchat.wanted(st_now, self.repo.count_replies(conv_id) + 1, user_msg["content"]):
-            # cards that create your character in the story: your answer fills the Sheet tab (once)
-            opening = next((m["content"] for m in self.repo.list_messages(conv_id) if m["role"] == "assistant"), "")
-            try:
-                sheet = await sheetchat.read_sheet(self.llm, opening, user_msg["content"])
-            except Exception as exc:  # the sheet stays as it was; the story goes on
-                log.warning("Reading the sheet from the chat failed: %s", exc)
-                sheet = None
-            if sheet:
-                st_now = self.repo.get_state(conv_id)
-                got = sheetchat.apply_sheet(st_now, sheet)
-                if got:
-                    self.repo.save_state(conv_id, st_now)
-                    yield {"type": "state", "state": st_now, "npcs": self.repo.list_npcs(conv_id), "changes": ["Your sheet: " + "; ".join(got)]}
+        sheet_fields = statusbook.custom_fields(tpl) if tpl else []
+        if sheetchat.wanted(st_now, self.repo.count_replies(conv_id) + 1, user_msg["content"], sheet_fields):
+            # your character sheet written in the chat fills the Sheet tab and the card's status (once)
+            st_now, got = await self._sheet_from_text(conv_id, user_msg["content"], tpl)
+            if got:
+                yield {"type": "state", "state": st_now, "npcs": self.repo.list_npcs(conv_id), "changes": ["Your sheet: " + "; ".join(got)]}
 
         place_now = self.repo.get_state(conv_id).get("location", "")
         card_places = scenario.get("places") or []
@@ -854,7 +929,7 @@ class ChatEngine:
         try:
             raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker, cal_on, bool(status_lines), bool(res_line)),
                                       temperature=0.2,
-                                      max_tokens=700 if tracker == "full" else 450)
+                                      max_tokens=1100 if tracker == "full" else 900)  # a cut JSON would lose the whole update
         except LLMError as exc:
             log.warning("State analysis failed: %s", exc)
             return None

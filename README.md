@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.12**. The version history is at the end of this file.
+Current version: **v2.13**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -41,7 +41,7 @@ Current version: **v2.12**. The version history is at the end of this file.
 **Every time you play:** double-click **`Play.bat`**. It:
 1. installs the Python packages the first time (and again only when they change)
 2. builds the interface when it is missing or its code changed
-3. starts the app, plus the AI (the built-in engine, or LM Studio if you use it)
+3. starts the app and Calíope's own AI engine (the model loads in the background)
 4. opens Calíope in **its own window**: a real app window (it uses Windows' built-in WebView2). If that can't start, it uses an Edge window without tabs or address bar instead
 
 While Calíope's window is open, the black window is hidden (the app's messages and errors go to `backend\data\caliope.log`). **Closing the game window stops everything.** The desktop shortcut starts the black window minimized, so you only see it during the first setup.
@@ -62,26 +62,18 @@ Calíope works with a local roleplay model. On an 8 GB graphics card (such as th
 
 **Which model fits your PC?** 🧠 Models > *Find more* shows **Your PC** (graphics card, its memory, RAM) and the roleplay model that fits best, with the file size to pick and a **🔍 Find it** button. If it can't read your PC, ask any AI assistant: "My PC has <graphics card> and <RAM>. What is the best GGUF roleplay model for it?"
 
-### Option A: the built-in engine (recommended; no LM Studio)
+### Calíope's own engine
+Calíope runs the model itself (llama.cpp's official Vulkan build, which works on AMD cards). No other program is needed, and LM Studio is never opened.
 1. Sidebar → **🧠 Models**.
 2. Get a model:
-   - *Browse this PC*: use models you already have, such as LM Studio's, without copying them. **Browse…** opens Windows' file picker, or you can paste a folder's address.
-   - *Find more*: search Hugging Face. Each file size has a note on quality and on whether it fits 8 GB. Downloads resume after a pause and are checked against Hugging Face's checksums.
-3. *My models* → **Load**. The first time, the engine itself (llama.cpp's official Vulkan build, about 30 MB, works on AMD cards) is downloaded first and the model loads right after. Optionally, **Use for memory** on a small embedding model (e.g. `nomic-embed-text`) for memory search by meaning.
+   - *Find more*: search Hugging Face. Each file size has a note on quality and on whether it fits 8 GB. Downloads go to Calíope's own folder (`backend\data\models`), resume after a pause, and are checked against Hugging Face's checksums.
+   - *Browse this PC*: use a `.gguf` file you already have in another folder, without downloading it again. **Browse…** opens Windows' file picker, or you can paste a folder's address.
+3. *My models* → **Load**. The first time, the engine itself (about 30 MB) is downloaded first and the model loads right after. Optionally, **Use for memory** on a small embedding model (e.g. `nomic-embed-text`) for memory search by meaning.
 
-The engine starts with the app and stops when you close it; LM Studio is not opened. The built-in engine is the default for new installs.
+The engine starts with the app and stops when you close it. A model that was used from LM Studio's folder (older versions) is copied into Calíope's folder by itself, in the background, and used from there on the next start.
 
-**Why it answers faster than LM Studio:** the engine keeps two memory slots. One holds only the story, so its long, unchanged beginning (card, world, characters) stays read between turns, and each reply only reads what is new. The other slot runs the helpers: the tracker, summaries, and the Aedo's answers outside the story. In LM Studio the tracker's call pushes the story out of memory, so every reply rereads the whole prompt (about a minute on an RX 580). The two slots use about 1 GB more video memory. When a card can't hold that, the engine starts lighter by itself: one slot, then part of the model on the processor. Before loading, Calíope asks LM Studio (if installed) to unload its models, so the two don't fill the card together.
-- If loading fails with "out of memory", lower the **Context window** or set **GPU layers** to about 28 in Settings.
-- Close LM Studio's own model first, so the two don't fight over video memory.
-
-### Option B: LM Studio
-In LM Studio:
-1. Choose the **Vulkan** runtime (Settings > Runtime).
-2. Load the model with **Context length 8192** and **GPU offload: max**.
-3. Start the **local server**.
-
-In Calíope: Settings > AI engine > *LM Studio*, address `http://localhost:1234/v1`. Play.bat can start LM Studio's server for you.
+**Why replies start fast:** the engine keeps two memory slots. One holds only the story, so its long, unchanged beginning (card, world, characters, the older messages) stays read between turns, and each reply only reads what is new. The other slot runs the helpers: the tracker, summaries, and the Aedo's answers outside the story. Calíope also reads the story ahead while you read and type (right after each reply, and when you open a game), and the oldest messages leave the window a few rounds at a time instead of one per turn, so the part already read stays valid. The two slots use about 1 GB more video memory; when a card can't hold that, the engine starts lighter by itself (one slot, then part of the model on the processor).
+- If loading fails with "out of memory", lower the **Context window** to 6144 or set **GPU layers** to about 28 in Settings.
 
 ### Online services
 Settings > *API key* also works with services that speak the same language (OpenRouter, for example): put their address in *Server address* and your key in *API key*. Remember that they see your story, charge per use, and may refuse dark scenes.
@@ -331,7 +323,7 @@ Run **`build-exe.bat`** (after Play.bat ran once). It builds the folder `Caliope
 
 | Setting | What it does |
 |---|---|
-| AI engine | Built-in (llama.cpp) or LM Studio / another server |
+| AI engine | Built-in (Calíope's own engine) or another server (an online service with your API key) |
 | Context window | How much text the model reads at once; must match the model (8192) |
 | Reply length | Short, medium or long replies |
 | Rounds kept word for word | How many recent exchanges stay complete |
@@ -352,8 +344,8 @@ Every setting has a **?** with a short explanation.
 
 | Problem | Try |
 |---|---|
-| "Cannot reach the model server" | Built-in engine: 🧠 Models → Load a model. LM Studio: start its server, and check that *Server address* is `http://localhost:1234/v1`. |
-| Engine: out of memory | Lower *Context window* or set *GPU layers* to ~28. Close LM Studio's model. |
+| "Cannot reach the model server" | 🧠 Models → **Load** a model (wait until it says Ready). |
+| Engine: out of memory | Lower *Context window* to 6144 or set *GPU layers* to ~28. Close other programs that use the graphics card (games, LM Studio). |
 | Replies are slow | *Reply length*: short. Turn on *Skip tracking on quiet turns*. Fewer *rounds kept*. |
 | The game opens in an Edge window, not the app window | The app-window package could not be installed. Delete `backend\.venv\window-tried` and run Play.bat again (needs internet). Edge works the same. |
 | The interface looks old after an update | Close the game window and run Play.bat again (it rebuilds the interface). |
@@ -420,6 +412,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |
 | 2.11 | The interface in English and Português (Brasil), switched in Settings or in the tour |
 | 2.11.1 | Audit 2 fixes (see AUDIT.md): start names, Places in .caliope files, repeated place pictures, safer imports |
+| 2.13 | Calíope runs its models itself (own models folder, LM Studio's copies moved in, LM Studio never opened), desktop and Start menu shortcuts, faster replies (story read ahead, card reminders read once, window moves in steps), your sheet in the chat fills the card's Status (📋 on any of your messages to read it again) |
 | 2.12.3 | Engine: unloads LM Studio's models first, and falls back to a lighter start when video memory runs out |
 | 2.12.2 | The black window hides while Calíope's window is open (messages in `backend\data\caliope.log`); the desktop shortcut starts it minimized |
 | 2.12 | Beta feedback: the Aedo answers `/questions` outside the story, two memory slots for much faster replies, Load gets the engine by itself (no LM Studio), interactive tour, Calíope's icon on the window, the Sheet tab on every card, help popups stay on screen |

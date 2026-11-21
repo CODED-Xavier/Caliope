@@ -161,14 +161,6 @@ if __name__ == "__main__":
 
 
 class FolderTests(Base):
-    def setUp(self):
-        super().setUp()
-        self._lm = modelhub.lmstudio_folder
-        modelhub.lmstudio_folder = lambda: None
-
-    def tearDown(self):
-        modelhub.lmstudio_folder = self._lm
-        super().tearDown()
 
     def test_add_folder_lists_its_models(self):
         other = self.tmp / "D" / "lmstudio-models" / "bartowski"
@@ -195,9 +187,5 @@ class FolderTests(Base):
         with self.assertRaises(ModelError):
             self.hub.add_folder(str(Path.home()))
 
-    def test_lmstudio_moved_folder(self):
-        moved = self.tmp / "E" / "models"
-        moved.mkdir(parents=True)
-        (moved / "x-Q4_K_M.gguf").write_bytes(BLOB)
-        modelhub.lmstudio_folder = lambda: moved
-        self.assertEqual([m["name"] for m in self.hub.local()], ["x-Q4_K_M.gguf"])
+    def test_lmstudio_folder_is_not_used_anymore(self):
+        self.assertNotIn(Path.home() / ".lmstudio" / "models", modelhub.model_roots())

@@ -71,15 +71,15 @@ export default function SettingsModal({ onClose, onSaved, onTour }) {
       <h3>Model</h3>
       <Row label="AI engine" help="ai_engine">
         <select className="field" value={s.ai_engine} onChange={(e) => set("ai_engine", e.target.value)}>
-          <option value="lmstudio">LM Studio (or another server)</option>
-          <option value="builtin">Built-in (no LM Studio needed)</option>
+          <option value="builtin">Built-in (on this PC)</option>
+          <option value="lmstudio">Another server (advanced: an online service with your API key)</option>
         </select>
       </Row>
       {s.ai_engine === "builtin" ? <EnginePanel s={s} set={set} Row={Row} /> : (<>
-      <Row label="Server address" help="llm_base_url" hint="LM Studio default: http://localhost:1234/v1">
+      <Row label="Server address" help="llm_base_url" hint="An OpenAI-compatible address, e.g. https://openrouter.ai/api/v1">
         <input className="field" value={s.llm_base_url} onChange={(e) => set("llm_base_url", e.target.value)} />
       </Row>
-      <Row label="API key" help="api_key" hint="Keep 'lm-studio' for LM Studio. Online services (OpenRouter…) need your own key.">
+      <Row label="API key" help="api_key" hint="Your key for that service.">
         <SecretField value={s.api_key ?? ""} onChange={(v) => set("api_key", v)} />
       </Row>
       <Row label="Chat model" help="model">

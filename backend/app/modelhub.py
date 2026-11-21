@@ -1,7 +1,6 @@
 """The Models window: your .gguf models, Hugging Face search and downloads, load/unload, hide, delete.
 
-- Models live in LM Studio's folder (~/.lmstudio/models/<author>/<repo>/) when LM Studio is installed, so both
-  programs share one copy; otherwise in the app's data/models folder.
+- Models live in Calíope's own folder (backend/data/models/<author>/<repo>/). Other folders can be added by hand.
 - Downloads come from huggingface.co (public repositories only), resume after an interruption, and are checked
   against the SHA-256 that Hugging Face publishes for every large file.
 - "Deactivated" models stay on disk but are hidden from the model pickers.
@@ -11,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import logging
 import re
 import shutil
@@ -49,22 +47,8 @@ class ModelError(ValueError):
     pass
 
 
-def lmstudio_folder() -> Path | None:
-    """LM Studio's models folder when it was moved in LM Studio's settings (e.g. to another drive)."""
-    try:
-        data = json.loads((Path.home() / ".lmstudio" / "settings.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    folder = data.get("downloadsFolder") if isinstance(data, dict) else None
-    return Path(folder) if isinstance(folder, str) and folder.strip() else None
-
-
 def model_roots(extra: list[str] | tuple = ()) -> list[Path]:
-    roots = list(runtime.MODEL_DIRS)
-    lm = lmstudio_folder()
-    if lm:
-        roots.append(lm)
-    roots += [Path(p) for p in extra]
+    roots = list(runtime.MODEL_DIRS) + [Path(p) for p in extra]
     out, seen = [], set()
     for r in roots:
         key = str(r).lower().rstrip("\\/")
@@ -92,8 +76,20 @@ def pick_model_file() -> str:
 
 
 def download_root() -> Path:
-    lm = Path.home() / ".lmstudio"
-    return lm / "models" if lm.is_dir() else runtime.DATA_DIR / "models"
+    """Calíope's own models folder: downloads go here (backend/data/models/<author>/<repo>/)."""
+    return runtime.DATA_DIR / "models"
+
+
+def own_copy(path: str) -> str | None:
+    """A model file with the same name inside Calíope's folder (for a model that was used from LM Studio's)."""
+    p = Path(path or "")
+    root = download_root()
+    if not p.name or root in p.parents or not root.is_dir():
+        return None
+    for found in root.rglob(p.name):
+        if found.is_file() and (not p.is_file() or found.stat().st_size == p.stat().st_size):
+            return str(found)
+    return None
 
 
 def quant_of(name: str) -> str:
@@ -138,7 +134,7 @@ class ModelHub:
         return model_roots(self.added_folders())
 
     def folders(self) -> list[dict]:
-        """Where the app looks for models: its own and LM Studio's folders, plus the ones you added."""
+        """Where the app looks for models: its own folder, plus the ones you added."""
         added = {a.lower().rstrip("\\/") for a in self.added_folders()}
         out = []
         for r in self.roots():
@@ -406,3 +402,56 @@ async def _http_stream(url: str, start: int = 0):
             r.raise_for_status()
             async for chunk in r.aiter_bytes(1 << 20):
                 yield chunk
+
+
+def use_own_models(settings) -> None:
+    """Calíope runs its models itself: a game set to LM Studio moves to the built-in engine (an online service with
+    its own address and key stays), and a model used from LM Studio's folder switches to its copy in Calíope's folder."""
+    s = settings.all()
+    local = str(s.get("llm_base_url") or "").startswith(("http://localhost", "http://127.0.0.1"))
+    changes = {}
+    if s.get("ai_engine") == "lmstudio" and local:
+        changes["ai_engine"] = "builtin"
+    for key in ("engine_model_path", "engine_embedding_path"):
+        mine = own_copy(str(s.get(key) or ""))
+        if mine and mine != s.get(key):
+            changes[key] = mine
+    if changes:
+        settings.update(changes)
+        log.info("Using Calíope's own models: %s", changes)
+
+
+def adopt_model(path: str) -> str | None:
+    """Copy a model that is used from another program's folder (LM Studio's) into Calíope's own folder, keeping its
+    <author>/<repo>/ names. Returns the new path, or None when there is nothing to copy (or no room on the disk)."""
+    src = Path(path or "")
+    root = download_root()
+    if not src.is_file() or root in src.parents:
+        return None
+    mine = own_copy(path)
+    if mine:
+        return mine
+    dest = root / src.parent.parent.name / src.parent.name / src.name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if shutil.disk_usage(dest.parent).free < src.stat().st_size + 2 * 2**30:  # leave 2 GB free
+        log.warning("Not enough free disk space to copy %s into Calíope's folder", src.name)
+        return None
+    part = dest.with_name(dest.name + ".copying")
+    shutil.copyfile(src, part)
+    part.replace(dest)
+    log.info("Copied %s into Calíope's models folder", src.name)
+    return str(dest)
+
+
+def adopt_models(settings) -> None:
+    """At start: models still used from LM Studio's folder are copied into Calíope's (in the background); the
+    settings switch to the copies, used from the next model load on."""
+    for key in ("engine_model_path", "engine_embedding_path"):
+        try:
+            new = adopt_model(str(settings.get(key) or ""))
+        except OSError as exc:
+            log.warning("Could not copy the model into Calíope's folder: %s", exc)
+            continue
+        if new and new != settings.get(key):
+            settings.update({key: new})
+

@@ -69,7 +69,7 @@ function CheckButtons({ checks, onCheck }) {
   );
 }
 
-const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, scenePictures, onPaint, onCheck, onBuy, currency, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, hit, voiceOn, isSpeaking, onSpeak }) {
+const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitStyle, scenePictures, onPaint, onCheck, onBuy, currency, isLast, isLastAssistant, onRegenerate, onContinue, canAct, lastContext, onEdit, onResend, onRewind, onFork, onSheet, hit, voiceOn, isSpeaking, onSpeak }) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -126,6 +126,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
       {canAct && !isLast && <button className="icon-btn" title="Rewind: delete everything after this message" onClick={() => onRewind(m.id, false)}>⏪</button>}
       {canAct && !isOpening && <button className="icon-btn" title="Delete this message and everything after it" onClick={() => onRewind(m.id, true)}>🗑</button>}
       {canAct && <button className="icon-btn" title="Save point: start a new game from this moment (this game stays as it is)" onClick={() => onFork(m.id)}>⑂</button>}
+      {canAct && isUser && <button className="icon-btn" title="Use this message as my character sheet (fills the Sheet and Status tabs)" onClick={() => onSheet(m.id)}>📋</button>}
       {voiceOn && !isUser && <button className={`icon-btn ${isSpeaking ? "speaking" : ""}`} title={isSpeaking ? "Stop reading" : "Read aloud"} onClick={() => onSpeak(m.id)}>{isSpeaking ? "⏹" : "🔊"}</button>}
       {canAct && scenePictures && !isUser && !m.meta?.scene_picture && !m.meta?.ooc && <button className="icon-btn" title="Paint this scene (Pollinations.ai)" onClick={() => onPaint(m.id)}>🖼</button>}
     </div>
@@ -224,7 +225,7 @@ const showThoughts = (t) => (t.trimStart().startsWith("/") && !/^\s*\/roll/i.tes
 // While a reply is being written: hide the status block and any half-written portrait tag at the end.
 const liveText = (t) => hideStatus(t).replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, "");
 
-export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint, onCheck, onBuy, voiceOn, speaking, onSpeak }) {
+export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, onSheet, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint, onCheck, onBuy, voiceOn, speaking, onSpeak }) {
   const [text, setText] = useState("");
   const [fixing, setFixing] = useState(false);
   const [beforeFix, setBeforeFix] = useState(null);
@@ -311,10 +312,10 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
   const live = useRef({});
   const check = (...args) => { waitingReply.current = true; anchored.current = false; onCheck?.(...args); };
   const buy = (...args) => { waitingReply.current = true; anchored.current = false; onBuy?.(...args); };
-  live.current = { regenerate, onContinue, onFork, onPaint, onEdit, onResend, onRewind, check, buy, onSpeak };
+  live.current = { regenerate, onContinue, onFork, onSheet, onPaint, onEdit, onResend, onRewind, check, buy, onSpeak };
   const actions = useMemo(() => {
     const call = (name) => (...args) => live.current[name]?.(...args);
-    return { regenerate: call("regenerate"), onContinue: call("onContinue"), onFork: call("onFork"), onPaint: call("onPaint"),
+    return { regenerate: call("regenerate"), onContinue: call("onContinue"), onFork: call("onFork"), onSheet: call("onSheet"), onPaint: call("onPaint"),
       onEdit: call("onEdit"), onResend: call("onResend"), onRewind: call("onRewind"), check: call("check"), buy: call("buy"), speak: call("onSpeak") };
   }, []);
 
@@ -354,7 +355,7 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
             {dividers[m.id] && <div className="canto-divider"><span>{dividers[m.id].label}{dividers[m.id].title ? ` · ${dividers[m.id].title}` : ""}</span></div>}
             <Message key={m.id} m={m} npcs={game.npcs} speaker={speaker} playerPic={playerPic} portraitStyle={portraitStyle}
               scenePictures={scenePictures} onPaint={actions.onPaint} onCheck={actions.check} onBuy={actions.buy} currency={game.conversation.scenario?.currency || "gold"} isLast={i === messages.length - 1} isLastAssistant={i === lastAssistantIdx}
-              onRegenerate={actions.regenerate} onContinue={actions.onContinue} onFork={actions.onFork}
+              onRegenerate={actions.regenerate} onContinue={actions.onContinue} onFork={actions.onFork} onSheet={actions.onSheet}
               hit={m.id === current ? "search-hit current" : hits.includes(m.id) ? "search-hit" : ""} canAct={!busy} lastContext={busy ? null : lastContext}
               onEdit={actions.onEdit} onResend={actions.onResend} onRewind={actions.onRewind}
               voiceOn={voiceOn} isSpeaking={speaking === m.id} onSpeak={actions.speak} />

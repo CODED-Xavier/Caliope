@@ -58,7 +58,7 @@ Calíope has its own built-in AI engine; you don't need any other program.
 
 The sidebar shows **Model server online** when it's ready.
 
-> Already have LM Studio with models? In 🧠 Models → **Browse this PC**, pick your `.gguf` file. It is used directly, with no second download.
+> Already have a `.gguf` model somewhere on your PC? In 🧠 Models → **Browse this PC**, pick the file. It is used directly, with no second download. LM Studio is not needed.
 
 ---
 
@@ -69,6 +69,7 @@ The sidebar shows **Model server online** when it's ready.
    - If you received a **`.caliope`** file, click **Import a card** and choose it.
 2. If the card has more than one start, choose one under **Choose your start**.
 3. Create your character: **Who are you?** (roleplay cards) or **Create your sheet** (adventure cards).
+   - Cards like Lumencia ask for your sheet in the chat (Tier, Attributes, Stats…). Answer in the chat: the Sheet and Status tabs fill in by themselves. If something didn't arrive, press **📋** under your message to read it again.
    - **✨ Fill the empty fields** suggests a background, looks and personality for you.
    - **💾 Save as persona** keeps your character for other games; **🎭 Personas** loads one.
 4. Read the opening scene and write what you do.

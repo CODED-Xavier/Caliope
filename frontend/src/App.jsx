@@ -173,6 +173,7 @@ export default function App() {
       setGame(data);
       setLastContext(null);
       setError("");
+      api.warm(id).catch(() => {});  // the engine reads the story now, so the first reply is quick
     } catch (e) {
       if (!quiet) setError(e.message);
       localStorage.removeItem("activeConv");
@@ -339,6 +340,17 @@ export default function App() {
     } catch (e) { setError(e.message); }
   };
 
+  const sheetFrom = async (messageId) => {
+    if (busy || !activeId) return;
+    setBusy(true);
+    try {
+      const r = await api.sheetFromMessage(activeId, messageId);
+      setGame((g) => (g ? { ...g, state: r.state, npcs: r.npcs || g.npcs } : g));
+      ask.alert(r.changes.join("\n"));
+    } catch (e) { setError(e.message); }
+    setBusy(false);
+  };
+
   const forkAt = async (messageId) => {
     if (busy || !activeId) return;
     if (!await ask.confirm("Make a save point here? A new game starts from this moment, with the sheet, characters and memories as they were. This game stays as it is.")) return;
@@ -454,7 +466,7 @@ export default function App() {
             </div>
             <Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
-              onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt}
+              onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt} onSheet={sheetFrom}
               follow={view.follow} portraitStyle={view.portraits} searchOpen={searchOpen}
               scenePictures={scenePictures} onPaint={paintScene} onCheck={rollCheck} onBuy={buyOffer}
               voiceOn={!!voice.name} speaking={speaking} onSpeak={playVoice} onCloseSearch={() => setSearchOpen(false)} />

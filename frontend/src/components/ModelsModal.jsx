@@ -37,7 +37,7 @@ export default function ModelsModal({ onClose, initialTab = "mine", initialQuery
         <span className="grow">
           {!eng ? "Checking…" : eng.state === "downloading" ? "Downloading the engine (about 30 MB). The model loads right after."
             : !eng.installed ? "Press Load on a model: the built-in engine (about 30 MB) is downloaded first, once."
-            : eng.mode !== "builtin" ? "Using LM Studio. Loading a model here switches to the built-in engine."
+            : eng.mode !== "builtin" ? "Using another server. Loading a model here switches to the built-in engine."
             : eng.state === "ready" ? `Loaded: ${eng.model.split(/[\\/]/).pop()}`
             : eng.state === "starting" ? "Loading the model…" : eng.message || "No model loaded."}
         </span>
@@ -55,7 +55,7 @@ export default function ModelsModal({ onClose, initialTab = "mine", initialQuery
 
       {tab === "mine" && (
         <div>
-          {data && !data.models.length && <p className="muted">No models yet. Already have one (LM Studio)? Use <b>Browse this PC</b>. Or use <b>Find more</b> to download one (for example Stheno, about 4.7 GB).</p>}
+          {data && !data.models.length && <p className="muted">No models yet. Already have a .gguf file? Use <b>Browse this PC</b>. Or use <b>Find more</b> to download one (for example Stheno, about 4.7 GB).</p>}
           {(data?.models || []).map((m) => (
             <div key={m.path} className={`card model-row ${m.disabled ? "off" : ""}`}>
               <div className="grow">
@@ -90,7 +90,7 @@ export default function ModelsModal({ onClose, initialTab = "mine", initialQuery
               </div>
             </div>
           ))}
-          {data && <p className="muted tiny">Models are kept in {data.folder} (LM Studio sees them too). Deactivated models stay on disk but leave the model lists.</p>}
+          {data && <p className="muted tiny">Models are kept in Calíope's folder: {data.folder}. Deactivated models stay on disk but leave the model lists.</p>}
         </div>
       )}
 
@@ -211,8 +211,8 @@ function FolderPicker({ data, setData, setErr, onAdded }) {
   return (
     <div>
       <p className="muted small">
-        Already have models (for example from LM Studio)? Point the app at them and use them without downloading again.
-        Nothing is copied or moved, and LM Studio doesn't need to be open: the app's own engine runs them.
+        Already have .gguf models in another folder? Point Calíope at it and use them without downloading again.
+        Nothing is copied or moved: Calíope's own engine runs them.
       </p>
       <div className="row gap">
         <button className="btn primary" disabled={busy} onClick={() => run(api.browseModel)}>📂 Browse…</button>

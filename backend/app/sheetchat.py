@@ -47,24 +47,43 @@ def looks_like_sheet(text: str) -> bool:
     return hits >= 2 or (hits >= 1 and len(text) > 250)
 
 
-def wanted(state: dict, user_count: int, text: str) -> bool:
-    return state.get("setup") == "card" and not state.get("sheet_from_chat") and user_count <= 4 and looks_like_sheet(text)
+def wanted(state: dict, user_count: int, text: str, status_fields: list[str] | None = None) -> bool:
+    """Cards that create the character in the chat, or cards with their own status block (Tier, Attributes...):
+    a sheet written in one of the first answers fills the Sheet tab and the status once."""
+    return ((state.get("setup") == "card" or bool(status_fields)) and not state.get("sheet_from_chat")
+            and user_count <= 4 and looks_like_sheet(text))
 
 
-async def read_sheet(llm, asked: str, answer: str) -> dict | None:
-    raw = await llm.chat([{"role": "user", "content": PROMPT.format(asked=truncate(asked, 3000), answer=truncate(answer, 3000))}],
-                         json_schema=SCHEMA, max_tokens=500, temperature=0.1)
+STATUS_PROMPT = """
+The card keeps these status fields. In "status", give a value for every field the player's answer sets (copy the
+player's words and numbers, in the field's format, for example Magic: 8, Body: D+ [0/100], Tier: 3-Circle).
+Leave out fields the answer does not mention. Fields and current values: {fields}"""
+
+
+async def read_sheet(llm, asked: str, answer: str, status_fields: list[str] | None = None,
+                     current: dict | None = None) -> dict | None:
+    schema = SCHEMA
+    prompt = PROMPT.format(asked=truncate(asked, 3000), answer=truncate(answer, 3000))
+    if status_fields:
+        schema = {**SCHEMA, "properties": {**SCHEMA["properties"], "status": {"type": "array", "items": {
+            "type": "object", "properties": {"field": {"type": "string", "enum": list(status_fields)}, "value": {"type": "string"}},
+            "required": ["field", "value"]}}}, "required": [*SCHEMA["required"], "status"]}
+        prompt += STATUS_PROMPT.format(fields="; ".join(f"{f} = {(current or {}).get(f, '-')}" for f in status_fields))
+    raw = await llm.chat([{"role": "user", "content": prompt}], json_schema=schema, max_tokens=900, temperature=0.1)
     data = extract_json(raw or "")
     return data if isinstance(data, dict) else None
 
 
-def apply_sheet(state: dict, data: dict) -> list[str]:
-    """Write the sheet into the game state. Returns what changed (for the 'changes' line)."""
+def apply_sheet(state: dict, data: dict, keep_existing: bool = False) -> list[str]:
+    """Write the sheet into the game state. Returns what changed (for the 'changes' line).
+    `keep_existing`: the player made the character on the start screen, so only empty boxes are filled."""
     p = state["player"]
     changes = []
     for key, field in (("name", "name"), ("race", "race"), ("class", "class"), ("background", "background"),
                        ("looks", "description"), ("personality", "traits")):
         val = truncate(str(data.get(key) or "").strip(), 900 if key == "background" else 300)
+        if keep_existing and str(p.get(field) or "").strip() and p.get(field) != "Player":
+            continue
         if val and val != p.get(field):
             p[field] = val
             changes.append(f"{field}: {truncate(val, 40)}")
@@ -72,7 +91,7 @@ def apply_sheet(state: dict, data: dict) -> list[str]:
     for a in data.get("attributes") or []:
         if isinstance(a, dict) and str(a.get("name", "")).strip():
             stats[truncate(str(a["name"]).strip(), 20)] = max(0, min(999, as_int(a.get("value"), 0)))
-    if len(stats) >= 2:
+    if len(stats) >= 2 and not keep_existing:
         p["stats"] = stats
         changes.append("attributes: " + ", ".join(f"{k} {v}" for k, v in stats.items()))
     gold = as_int(data.get("gold"), -1)

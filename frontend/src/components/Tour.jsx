@@ -41,7 +41,7 @@ const STEPS = [
         <ol>
           <li><b>Download engine</b> (once, about 30 MB).</li>
           <li><b>Find more</b> → search a model → open it → pick the file size shown for your card → <b>Download</b>.</li>
-          <li><b>My models</b> → <b>Load</b>. Already have models from LM Studio? <b>Browse this PC</b> uses them without a new download.</li>
+          <li><b>My models</b> → <b>Load</b>. Already have a .gguf model? <b>Browse this PC</b> uses it without a new download.</li>
         </ol>
         <PcAdvice compact />
       </>

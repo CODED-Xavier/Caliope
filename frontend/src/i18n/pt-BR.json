@@ -1259,7 +1259,26 @@
 "Downloading the engine (about 30 MB). The model loads right after.": "Baixando o motor (cerca de 30 MB). O modelo carrega logo depois.",
 "Press Load on a model: the built-in engine (about 30 MB) is downloaded first, once.": "Aperte Carregar num modelo: o motor embutido (cerca de 30 MB) é baixado antes, uma vez só.",
 "🗨 The Aedo, outside the story": "🗨 O Aedo, fora da história",
-"Try it: click the highlighted button. The tour waits here.": "Experimente: clique no botão destacado. O tour espera aqui."
+"Try it: click the highlighted button. The tour waits here.": "Experimente: clique no botão destacado. O tour espera aqui.",
+"Built-in (on this PC)": "Embutido (neste PC)",
+"Another server (advanced: an online service with your API key)": "Outro servidor (avançado: um serviço online com sua chave de API)",
+"An OpenAI-compatible address, e.g. https://openrouter.ai/api/v1": "Um endereço compatível com OpenAI, ex.: https://openrouter.ai/api/v1",
+"Your key for that service.": "Sua chave desse serviço.",
+"Use this message as my character sheet (fills the Sheet and Status tabs)": "Usar esta mensagem como minha ficha (preenche as abas Ficha e Status)",
+"Only your own messages can be used as your sheet.": "Só as suas próprias mensagens podem virar sua ficha.",
+"No sheet details were found in that message.": "Nenhum detalhe de ficha foi encontrado nessa mensagem.",
+"Which program runs the AI. Built-in: Calíope runs the model itself on this PC with llama.cpp (no other program needed). Another server: an online service that speaks the OpenAI format, with its address and your API key.": "Qual programa roda a IA. Embutido: o Calíope roda o modelo sozinho neste PC com o llama.cpp (nenhum outro programa é necessário). Outro servidor: um serviço online no formato da OpenAI, com o endereço dele e sua chave de API.",
+"Keep Built-in. The engine (about 30 MB) is downloaded the first time you press Load in the Models window.": "Deixe Embutido. O motor (cerca de 30 MB) é baixado na primeira vez que você aperta Carregar na janela Modelos.",
+"Built-in keeps the story in its memory between turns, so replies start quickly. Online services charge per use and see your story.": "O embutido guarda a história na memória entre os turnos, então as respostas começam rápido. Serviços online cobram pelo uso e veem sua história.",
+"The .gguf file the built-in engine loads, from Calíope's models folder (or a folder you added).": "O arquivo .gguf que o motor embutido carrega, da pasta de modelos do Calíope (ou de uma pasta que você adicionou).",
+"8192 is a good size for 8 GB cards. Lower it (6144) if the engine runs out of video memory.": "8192 é um bom tamanho para placas de 8 GB. Diminua (6144) se faltar memória de vídeo para o motor.",
+"Using another server. Loading a model here switches to the built-in engine.": "Usando outro servidor. Carregar um modelo aqui troca para o motor embutido.",
+"No models yet. Already have a .gguf file? Use": "Nenhum modelo ainda. Já tem um arquivo .gguf? Use",
+"Already have .gguf models in another folder? Point Calíope at it and use them without downloading again. Nothing is copied or moved: Calíope's own engine runs them.": "Já tem modelos .gguf em outra pasta? Aponte o Calíope para ela e use sem baixar de novo. Nada é copiado ou movido: o motor do próprio Calíope os roda.",
+"Already have a .gguf model?": "Já tem um modelo .gguf?",
+"uses it without a new download.": "usa sem baixar de novo.",
+"Models are kept in Calíope's folder:": "Os modelos ficam na pasta do Calíope:",
+"Deactivated models stay on disk but leave the model lists.": "Modelos desativados continuam no disco, mas saem das listas de modelos."
 },
 "patterns": [
 [
@@ -1545,6 +1564,10 @@
 [
 "Installed: {0}",
 "Instalada: {0}"
+],
+[
+"Your sheet: {0}",
+"Sua ficha: {0}"
 ]
 ]
 }

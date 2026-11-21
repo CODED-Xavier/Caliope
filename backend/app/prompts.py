@@ -93,21 +93,32 @@ def relationship_label(value: int) -> str:
     return "deeply bonded"
 
 
-def describe_state(state: dict) -> str:
+_LINKS = [re.compile(r"Base URL:\s*\S+(?:\s*\([^)]*\))?", re.I),           # "Base URL: https://… (1=Standard, …)"
+          re.compile(r"!\[[^\]]*\]\([^)]*\)"),                                # markdown pictures
+          re.compile(r"https?://\S+\.(?:png|jpe?g|webp|gif)\b\S*", re.I)]     # bare picture links
+
+
+def strip_links(text: str) -> str:
+    """Picture links in card text: the app shows the pictures itself, so the model never needs them (tokens saved)."""
+    for rx in _LINKS:
+        text = rx.sub("", text)
+    return re.sub(r"[ \t]{2,}", " ", text)
+
+
+def describe_state(state: dict, compact: bool = False) -> str:
+    """`compact`: the card's own status block (sent too) already has the numbers and the bag; the player's looks are
+    in the stable part of the prompt. Fewer tokens to read every turn."""
     p = state["player"]
     hp = p["hp"]
     stats = ", ".join(f"{k} {v}" for k, v in p.get("stats", {}).items())
-    lines = [
-        f"Player character: {p['name']}"
-        + (f", {p['race']}" if p.get("race") else "")
-        + (f" {p['class']}" if p.get("class") else "")
-        + f", level {p.get('level', 1)}. HP {hp['current']}/{hp['max']}, AC {p.get('ac', 10)}.",
-        f"Stats: {stats}.",
-    ]
-    if p.get("description"):
-        lines.append(f"Appearance/background: {truncate(p['description'], 300)}")
-    inv = ", ".join(f"{i['name']}" + (f" x{i['qty']}" if i["qty"] > 1 else "") for i in state["inventory"]) or "nothing"
-    lines.append(f"Gold: {state['gold']}. Inventory: {inv}.")
+    who = f"Player character: {p['name']}" + (f", {p['race']}" if p.get("race") else "") + (f" {p['class']}" if p.get("class") else "")
+    if compact:
+        lines = [who + "."]
+    else:
+        lines = [who + f", level {p.get('level', 1)}. HP {hp['current']}/{hp['max']}, AC {p.get('ac', 10)}.", f"Stats: {stats}."]
+    if not compact:
+        inv = ", ".join(f"{i['name']}" + (f" x{i['qty']}" if i["qty"] > 1 else "") for i in state["inventory"]) or "nothing"
+        lines.append(f"Gold: {state['gold']}. Inventory: {inv}.")
     active = [q for q in state["quests"] if q["status"] == "active"]
     if active:
         lines.append("Active quests: " + "; ".join(f"{q['title']}" + (f" ({truncate(q['notes'], 80)})" if q["notes"] else "") for q in active))
@@ -198,9 +209,11 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
     return kept
 
 
+WINDOW_STEP = 6  # messages (3 rounds): see build()
+
 SECTION_ORDER = [
     "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "route", "places",
-    "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_overrides", "portraits", "npcs", "npc_hint",
+    "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_reminders", "card_overrides", "portraits", "npcs", "npc_hint",
     "player", "pinned", "opening", "cantos", "summary",
 ]
 
@@ -237,6 +250,9 @@ class PromptBuilder:
         prompt_npcs = [n for n in npcs if n.get("in_prompt", True)]
         sections = self._stable_sections(scenario, prompt_npcs, summary, pinned, language, settings, mode, opening, skills)
         sections.update(self._card_sections(scenario, npcs, lore[0], macro, app_status is not None))
+        reminders = split_template((scenario.get("information") or {}).get("post_history") or "")[0]
+        if reminders.strip():  # the same every turn: kept in the stable part, so it is read once, not every turn
+            sections["card_reminders"] = "## Card reminders\n" + strip_links(macro(reminders)).strip()
         replies = sum(1 for h in history if h["role"] == "assistant" and not h.get("meta", {}).get("opening"))
         if "card_examples" in sections and (summary or replies >= EXAMPLES_UNTIL):
             sections.pop("card_examples")  # the story itself now shows the style; frees ~300-800 tokens for history
@@ -301,7 +317,7 @@ class PromptBuilder:
                 f"[{r['book']}, p. {r['page']}{' - ' + r['heading'] if r['heading'] else ''}]\n{r['text']}" for r in rules)
             extra = ref + ("\n\n" + extra if extra else "")
         early = sum(1 for h in history if h["role"] == "user") <= 2  # the first turns of a game
-        volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra, early)
+        volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra, early, app_status is not None)
         budget = ctx - reserve - estimate_tokens(system_text) - estimate_tokens(volatile)
 
         kept: list[dict] = []
@@ -313,6 +329,15 @@ class PromptBuilder:
             kept.append(msg)
             used += cost
         kept.reverse()
+        # The window's start moves in steps of a few rounds, not one message per turn: while it stays put, the
+        # engine reuses the whole story it already read and only reads the newest messages (a minute saved on
+        # slow cards). History here starts at the summary's end, so the steps stay in the same place between turns.
+        start = len(history) - len(kept)
+        if start > 0:
+            step_start = min(-(-start // WINDOW_STEP) * WINDOW_STEP, len(history) - 2)
+            if step_start > start:
+                kept = history[step_start:]
+                used = sum(estimate_tokens(m["content"]) + 6 for m in kept)
 
         # Facts that repeat text still visible in the kept history are redundant: drop them.
         if kept and used_memories:
@@ -320,7 +345,7 @@ class PromptBuilder:
             fresh = [m for m in used_memories if m.get("message_id") is None or m["message_id"] < first_id]
             if len(fresh) != len(used_memories):
                 used_memories = fresh
-                volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra, early)
+                volatile = self._volatile(state, met, used_memories, mode, appearance_hint, extra, early, app_status is not None)
 
         # Many chat templates require the first turn after the system prompt to come from the user.
         while kept and kept[0]["role"] == "assistant" and len(kept) > 1:
@@ -445,10 +470,8 @@ class PromptBuilder:
         info = scenario.get("information") or {}
         parts: list[str] = []
         if triggered:
-            parts.append("## World info (relevant right now)\n" + "\n\n".join(macro(e["content"]).strip() for e in triggered))
+            parts.append("## World info (relevant right now)\n" + "\n\n".join(strip_links(macro(e["content"])).strip() for e in triggered))
         rules, template = split_template(info.get("post_history") or "")
-        if rules.strip():
-            parts.append("## Card reminders\n" + macro(rules).strip())
         if app_status:
             parts.append("## Status (kept by the app; do not write it)\n" + app_status)
         elif template and status_due is not None:
@@ -459,13 +482,14 @@ class PromptBuilder:
         return "\n\n".join(parts)
 
     @staticmethod
-    def _volatile(state, npcs, memories, mode, appearance_hint: str = "", extra: str = "", early: bool = False) -> str:
+    def _volatile(state, npcs, memories, mode, appearance_hint: str = "", extra: str = "", early: bool = False,
+                  compact: bool = False) -> str:
         parts: list[str] = []
         fight = describe_combat(state.get("combat") or {})
         if fight:
             parts.append("## Combat (tracked by the app)\n" + fight + "\n" + COMBAT_RULES)
         if mode != "character":
-            parts.append("## Current game state\n" + describe_state(state))
+            parts.append("## Current game state\n" + describe_state(state, compact))
         elif describe_scene(state):
             parts.append("## Scene\n" + describe_scene(state))
         rel = describe_relationships(npcs)

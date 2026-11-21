@@ -30,7 +30,7 @@ from .jukebox import MusicError
 from .rulebooks import RulebookError, ocr_available
 from .runtime import ENGINE_KEYS, EngineError
 from .runtime import server_binary as runtime_binary
-from .modelhub import download_root, pick_model_file
+from .modelhub import adopt_models, download_root, pick_model_file, use_own_models
 from .picker import pick_folder
 from . import backups, cardpics, hardware, npcfill, r2
 from . import writing_help
@@ -58,6 +58,8 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 async def lifespan(app: FastAPI):
     app.state.svc = Services()
     app.state.tasks = set()
+    use_own_models(app.state.svc.settings)
+    background(asyncio.to_thread(adopt_models, app.state.svc.settings))  # LM Studio's copies move into Calíope's folder
     if app.state.svc.settings.get("ai_engine") == "builtin":
         background(app.state.svc.runtime.start())  # the app opens at once; the model loads behind it
     background(catch_up_embeddings())
@@ -685,6 +687,14 @@ async def cantos_close(conv_id: int, body: dict = Body(default={})):
 @app.patch("/api/cantos/{canto_id}")
 async def cantos_rename(canto_id: int, body: dict = Body(...)):
     return svc().cantos.rename(canto_id, str(body.get("title", "")))
+
+
+@app.post("/api/conversations/{conv_id}/warm")
+async def warm_story(conv_id: int):
+    """Let the built-in engine read this game's story now, so the first reply after opening it is quick."""
+    svc().conversations.get(conv_id)
+    background(svc().engine.warm(conv_id))
+    return {"ok": True}
 
 
 @app.post("/api/conversations/{conv_id}/recap")
@@ -1352,6 +1362,16 @@ async def resend(conv_id: int, message_id: int, body: dict[str, Any] = Body(...)
     svc().conversations.get(conv_id)
     svc().conversations.get_message(message_id)
     return stream_response(svc().engine.resend(conv_id, message_id, str(body.get("content", ""))))
+
+
+@app.post("/api/conversations/{conv_id}/messages/{message_id}/sheet")
+async def sheet_from_message(conv_id: int, message_id: int):
+    """📋 on one of your messages: read the character sheet written there into the Sheet and Status tabs."""
+    svc().conversations.get(conv_id)
+    try:
+        return await svc().engine.sheet_from_message(conv_id, message_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # -------------------------------------------------------------------------- state
