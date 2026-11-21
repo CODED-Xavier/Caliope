@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.18**. The version history is at the end of this file.
+Current version: **v2.19**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -201,7 +201,7 @@ On the **Sheet** tab, **✨ Wishes for the story** takes your soft hints ("Kaida
 ### Adventures (published modules)
 For adventure cards that follow a book (*Lost Mine of Phandelver*, any module, your own notes). In the card editor,
 **Adventure: scenes, maps and fights**:
-- **Import** a PDF, or text copied from it, one part at a time (give the part a name). Calíope splits it by itself into
+- **Import** a PDF, or text copied from it, one part at a time: type the chapter's name ("Part 1: Goblin Arrows"), then import. The **Parts** list shows the chapters; **⬆ Import here** adds the next text to one of them. **Maps** and **Scenes** are below. Calíope splits it by itself into
   **scenes**: numbered areas ("1. Cave Mouth") grouped under their location ("Cragmaw Hideout"), and encounters with their
   own heading ("Goblin Ambush"). Each scene keeps:
   - the **read-aloud text**, which the Aedo narrates close to word for word on the first visit;
@@ -257,6 +257,14 @@ The bucket stays private: Calíope signs every download with your keys and keeps
 - The preview offers **＋ Add to Calíope** (find it in New game; ✎ to edit) or **⤓ Save file** (a JSON card to import later).
 - **👥 Add characters to a card** writes sheets (description, personality, speech, looks) for the characters of the talk and adds them to one of your cards. A character with the same name already in the card (for example one created from your pictures folder) keeps its pictures and anything written; only its empty boxes are filled. Games using the card get the characters too, not met yet.
 
+**📚 Research a work** drafts a card from an existing anime, game or book series (needs the internet):
+1. Type the work's name (or paste its wiki's address) and click **Find the wiki**. Fandom wikis are found by name; any other MediaWiki wiki works by address.
+2. Tick the pages to read: the biggest character pages and lore pages (places, groups, powers) come first. Up to 40 pages.
+3. **✨ Draft the card**: the world comes from the work's own page, each character gets its introduction, personality and appearance from the wiki, and each lore page becomes a lorebook entry. No model is needed, so it takes about a minute.
+4. **See the card** (then ＋ Add to Calíope) or **👥 Add these characters to a card** you already have. With a talk open, the Muse gets a research note, so you can keep planning the story with her.
+
+The card comes without an opening: write one with ✨ Draft in the card editor, or ask the Muse; ✨ Fill adds speech styles. Wiki text is shared by its authors under CC BY-SA; the card is for your own games.
+
 The Muse and your games share the model, so one waits for the other.
 
 ---
@@ -277,6 +285,7 @@ Settings > *Scene pictures*. When a scene starts (a new place, a fight), the Aed
 ### Jukebox
 **🎵 Music** → add songs from your PC (or direct audio links) and tag them with moods (tavern, forest, dungeon, combat, boss, victory…).
 With **Auto**, the music follows the scene: combat music in fights, boss music for bosses, a victory song when you win.
+**🔁** loops the song that is playing (it stays even when the scene's mood changes) until you click it again.
 
 ### Narration voice
 Settings > *Narration voice*:
@@ -463,3 +472,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.16 | Pictures: a new place is described in detail first (architecture, light, air, weather, people there; no more empty white backgrounds), and 🖼 on a reply paints that exact moment with the characters' saved looks and poses |
 | 2.17 | Sheet library: ready character sheets (D&D 5e, Pathfinder 2e, Tormenta20, Vampire V5, Call of Cthulhu, Cyberpunk RED, academy, slice of life) for the Status tab, per card or per game |
 | 2.18 | Adventures: import a published adventure (PDF or text) as scenes with read-aloud text, GM notes, checks with DC, enemies, treasure, XP and maps; the 📕 Adventure tab; fights on the adventure's map; dark route for Lumencia |
+| 2.19 | The Muse researches a work on its fan wiki (📚 Research a work); 🔁 loop a song in the music controls; adventure Parts list |

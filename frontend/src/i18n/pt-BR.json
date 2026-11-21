@@ -1402,7 +1402,29 @@
 "The Aedo follows the adventure: the read-aloud text on the first visit, the checks with their DC, the enemies here. The scene changes when the story moves on (or when you pick one here).": "O Aedo segue a aventura: o texto para ler em voz alta na primeira visita, os testes com a CD, os inimigos daqui. A cena muda quando a história avança (ou quando você escolhe uma aqui).",
 "A published adventure (Lost Mine of Phandelver, a module, your own notes) split into scenes. Import a PDF, or text copied from it, one part at a time. Each scene keeps its read-aloud text (the Aedo narrates it close to word for word on the first visit), hidden GM notes, checks and traps with their DC (rolled with the dice, not decided by the AI), enemies with their numbers, treasure, an XP award and the ways on. Add the map pictures and click where each area is: in play the Adventure tab shows where you are, and a fight starts on that map with the enemies already placed.": "Uma aventura publicada (A Mina Perdida de Phandelver, um módulo, suas próprias notas) dividida em cenas. Importe um PDF, ou texto copiado dele, uma parte por vez. Cada cena guarda o texto para ler em voz alta (o Aedo narra quase palavra por palavra na primeira visita), notas escondidas do mestre, testes e armadilhas com a CD (rolados nos dados, não decididos pela IA), inimigos com seus números, tesouro, um prêmio de XP e os caminhos seguintes. Adicione as imagens dos mapas e clique onde fica cada área: no jogo a aba Aventura mostra onde você está, e a luta começa nesse mapa com os inimigos já posicionados.",
 "For adventure cards that follow a book. The splitting is automatic, so check each scene once (merge, rename or remove scenes) before playing.": "Para cards de aventura que seguem um livro. A divisão é automática, então confira cada cena uma vez (junte, renomeie ou remova cenas) antes de jogar.",
-"Only the current scene is sent with each reply (a few hundred tokens). The book stays on this PC.": "Só a cena atual vai com cada resposta (algumas centenas de tokens). O livro fica neste PC."
+"Only the current scene is sent with each reply (a few hundred tokens). The book stays on this PC.": "Só a cena atual vai com cada resposta (algumas centenas de tokens). O livro fica neste PC.",
+"Draft a card from a work's fan wiki": "Criar um card a partir da wiki de fãs de uma obra",
+"Research a work": "Pesquisar uma obra",
+"drafts a card from an existing anime, game or book series: its fan wiki's world, characters and lore.": "cria um card a partir de um anime, jogo ou série de livros que já existe: o mundo, os personagens e o lore da wiki de fãs.",
+"Looking for the wiki…": "Procurando a wiki…",
+"None found.": "Nada encontrado.",
+"The Muse reads the work's fan wiki (Fandom or another MediaWiki wiki) and drafts a card: the world, the characters with their personality and looks, and a lorebook. Needs the internet. The wiki's text is shared by its authors (CC BY-SA); the card is for your own games.": "A Musa lê a wiki de fãs da obra (Fandom ou outra wiki MediaWiki) e cria um rascunho de card: o mundo, os personagens com personalidade e aparência, e um lorebook. Precisa de internet. O texto da wiki é compartilhado pelos autores (CC BY-SA); o card é para os seus jogos.",
+"Jujutsu Kaisen, or the wiki's address": "Jujutsu Kaisen, ou o endereço da wiki",
+"Find the wiki": "Achar a wiki",
+"The work's own page (for the world)": "A página da própria obra (para o mundo)",
+"The biggest pages come first: usually the main characters and the key ideas. Up to 40 pages.": "As maiores páginas vêm primeiro: em geral os personagens principais e as ideias centrais. Até 40 páginas.",
+"Draft the card": "Criar o card",
+"See the card": "Ver o card",
+"Add these characters to a card": "Adicionar estes personagens a um card",
+"The card has no opening yet: write one in the card editor (✨ Draft), or ask the Muse. ✨ Fill can add speech styles.": "O card ainda não tem abertura: escreva uma no editor de card (✨ Rascunho), ou peça à Musa. ✨ Preencher pode adicionar os jeitos de falar.",
+"Parts": "Partes",
+"The chapters of the adventure. Each import goes into the part named above (a new name makes a new part).": "Os capítulos da aventura. Cada importação vai para a parte com o nome acima (um nome novo cria uma parte nova).",
+"Import the next chapter into this part": "Importar o próximo capítulo nesta parte",
+"Import here": "Importar aqui",
+"No parts yet: type the chapter's name above (for example \"Part 1: Goblin Arrows\") and import its text.": "Ainda sem partes: escreva o nome do capítulo acima (por exemplo \"Parte 1: Flechas Goblins\") e importe o texto dele.",
+"The scenes appear here after the first import.": "As cenas aparecem aqui depois da primeira importação.",
+"Looping this song (click to stop)": "Repetindo esta música (clique para parar)",
+"Loop this song": "Repetir esta música"
 },
 "patterns": [
 [
@@ -1736,6 +1758,30 @@
 [
 "Remove \"{0}\"?",
 "Remover \"{0}\"?"
+],
+[
+"Found: {0}",
+"Encontrada: {0}"
+],
+[
+"Characters ({0})",
+"Personagens ({0})"
+],
+[
+"Lore ({0})",
+"Lore ({0})"
+],
+[
+"Drafted \"{0}\": {1} characters and {2} lorebook entries.",
+"Rascunho de \"{0}\": {1} personagens e {2} entradas de lorebook."
+],
+[
+"{0} scenes",
+"{0} cenas"
+],
+[
+"({0})",
+"({0})"
 ]
 ]
 }

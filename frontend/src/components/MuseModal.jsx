@@ -18,6 +18,7 @@ export default function MuseModal({ onClose, onCardAdded }) {
   const [chars, setChars] = useState(null);
   const [note, setNote] = useState("");
   const [err, setErr] = useState("");
+  const [research, setResearch] = useState(false);
   const bottom = useRef(null);
 
   const loadList = () => api.museTalks().then(setTalks).catch((e) => setErr(e.message));
@@ -93,6 +94,7 @@ export default function MuseModal({ onClose, onCardAdded }) {
       <div className="muse">
         <div className="muse-list">
           <button className="btn primary small" onClick={fresh} disabled={busy}>＋ New talk</button>
+          <button className="btn small" onClick={() => setResearch(true)} disabled={busy} title="Draft a card from a work's fan wiki">📚 Research a work</button>
           {talks.map((t) => (
             <div key={t.id} className={`conv ${talk?.id === t.id ? "active" : ""}`} onClick={() => !busy && open(t.id)}>
               <div className="conv-title">{t.title}</div>
@@ -103,10 +105,20 @@ export default function MuseModal({ onClose, onCardAdded }) {
           {!talks.length && <div className="muted tiny">Your talks with the Muse are kept here.</div>}
         </div>
         <div className="muse-main">
-          {!talk ? (
+          {research && (
+            <ResearchPanel talkId={talk?.id} busy={busy} setBusy={setBusy}
+              onClose={() => setResearch(false)} onError={setErr}
+              onCard={async (c) => { setCard(c); setResearch(false); if (talk) setTalk(await api.museTalk(talk.id)); }}
+              onChars={(npcs) => { setChars(npcs); setResearch(false); }} />
+          )}
+          {!talk && !research && card && <CardPreview card={card} onAdd={addCard} onSave={saveFile} onDiscard={() => setCard(null)} />}
+          {!talk && chars && <CharactersPreview npcs={chars} onDone={(msg) => { setChars(null); setNote(msg); }} onError={setErr} onDiscard={() => setChars(null)} />}
+          {!talk && (note || err) && <div className={`${err ? "error-text" : "ok-text"} small`}>{err || note}</div>}
+          {research ? null : !talk ? (
             <div className="muted muse-empty">
               <p><HelpTip id="muse" /> Talk with the Muse like with a co-writer: worlds, characters, a new route for a card, a twist for your campaign.</p>
               <p>When the idea is ready, <b>✨ Make it a card</b> turns the talk into a card you can play.</p>
+              <p><b>📚 Research a work</b> drafts a card from an existing anime, game or book series: its fan wiki's world, characters and lore.</p>
               <button className="btn primary" onClick={fresh}>＋ Start a talk</button>
             </div>
           ) : (
@@ -203,6 +215,88 @@ function CharactersPreview({ npcs, onDone, onError, onDiscard }) {
         <button className="btn small" onClick={onDiscard}>Discard</button>
         <button className="btn small primary" disabled={!target || !pick.some(Boolean)} onClick={add}>＋ Add to this card</button>
       </div>
+    </div>
+  );
+}
+
+/** 📚 Research a work: find its fan wiki, tick the pages, and draft a card from them. */
+function ResearchPanel({ talkId, busy, setBusy, onClose, onError, onCard, onChars }) {
+  const [query, setQuery] = useState("");
+  const [wiki, setWiki] = useState(null);
+  const [work, setWork] = useState("");
+  const [pickC, setPickC] = useState({});
+  const [pickL, setPickL] = useState({});
+  const [step, setStep] = useState("");
+  const [built, setBuilt] = useState(null);
+  const find = async () => {
+    if (!query.trim() || busy) return;
+    setBusy(true); setStep("Looking for the wiki…"); setWiki(null); setBuilt(null); onError("");
+    try {
+      const r = await api.researchFind(query.trim());
+      setWiki(r); setWork(r.work || "");
+      setPickC(Object.fromEntries(r.characters.map((p, i) => [p.title, i < 12])));
+      setPickL(Object.fromEntries(r.lore.map((p, i) => [p.title, i < 10])));
+    } catch (e) { onError(e.message); }
+    setBusy(false); setStep("");
+  };
+  const build = async () => {
+    setBusy(true); setStep("Starting…"); onError("");
+    try {
+      await streamPost("/api/research/build", {
+        api: wiki.api, sitename: wiki.sitename, work, talk_id: talkId || null,
+        characters: Object.keys(pickC).filter((t) => pickC[t]), lore: Object.keys(pickL).filter((t) => pickL[t]),
+      }, (ev) => {
+        if (ev.type === "progress") setStep(ev.step);
+        else if (ev.type === "card") setBuilt(ev.card);
+        else if (ev.type === "error") onError(ev.message);
+      });
+    } catch (e) { onError(e.message); }
+    setBusy(false); setStep("");
+  };
+  const list = (pages, pick, setPick) => (
+    <div className="research-list">
+      {pages.map((p) => (
+        <label key={p.title} className="check small">
+          <input type="checkbox" checked={!!pick[p.title]} onChange={(e) => setPick((x) => ({ ...x, [p.title]: e.target.checked }))} />
+          <span>{p.title}</span>
+        </label>
+      ))}
+      {!pages.length && <div className="muted tiny">None found.</div>}
+    </div>
+  );
+  const count = (pick) => Object.values(pick).filter(Boolean).length;
+  return (
+    <div className="card research">
+      <div className="row gap center"><strong className="grow">📚 Research a work</strong><button className="icon-btn" onClick={onClose} title="Close">✕</button></div>
+      <div className="muted tiny">The Muse reads the work's fan wiki (Fandom or another MediaWiki wiki) and drafts a card: the world, the characters with their personality and looks, and a lorebook. Needs the internet. The wiki's text is shared by its authors (CC BY-SA); the card is for your own games.</div>
+      <div className="row gap">
+        <input className="field grow" value={query} placeholder="Jujutsu Kaisen, or the wiki's address" onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") find(); }} disabled={busy} />
+        <button className="btn small primary" onClick={find} disabled={busy || !query.trim()}>Find the wiki</button>
+      </div>
+      {step && <div className="muted small"><span className="spinner" /> {step}</div>}
+      {wiki && !built && (
+        <>
+          <div className="small">{`Found: ${wiki.sitename}`}</div>
+          <label className="lbl">The work's own page (for the world)<input className="field" value={work} onChange={(e) => setWork(e.target.value)} /></label>
+          <div className="row gap research-cols">
+            <div className="grow"><div className="lbl">{`Characters (${count(pickC)})`}</div>{list(wiki.characters, pickC, setPickC)}</div>
+            <div className="grow"><div className="lbl">{`Lore (${count(pickL)})`}</div>{list(wiki.lore, pickL, setPickL)}</div>
+          </div>
+          <div className="muted tiny">The biggest pages come first: usually the main characters and the key ideas. Up to 40 pages.</div>
+          <button className="btn small primary" disabled={busy || !(count(pickC) + count(pickL))} onClick={build}>✨ Draft the card</button>
+        </>
+      )}
+      {built && (
+        <>
+          <div className="ok-text small">{`Drafted "${built.name}": ${built.npcs.length} characters and ${built.lorebook.entries.length} lorebook entries.`}</div>
+          <div className="row gap wrap">
+            <button className="btn small primary" onClick={() => onCard(built)}>See the card</button>
+            <button className="btn small" disabled={!built.npcs.length} onClick={() => onChars(built.npcs)}>👥 Add these characters to a card</button>
+          </div>
+          <div className="muted tiny">The card has no opening yet: write one in the card editor (✨ Draft), or ask the Muse. ✨ Fill can add speech styles.</div>
+        </>
+      )}
     </div>
   );
 }

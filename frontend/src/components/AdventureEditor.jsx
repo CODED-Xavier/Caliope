@@ -182,7 +182,18 @@ export default function AdventureEditor({ cardId, adventure, onChange, onImporte
       {busy && <div className="muted small">Reading the adventure…</div>}
       {report && <div className="small">{`Found ${report.scenes} scenes (${report.read_aloud} with read-aloud text), ${report.checks} checks and ${report.enemies} enemy groups.`}{" "}
         {report.npcs.length > 0 && <span>{`New characters: ${report.npcs.join(", ")}.`} </span>}{report.background && <span>The background went to the Aedo's notes. </span>}<span>The card is saved.</span></div>}
-      {adv.scenes.length > 0 && (
+      <div className="section-title">Parts <span className="muted tiny">{`(${adv.parts.length})`}</span></div>
+      <div className="muted tiny">The chapters of the adventure. Each import goes into the part named above (a new name makes a new part).</div>
+      {adv.parts.map((p, i) => (
+        <div className="row gap center" key={p.id || i}>
+          <span className="muted tiny">{i + 1}.</span>
+          <input className="field grow" value={p.title} onChange={(e) => set("parts", adv.parts.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} />
+          <span className="muted tiny">{`${adv.scenes.filter((sc) => sc.part === p.id).length} scenes`}</span>
+          <button className="btn small" title="Import the next chapter into this part" onClick={() => setPart(p.title)}>⬆ Import here</button>
+        </div>
+      ))}
+      {!adv.parts.length && <div className="muted tiny">No parts yet: type the chapter's name above (for example "Part 1: Goblin Arrows") and import its text.</div>}
+      {(
         <>
           <label className="lbl">Background for the Aedo (GM only)</label>
           <textarea className="field" rows={3} value={adv.background || ""} onChange={(e) => set("background", e.target.value)} />
@@ -194,6 +205,7 @@ export default function AdventureEditor({ cardId, adventure, onChange, onImporte
           ))}
           <button className="btn small" onClick={() => set("maps", [...adv.maps, { id: `map-${Date.now().toString(36)}`, name: "New map", picture: "", player_picture: "", cols: 30, rows: 20, markers: {} }])}>＋ Add a map</button>
           <div className="section-title">Scenes</div>
+          {!adv.scenes.length && <div className="muted tiny">The scenes appear here after the first import.</div>}
           {adv.scenes.map((sc, i) => {
             const header = sc.part !== lastPart ? <div className="part-title" key={`p-${sc.part}`}>{partName(sc.part) || "Part"}</div> : null;
             lastPart = sc.part;

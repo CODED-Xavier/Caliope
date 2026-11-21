@@ -115,6 +115,7 @@ export const api = {
   keepPicture: (id, messageId) => request("POST", `/api/conversations/${id}/gallery`, { message_id: messageId }),
   renamePicture: (id, title) => request("PATCH", `/api/gallery/${id}`, { title }),
   removePicture: (id) => request("DELETE", `/api/gallery/${id}`),
+  researchFind: (query) => request("POST", "/api/research/find", { query }),
   museTalks: () => request("GET", "/api/muse"),
   museTalk: (id) => request("GET", `/api/muse/${id}`),
   museCreate: (title = "") => request("POST", "/api/muse", { title }),

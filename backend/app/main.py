@@ -41,7 +41,7 @@ from .playerlore import parse_suggestions, suggest_prompt
 from .checks import roll_line
 from . import shop
 from . import resources
-from . import adventure, sheets, statusbook
+from . import adventure, sheets, statusbook, wikiresearch
 from . import worldtime
 from .engine import BusyError
 from .llm import LLMError
@@ -898,6 +898,57 @@ async def _one_at_a_time(events):
         async with aclosing(events) as stream:
             async for e in stream:
                 yield e
+
+
+async def _wiki_fetch(url: str) -> dict:
+    """GET a wiki's API (public sites only; every redirect is checked again)."""
+    import httpx
+    from .images import validate_url
+
+    async with httpx.AsyncClient(follow_redirects=False, timeout=25.0) as client:
+        for _ in range(4):
+            validate_url(url)
+            resp = await client.get(url, headers={"User-Agent": "Caliope/2.18 (personal roleplay app; wiki research)"})
+            if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get("location"):
+                url = str(resp.url.join(resp.headers["location"]))
+                continue
+            resp.raise_for_status()
+            return resp.json()
+    raise wikiresearch.ResearchError("The wiki redirected too many times.")
+
+
+@app.post("/api/research/find")
+async def research_find(body: dict[str, Any] = Body(...)):
+    """📚 The Muse looks for a work's wiki and lists its biggest character and lore pages."""
+    try:
+        wiki = await wikiresearch.find_wiki(_wiki_fetch, str(body.get("query") or ""))
+        pages = await wikiresearch.list_pages(_wiki_fetch, wiki["api"])
+    except wikiresearch.ResearchError:
+        raise
+    except Exception as exc:
+        raise HTTPException(502, f"The wiki could not be reached ({exc}). Is the internet on?") from exc
+    return {**wiki, **pages}
+
+
+@app.post("/api/research/build")
+async def research_build(body: dict[str, Any] = Body(...)):
+    """Read the ticked pages and draft a card (streamed progress). With a talk, the Muse gets a research note."""
+    api_url = str(body.get("api") or "")
+    if not re.match(r"^https://[^/]+(/[a-z]{2}(-[a-z]{2})?)?/api\.php$", api_url):
+        raise HTTPException(400, "Find the wiki first.")
+    talk_id = body.get("talk_id")
+
+    async def events():
+        async for ev in wikiresearch.research(_wiki_fetch, api_url, str(body.get("sitename") or ""), str(body.get("work") or ""),
+                                              [str(x) for x in body.get("characters") or []], [str(x) for x in body.get("lore") or []],
+                                              str(body.get("language") or "")):
+            if ev["type"] == "card" and talk_id:
+                try:
+                    svc().muse._add(int(talk_id), "assistant", ev["notes"])
+                except Exception:
+                    pass
+            yield ev
+    return stream_response(events())
 
 
 @app.post("/api/muse/{talk_id}/message")

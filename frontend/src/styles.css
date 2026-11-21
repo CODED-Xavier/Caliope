@@ -589,3 +589,7 @@ body.resizing { user-select: none; cursor: col-resize; }
 .adventure-tab .read-aloud .pre { white-space: pre-wrap; padding: 6px 0; }
 .link-btn.block { display: block; text-align: left; }
 .link-btn.block.on { font-weight: 600; }
+.research { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.research-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.research-cols > div { min-width: 0; }
+.jukebox .icon-btn.on { color: var(--accent); text-shadow: 0 0 6px var(--accent); }

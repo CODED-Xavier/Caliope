@@ -185,3 +185,65 @@ class AdventurePlayTests(unittest.IsolatedAsyncioTestCase):
         out = normalize_state(st)
         self.assertEqual(out["adventure"]["scene"], "a")
         self.assertEqual(out["script"]["next"], 2)
+
+
+class WikiResearchTests(unittest.IsolatedAsyncioTestCase):
+    async def test_find_list_read_and_build_a_card(self):
+        from app import wikiresearch as W
+        pages = {
+            "Hero Saga": "'''Hero Saga''' is a series about a [[academy|magic academy]].\n== Plot ==\nStuff.",
+            "Aya Kurogane": "{{Infobox|age=16}}\n'''Aya Kurogane''' is the [[protagonist]]. She wields a cursed blade.\n"
+                            "== Appearance ==\nShort black hair.\n== Personality ==\nStubborn and kind.",
+            "Sun Academy": "The '''Sun Academy''' is the school where sorcerers train.<ref>x</ref>",
+        }
+        calls = []
+
+        async def fetch(url):
+            calls.append(url)
+            if "meta=siteinfo" in url:
+                if "hero-saga.fandom" not in url:
+                    raise OSError("no wiki")
+                return {"query": {"general": {"sitename": "Hero Saga Wiki", "mainpage": "Hero Saga Wiki"}}}
+            if "list=search" in url:
+                return {"query": {"search": [{"title": "Hero Saga"}]}}
+            if "list=categorymembers" in url:
+                if "Characters" in url and "Main" not in url and "Female" not in url and "Male" not in url:
+                    return {"query": {"categorymembers": [{"title": "Aya Kurogane"}, {"title": "List of characters"}]}}
+                if "Locations" in url:
+                    return {"query": {"categorymembers": [{"title": "Sun Academy"}]}}
+                return {"query": {"categorymembers": []}}
+            if "prop=info" in url:
+                return {"query": {"pages": {"1": {"title": "Aya Kurogane", "length": 9000}, "2": {"title": "Sun Academy", "length": 3000}}}}
+            if "action=parse" in url:
+                from urllib.parse import unquote
+                title = unquote(url.split("page=")[1].split("&")[0])
+                return {"parse": {"wikitext": {"*": pages[title]}}}
+            raise AssertionError(url)
+
+        W.GAP = 0
+        wiki = await W.find_wiki(fetch, "Hero Saga")
+        self.assertEqual(wiki["api"], "https://hero-saga.fandom.com/api.php")
+        self.assertEqual(wiki["work"], "Hero Saga")
+        listed = await W.list_pages(fetch, wiki["api"])
+        self.assertEqual([p["title"] for p in listed["characters"]], ["Aya Kurogane"])     # "List of..." skipped
+        self.assertEqual([p["title"] for p in listed["lore"]], ["Sun Academy"])
+        events = [e async for e in W.research(fetch, wiki["api"], wiki["sitename"], "Hero Saga", ["Aya Kurogane"], ["Sun Academy"])]
+        card = events[-1]["card"]
+        self.assertEqual(card["name"], "Hero Saga")
+        self.assertIn("magic academy", card["world"])
+        aya = card["npcs"][0]
+        self.assertEqual(aya["name"], "Aya Kurogane")
+        self.assertIn("cursed blade", aya["description"])
+        self.assertEqual(aya["personality"], "Stubborn and kind.")
+        self.assertNotIn("Infobox", aya["description"])
+        names = [e["name"] for e in card["lorebook"]["entries"]]
+        self.assertIn("Sun Academy", names)
+        self.assertNotIn("<ref>", card["lorebook"]["entries"][0]["content"])
+        self.assertIn("Aya Kurogane", events[-1]["notes"])
+        from app.scenarios import normalize_scenario
+        self.assertEqual(normalize_scenario(card)["npcs"][0]["name"], "Aya Kurogane")    # a valid card
+
+    def test_nothing_found_explains_what_to_do(self):
+        from app import wikiresearch as W
+        with self.assertRaises(W.ResearchError):
+            W.wiki_candidates("  ")

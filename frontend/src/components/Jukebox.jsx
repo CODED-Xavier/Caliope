@@ -78,7 +78,7 @@ export function JukeboxPlayer({ game, tracks, onOpenLibrary }) {
 
   // Auto mode: change song when the mood changes (a won fight plays a victory song once).
   useEffect(() => {
-    if (!prefs.auto || !tracks.length || !game) return;
+    if (!prefs.auto || !tracks.length || !game || (prefs.loop && current && playing)) return; // a looped song stays
     let want = mood;
     if (wasFighting.current && !fighting && won) { want = "victory"; victoryUntilEnd.current = true; }
     wasFighting.current = fighting;
@@ -92,6 +92,7 @@ export function JukeboxPlayer({ game, tracks, onOpenLibrary }) {
   useEffect(() => { const e = el(); if (e && !fadeTimer.current) e.volume = prefs.volume; else if (e) e.volume = prefs.volume; }, [prefs.volume]); // eslint-disable-line
 
   const ended = () => { // next song of the same mood (or back to the scene after the victory song)
+    if (prefs.loop && current) { const e = el(); e.currentTime = 0; e.play().catch(() => setBlocked(true)); return; }
     const want = victoryUntilEnd.current ? mood : (prefs.auto ? mood : current?.tags[0]);
     victoryUntilEnd.current = false;
     lastMood.current = want;
@@ -114,6 +115,8 @@ export function JukeboxPlayer({ game, tracks, onOpenLibrary }) {
       <audio ref={b} onEnded={ended} preload="auto" />
       <button className="icon-btn" title={playing ? "Pause" : blocked ? "Click to start the music" : "Play"} onClick={toggle}>{playing ? "⏸" : "▶"}</button>
       <button className="icon-btn" title="Next song" onClick={skip}>⏭</button>
+      <button className={`icon-btn ${prefs.loop ? "on" : ""}`} title={prefs.loop ? "Looping this song (click to stop)" : "Loop this song"}
+        onClick={() => savePrefs({ ...prefs, loop: !prefs.loop })}>🔁</button>
       <button className="jb-title" title={current ? `${current.name} · ${current.tags.join(", ")}` : "Music library"} onClick={onOpenLibrary}>
         {blocked ? "Click ▶ for music" : current ? current.name : "🎵 Music"}
         {prefs.auto && <span className="jb-mood"> · {mood}</span>}

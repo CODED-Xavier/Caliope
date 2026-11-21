@@ -90,6 +90,8 @@ Easier: pick a mode under the text box (**🗣 Speak · ✋ Act · 💭 Think ·
 - Under a reply: **Continue ▸** (keep writing), **↻** (write it again), **⏪** (rewind to there), **⑂** (start a new game from that moment).
 - Top of the chat: **↶ Undo**, **📜 Recap** ("Previously, in…"), **🎵 Music**, **Aa** (text size and colours), **🔍** (search).
 - 🎲 **roll buttons** appear when the Aedo asks for a check, and 🛒 **buy buttons** when something has a price.
+- **📚 Research a work** (in the Muse): type an anime/game/book name, tick the wiki pages, and get a draft card with its world, characters and lore.
+- **🔁** in the music controls loops the current song.
 - **Adventures:** in the card editor, *Adventure: scenes, maps and fights* imports a published adventure (PDF or pasted text). In play the **📕 Adventure** tab shows your scene, the map, XP and **⚔ Fight here**.
 - The **Status** tab in the right panel can show a ready character sheet (D&D 5e, Tormenta20, Vampire, Call of Cthulhu…): open it and pick one. The app keeps the numbers up to date.
 - The **right panel** has your Sheet, Bag, People (relationships from −100 to +100, plus notes about each character: yours and the Aedo's ✒), Journal and more.
