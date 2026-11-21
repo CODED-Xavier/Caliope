@@ -29,6 +29,7 @@ from .jukebox import MOODS as MUSIC_MOODS
 from .jukebox import MusicError
 from .rulebooks import RulebookError, ocr_available
 from .runtime import ENGINE_KEYS, EngineError
+from .runtime import server_binary as runtime_binary
 from .modelhub import download_root, pick_model_file
 from .picker import pick_folder
 from . import backups, cardpics, hardware, npcfill, r2
@@ -1506,6 +1507,11 @@ async def engine_stop():
 
 @app.post("/api/engine/download")
 async def engine_download():
+    return _start_engine_download()
+
+
+def _start_engine_download() -> dict:
+    """Download the built-in engine in the background, then start it if a model is chosen."""
     rt = svc().runtime
     if rt.state == "downloading":
         return rt.status()
@@ -1589,6 +1595,9 @@ async def models_download_clear(body: dict = Body(...)):
 @app.post("/api/models/load")
 async def models_load(body: dict = Body(...)):
     values = svc().models.load_values(str(body.get("path", "")), str(body.get("role", "story")))
+    if not runtime_binary():  # first time: get the engine (about 30 MB), then the model loads by itself
+        svc().settings.update(values)
+        return _start_engine_download()
     if svc().settings.get("ai_engine") == "builtin" and all(svc().settings.get(k) == v for k, v in values.items()):
         background(svc().runtime.start())  # same model: just (re)start it
     apply_settings(values)

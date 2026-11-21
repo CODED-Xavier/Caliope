@@ -142,11 +142,7 @@ class LocalTests(Base):
         self.assertTrue(self.hub.local()[0]["disabled"])
         self.hub.set_disabled(str(m), False)
         self.assertFalse(self.hub.local()[0]["disabled"])
-        with self.assertRaises(ModelError):  # engine not downloaded
-            self.hub.load_values(str(m))
-        (runtime.ENGINE_DIR).mkdir()
-        (runtime.ENGINE_DIR / "llama-server").write_text("x")
-        values = self.hub.load_values(str(m))
+        values = self.hub.load_values(str(m))  # works before the engine is downloaded (the app downloads it first)
         self.assertEqual(values, {"ai_engine": "builtin", "engine_model_path": str(m)})
         self.svc.settings.update(values)
         self.assertEqual(self.hub.local()[0]["selected"], "story")

@@ -47,15 +47,14 @@ If you already have them, skip this.
 Calíope has its own built-in AI engine; you don't need any other program.
 
 1. In the left sidebar click **🧠 Models**.
-2. At the top, click **Download engine** (about 30 MB). Wait until it says it is ready.
-3. Open the **Find more** tab. The box at the top, **Your PC**, shows your graphics card and the best model for it; **🔍 Find it** searches it for you. Or search for: `Stheno-v3.2`.
-4. Open **L3-8B-Stheno-v3.2** (a GGUF version) and pick the file that fits your graphics card. The list shows a note on each size.
+2. Open the **Find more** tab. The box at the top, **Your PC**, shows your graphics card and the best model for it; **🔍 Find it** searches it for you. Or search for: `Stheno-v3.2`.
+3. Open **L3-8B-Stheno-v3.2** (a GGUF version) and pick the file that fits your graphics card. The list shows a note on each size.
    - **8 GB card: `Q4_K_M`** (or `Q4_K_S`), about 5 GB. This is the recommended one: great at roleplay and fast.
    - 6 GB card: `Q3_K_M`.
    - 12 GB or more: `Q6_K` or `Q8_0` (better quality).
-5. Click **Download** and wait (the **Downloads** tab shows the progress).
-6. Open the **My models** tab and click **Load** on Stheno. Loading takes 10 to 60 seconds.
-7. Optional, but it improves memory: search for `nomic-embed-text` (GGUF), download it, and click **Use for memory** on it.
+4. Click **Download** and wait (the **Downloads** tab shows the progress).
+5. Open the **My models** tab and click **Load** on Stheno. The first time, the engine (about 30 MB) is downloaded before it; then loading takes 10 to 60 seconds. LM Studio is not needed and is not opened.
+6. Optional, but it improves memory: search for `nomic-embed-text` (GGUF), download it, and click **Use for memory** on it.
 
 The sidebar shows **Model server online** when it's ready.
 

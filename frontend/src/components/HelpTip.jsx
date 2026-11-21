@@ -12,13 +12,18 @@ export default function HelpTip({ id }) {
   const open = hover || sticky;
 
   // Place the popup with fixed coordinates so scrolling panels never clip it and it stays on screen.
+  // Measured after it is drawn (texts differ in length, Portuguese is longer): below the "?", else above, else
+  // as high as fits; it never runs off the window.
+  const popRef = useRef(null);
   useLayoutEffect(() => {
     if (!open || !btnRef.current) return;
     const r = btnRef.current.getBoundingClientRect();
     const width = 270;
+    const h = popRef.current?.offsetHeight || 150;
     const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
     const below = r.bottom + 6;
-    const top = below + 150 > window.innerHeight ? Math.max(8, r.top - 150) : below;
+    const above = r.top - 6 - h;
+    const top = below + h <= window.innerHeight - 8 ? below : above >= 8 ? above : Math.max(8, window.innerHeight - 8 - h);
     setPos({ left, top });
   }, [open]);
 
@@ -37,7 +42,7 @@ export default function HelpTip({ id }) {
       <button type="button" className="helptip-btn" ref={btnRef} aria-label={`Help: ${info.title}`} aria-expanded={open}
         onClick={(e) => { e.stopPropagation(); setSticky(!sticky); }}>?</button>
       {open && (
-        <span className="helptip-pop" role="tooltip" style={{ left: pos.left, top: pos.top }}>
+        <span className="helptip-pop" role="tooltip" ref={popRef} style={{ left: pos.left, top: pos.top }}>
           <strong>{info.title}</strong>
           <span><b>What it does:</b> {info.what}</span>
           <span><b>When to use it:</b> {info.when}</span>

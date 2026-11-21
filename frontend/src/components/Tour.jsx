@@ -100,35 +100,47 @@ const STEPS = [
   },
 ];
 
-export default function Tour({ onDone, onGetModel }) {
+/** `hidden`: a window opened from the tour (for example by clicking the highlighted Models button) is on top;
+ * the tour waits on the same step and comes back when it closes. */
+export default function Tour({ onDone, onGetModel, hidden = false }) {
   const [i, setI] = useState(0);
   const [box, setBox] = useState(null);
   const step = STEPS[i];
 
   useLayoutEffect(() => {
-    const el = step.target ? document.querySelector(step.target) : null;
+    const el = step.target && !hidden ? document.querySelector(step.target) : null;
     if (!el) { setBox(null); return undefined; }
     const place = () => { const r = el.getBoundingClientRect(); setBox({ top: r.top - 6, left: r.left - 6, width: r.width + 12, height: r.height + 12 }); };
     place();
     window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
-  }, [i]); // eslint-disable-line
+  }, [i, hidden]); // eslint-disable-line
 
   useEffect(() => {
+    if (hidden) return undefined;
     const key = (e) => { if (e.key === "Escape") onDone(); };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [onDone]);
+  }, [onDone, hidden]);
 
+  if (hidden) return null;
   const cardStyle = box
     ? { top: Math.min(Math.max(16, box.top), window.innerHeight - 380), left: Math.min(box.left + box.width + 18, window.innerWidth - 440) }
     : {};
+  // Around the highlighted button the screen stays blocked; the button itself can be clicked to try it.
+  const blockers = box ? [
+    { top: 0, left: 0, right: 0, height: Math.max(0, box.top) },
+    { top: box.top + box.height, left: 0, right: 0, bottom: 0 },
+    { top: box.top, left: 0, width: Math.max(0, box.left), height: box.height },
+    { top: box.top, left: box.left + box.width, right: 0, height: box.height },
+  ] : [];
   return (
-    <div className="tour">
-      {box ? <div className="tour-spot" style={box} /> : <div className="tour-dim" />}
+    <div className={`tour ${box ? "open-spot" : ""}`}>
+      {box ? <><div className="tour-spot" style={box} />{blockers.map((b, k) => <div key={k} className="tour-block" style={b} />)}</> : <div className="tour-dim" />}
       <div className={`tour-card ${box ? "" : "center"}`} style={cardStyle}>
         <div className="row center"><b className="grow">{step.title}</b><span className="muted tiny">{i + 1} / {STEPS.length}</span></div>
         <div className="tour-body small">{step.body}</div>
+        {box && <div className="muted tiny">Try it: click the highlighted button. The tour waits here.</div>}
         <div className="row gap center">
           <button className="btn small ghost" onClick={onDone}>Skip the tour</button>
           <span className="grow" />

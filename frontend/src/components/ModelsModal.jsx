@@ -35,7 +35,8 @@ export default function ModelsModal({ onClose, initialTab = "mine", initialQuery
       <div className={`status-line ${eng?.state === "ready" ? "ok" : eng?.state === "error" ? "bad" : ""}`}>
         <span className={`dot ${eng?.state === "ready" ? "on" : "off"}`} />
         <span className="grow">
-          {!eng ? "Checking…" : !eng.installed ? "The built-in engine is not downloaded yet (needed to load models here)."
+          {!eng ? "Checking…" : eng.state === "downloading" ? "Downloading the engine (about 30 MB). The model loads right after."
+            : !eng.installed ? "Press Load on a model: the built-in engine (about 30 MB) is downloaded first, once."
             : eng.mode !== "builtin" ? "Using LM Studio. Loading a model here switches to the built-in engine."
             : eng.state === "ready" ? `Loaded: ${eng.model.split(/[\\/]/).pop()}`
             : eng.state === "starting" ? "Loading the model…" : eng.message || "No model loaded."}

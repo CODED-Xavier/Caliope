@@ -17,7 +17,7 @@ from typing import AsyncIterator
 
 from .appearance import appearance_seed
 from .checks import find_checks
-from . import resources, routes, sheetchat
+from . import aedo_desk, resources, routes, sheetchat
 from .places import find_place, place_picture
 from .shop import find_offers, is_trade
 from . import statusbook
@@ -194,6 +194,39 @@ class ChatEngine:
                 async for event in turn:
                     yield event
 
+    async def _aedo_answer(self, conv_id: int, user_msg: dict) -> AsyncIterator[dict]:
+        """A short answer out of character, from its own small prompt (the story's memory slot is not touched)."""
+        t_start = time.perf_counter()
+        settings = self.settings.all()
+        conv = self.repo.get(conv_id)
+        scenario = conv["scenario"]
+        language = scenario.get("language") or settings.get("response_language", "en")
+        messages = aedo_desk.build_messages(
+            scenario=scenario, state=self.repo.get_state(conv_id), npcs=self.repo.list_npcs(conv_id),
+            summary=conv["summary"], history=self.repo.list_messages(conv_id, after_id=conv["summary_upto"])[:-1],
+            question=user_msg["content"], language=language, player_lore=conv.get("player_lore"))
+        partial: list[str] = []
+        t_first = None
+        try:
+            async with aclosing(self.llm.stream_chat(messages, max_tokens=900, temperature=0.4)) as pieces:
+                async for piece in pieces:
+                    t_first = t_first or time.perf_counter()
+                    partial.append(piece)
+                    yield {"type": "token", "text": piece}
+        except LLMError as exc:
+            yield {"type": "error", "message": str(exc)}
+            return
+        reply = "".join(partial).strip()
+        if not reply:
+            yield {"type": "error", "message": "The model returned nothing. Try again."}
+            return
+        meta: dict = {"ooc": True}
+        if settings.get("show_timing", True):
+            meta["timing"] = {"first_word_s": round((t_first or time.perf_counter()) - t_start, 1),
+                              "total_s": round(time.perf_counter() - t_start, 1)}
+        msg = self.repo.add_message(conv_id, "assistant", reply, meta)
+        yield {"type": "assistant_message", "message": self.repo.get_message(msg["id"])}
+
     def _time_skip(self, conv_id: int, text: str):
         """(prepare, text) for '/wait …' or 'I sleep until morning' in a game with a calendar, else (None, text)."""
         cal = self.repo.get(conv_id)["scenario"].get("calendar") or {}
@@ -294,7 +327,7 @@ class ChatEngine:
             partial: list[str] = []
             error: str | None = None
             try:
-                async with aclosing(self.llm.stream_chat(messages, max_tokens=reply_token_limit(settings))) as pieces:
+                async with aclosing(self.llm.stream_chat(messages, max_tokens=reply_token_limit(settings), story=True)) as pieces:
                     async for piece in pieces:
                         partial.append(piece)
                         yield {"type": "token", "text": piece}
@@ -470,13 +503,18 @@ class ChatEngine:
                 self.repo.rename(conv_id, truncate(f"{scenario_name}: {said}" if scenario_name else said, 60))
 
     async def _reply(self, conv_id: int, user_msg: dict) -> AsyncIterator[dict]:
+        if is_gm_message(user_msg["content"]):  # "/question": the Aedo answers outside the story
+            async with aclosing(self._aedo_answer(conv_id, user_msg)) as answer:
+                async for event in answer:
+                    yield event
+            return
         t_start = time.perf_counter()
         settings = self.settings.all()
         conv = self.repo.get(conv_id)
         scenario = conv["scenario"]
         state = self.repo.get_state(conv_id)
         npcs = self.repo.list_npcs(conv_id)
-        history = self.repo.list_messages(conv_id, after_id=conv["summary_upto"])
+        history = aedo_desk.without_ooc(self.repo.list_messages(conv_id, after_id=conv["summary_upto"]))
 
         previous_assistant = next((m for m in reversed(history[:-1]) if m["role"] == "assistant"), None)
         previous_text = previous_assistant["content"] if previous_assistant else ""
@@ -513,7 +551,7 @@ class ChatEngine:
         error: str | None = None
         t_first: float | None = None
         try:
-            async with aclosing(self.llm.stream_chat(messages, stop=stop, max_tokens=reply_token_limit(settings))) as pieces:
+            async with aclosing(self.llm.stream_chat(messages, stop=stop, max_tokens=reply_token_limit(settings), story=True)) as pieces:
                 async for piece in pieces:
                     if t_first is None:
                         t_first = time.perf_counter()
@@ -899,7 +937,8 @@ class ChatEngine:
         and the model can reuse its earlier work instead of rereading everything.
         """
         conv = self.repo.get(conv_id)
-        rows = [r for r in self.repo.list_messages(conv_id, after_id=conv["summary_upto"]) if not r["meta"].get("opening")]
+        rows = [r for r in aedo_desk.without_ooc(self.repo.list_messages(conv_id, after_id=conv["summary_upto"]))
+                if not r["meta"].get("opening")]
         max_msgs = max(4, int(settings["recent_rounds"]) * 2)
         block_msgs = max(2, int(settings["fold_block_rounds"]) * 2)
         history_budget = (int(settings["context_window"]) - reply_token_limit(settings)) * 0.5

@@ -92,7 +92,7 @@ def make_services(llm=None, skills_src=True):
             (skills_dir / name).mkdir()
             (skills_dir / name / "SKILL.md").write_text(text, encoding="utf-8")
     svc = Services(db_path=":memory:", skills_dir=skills_dir, seed_dir=SEED_DIR, llm=llm or FakeLLM())
-    svc.settings.update({"tracker_skip": False})
+    svc.settings.update({"tracker_skip": False, "ai_engine": "lmstudio"})  # tests talk to a fake LM Studio
     from app.util import set_chars_per_token
     set_chars_per_token(3.4)  # a test that measured another value must not change the next ones  # most tests expect the tracker on every turn (tests/test_signals.py covers skipping)
     return svc

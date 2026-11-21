@@ -177,6 +177,10 @@ class LLMClient:
             payload["min_p"] = s["min_p"]
         if s.get("repeat_penalty"):
             payload["repeat_penalty"] = s["repeat_penalty"]
+        story = bool(overrides.pop("story", False))
+        if self._builtin():  # the built-in engine keeps the story and the helper calls in separate memory slots
+            payload["id_slot"] = 0 if story else 1
+            payload["cache_prompt"] = True
         payload.update({k: v for k, v in overrides.items() if v is not None})
         if stop:
             payload["stop"] = list(stop)

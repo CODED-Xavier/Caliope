@@ -465,7 +465,7 @@ export default function App() {
             <h1 className="brand-name">Calíope</h1>
             <p className="muted">Roleplay and tabletop adventures that run entirely on your PC.<br />No tokens, no limits, and it remembers everything.</p>
             <button className="btn primary big" onClick={() => setModal("new")}>＋ Start a new game</button>
-            {!online && <p className="error-text small">The model server is offline. Start LM Studio's server, then check <a href="#" onClick={(e) => { e.preventDefault(); setModal("settings"); }}>Settings</a>.</p>}
+            {!online && <p className="error-text small">No AI model is running yet. Open <a href="#" onClick={(e) => { e.preventDefault(); openModels(); }}>🧠 Models</a> and press Load on a model.</p>}
             {error && <p className="error-text small">{error}</p>}
           </div>
         )}
@@ -483,7 +483,7 @@ export default function App() {
       {modal === "muse" && <MuseModal onClose={() => setModal(null)} />}
       {modal === "models" && <ModelsModal initialTab={modelsInit.tab} initialQuery={modelsInit.query} onClose={() => { setModal(null); refreshHealth(); }} />}
       <DialogHost />
-      {tour && !modal && <Tour onDone={endTour} onGetModel={(q) => openModels(q)} />}
+      {tour && <Tour hidden={!!modal} onDone={endTour} onGetModel={(q) => openModels(q)} />}
       {modal === "new" && <ScenarioModal onClose={() => setModal(null)} onStart={startGame} />}
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} onTour={() => { setModal(null); setTour(true); }} />}
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}

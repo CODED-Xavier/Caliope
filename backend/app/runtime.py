@@ -70,14 +70,20 @@ def find_models(dirs: list[Path] | None = None) -> list[dict]:
     return sorted(out, key=lambda m: (m["embedding"], -m["size_gb"]))
 
 
+SLOTS = 2  # see build_command
+STORY_SLOT, HELPER_SLOT = 0, 1
+
+
 def build_command(binary: Path, model: str, ctx: int, port: int, gpu_layers: str, embedding: bool = False) -> list[str]:
     cmd = [str(binary), "-m", model, "--host", "127.0.0.1", "--port", str(port), "-ngl", str(gpu_layers or "auto"),
            "--no-webui"]
     if embedding:
         cmd += ["--embeddings", "-c", "2048"]
     else:
-        # One slot so the whole context belongs to the story; reuse the unchanged start of the prompt between turns.
-        cmd += ["-c", str(int(ctx)), "-np", "1", "--cache-reuse", "256"]
+        # Two slots, each with the full context: slot 0 only ever holds the story, slot 1 the helpers (tracker,
+        # summaries, the Aedo's answers outside the story). So the story's long, unchanged beginning stays in memory
+        # between turns and only the new part is read: the first word comes in seconds instead of a minute.
+        cmd += ["-c", str(int(ctx) * SLOTS), "-np", str(SLOTS), "--cache-reuse", "256"]
     return cmd
 
 

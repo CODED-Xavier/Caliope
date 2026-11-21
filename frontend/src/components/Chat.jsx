@@ -122,12 +122,12 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
       )}
       {canAct && <button className="icon-btn" title="Edit this message" onClick={startEdit}>✎</button>}
       {canAct && !isUser && isLast && !isOpening && <button className="icon-btn" title="Regenerate this reply" onClick={onRegenerate}>↻</button>}
-      {canAct && !isUser && isLast && !isOpening && <button className="btn small continue-btn" title="Keep writing this reply from where it stopped" onClick={onContinue}>Continue ▸</button>}
+      {canAct && !isUser && isLast && !isOpening && !m.meta?.ooc && <button className="btn small continue-btn" title="Keep writing this reply from where it stopped" onClick={onContinue}>Continue ▸</button>}
       {canAct && !isLast && <button className="icon-btn" title="Rewind: delete everything after this message" onClick={() => onRewind(m.id, false)}>⏪</button>}
       {canAct && !isOpening && <button className="icon-btn" title="Delete this message and everything after it" onClick={() => onRewind(m.id, true)}>🗑</button>}
       {canAct && <button className="icon-btn" title="Save point: start a new game from this moment (this game stays as it is)" onClick={() => onFork(m.id)}>⑂</button>}
       {voiceOn && !isUser && <button className={`icon-btn ${isSpeaking ? "speaking" : ""}`} title={isSpeaking ? "Stop reading" : "Read aloud"} onClick={() => onSpeak(m.id)}>{isSpeaking ? "⏹" : "🔊"}</button>}
-      {canAct && scenePictures && !isUser && !m.meta?.scene_picture && <button className="icon-btn" title="Paint this scene (Pollinations.ai)" onClick={() => onPaint(m.id)}>🖼</button>}
+      {canAct && scenePictures && !isUser && !m.meta?.scene_picture && !m.meta?.ooc && <button className="icon-btn" title="Paint this scene (Pollinations.ai)" onClick={() => onPaint(m.id)}>🖼</button>}
     </div>
   );
 
@@ -145,6 +145,18 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
               {actions}
             </>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (m.meta?.ooc) {  // the Aedo's answer outside the story: not part of the story
+    return (
+      <div className={`msg assistant ooc ${hit || ""}`} data-mid={m.id}>
+        <div className="msg-body">
+          <div className="tag">🗨 The Aedo, outside the story</div>
+          <div className="bubble ooc-bubble"><Markdown text={m.content} /></div>
+          {actions}
         </div>
       </div>
     );

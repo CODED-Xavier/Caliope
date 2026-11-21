@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.11.1**. The version history is at the end of this file.
+Current version: **v2.12**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -64,13 +64,14 @@ Calíope works with a local roleplay model. On an 8 GB graphics card (such as th
 
 ### Option A: the built-in engine (recommended; no LM Studio)
 1. Sidebar → **🧠 Models**.
-2. **Download engine** (about 30 MB): llama.cpp's official Vulkan build, which works on AMD cards.
-3. Get a model:
+2. Get a model:
    - *Browse this PC*: use models you already have, such as LM Studio's, without copying them. **Browse…** opens Windows' file picker, or you can paste a folder's address.
    - *Find more*: search Hugging Face. Each file size has a note on quality and on whether it fits 8 GB. Downloads resume after a pause and are checked against Hugging Face's checksums.
-4. *My models* → **Load**. Optionally, **Use for memory** on a small embedding model (e.g. `nomic-embed-text`) for memory search by meaning.
+3. *My models* → **Load**. The first time, the engine itself (llama.cpp's official Vulkan build, about 30 MB, works on AMD cards) is downloaded first and the model loads right after. Optionally, **Use for memory** on a small embedding model (e.g. `nomic-embed-text`) for memory search by meaning.
 
-The engine starts with the app and stops when you close it.
+The engine starts with the app and stops when you close it; LM Studio is not opened. The built-in engine is the default for new installs.
+
+**Why it answers faster than LM Studio:** the engine keeps two memory slots. One holds only the story, so its long, unchanged beginning (card, world, characters) stays read between turns, and each reply only reads what is new. The other slot runs the helpers: the tracker, summaries, and the Aedo's answers outside the story. In LM Studio the tracker's call pushes the story out of memory, so every reply rereads the whole prompt (about a minute on an RX 580). The two slots use about 1 GB more video memory. If replies get slower after the change, lower the **Context window** to 6144.
 - If loading fails with "out of memory", lower the **Context window** or set **GPU layers** to about 28 in Settings.
 - Close LM Studio's own model first, so the two don't fight over video memory.
 
@@ -104,7 +105,7 @@ Settings > *API key* also works with services that speak the same language (Open
 | `"Hello there."` | Your character speaks |
 | `*I draw my sword*` | Your character acts |
 | `'He is lying.'` | Your character thinks. Only the Aedo knows (characters never do) and may give subtle hints. |
-| `/how much gold do I have?` | A message to the Aedo outside the story |
+| `/how much gold do I have?` | A question to the Aedo outside the story. He answers in a dashed box, plainly and without narrating; the question and answer are kept in the chat but not in the story he plays (`/what was my background?` gives your sheet back, for example) |
 | `/roll 1d20+3` | Dice, rolled by the app (`adv`, `dis`, `4d6kh3` work too) |
 | `/wait 3 days`, `/wait until morning` | Time passes, only when you choose |
 | no marks | The Aedo decides |
@@ -419,3 +420,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |
 | 2.11 | The interface in English and Português (Brasil), switched in Settings or in the tour |
 | 2.11.1 | Audit 2 fixes (see AUDIT.md): start names, Places in .caliope files, repeated place pictures, safer imports |
+| 2.12 | Beta feedback: the Aedo answers `/questions` outside the story, two memory slots for much faster replies, Load gets the engine by itself (no LM Studio), interactive tour, Calíope's icon on the window, the Sheet tab on every card, help popups stay on screen |

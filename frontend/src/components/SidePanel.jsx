@@ -585,7 +585,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
   const mode = conversation.scenario?.mode;
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
   const allowed = [...(game.features?.panels || TABS.map(([k]) => k)), ...(state.combat?.active ? ["combat"] : []),
-    ...(Object.keys(state.resources || {}).length || game.card_has_resources ? ["sheet"] : []),  // resources live on the sheet
+    "sheet",  // always: your character (name, background, looks…) can be read, copied and edited there
     ...((game.messages || []).some((m) => m.meta?.scene_picture) ? ["map"] : [])];  // the map bag lives on the map tab
   const tabs = TABS.filter(([k]) => allowed.includes(k));
   const active = tabs.some(([k]) => k === tab) ? tab : tabs[0]?.[0];

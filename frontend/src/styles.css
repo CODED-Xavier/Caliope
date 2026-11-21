@@ -180,7 +180,7 @@ textarea.field { resize: vertical; }
 .helptip { position: relative; display: inline-block; vertical-align: middle; }
 .helptip-btn { width: 17px; height: 17px; padding: 0; border-radius: 50%; border: 1px solid var(--muted); background: transparent; color: var(--muted); font-size: 11px; line-height: 1; cursor: help; }
 .helptip-btn:hover, .helptip-btn:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
-.helptip-pop { position: fixed; z-index: 80; width: 270px; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; text-align: left; font-size: 12.5px; font-weight: 400; line-height: 1.4; color: var(--text); text-transform: none; letter-spacing: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.helptip-pop { position: fixed; z-index: 80; width: 270px; max-height: calc(100vh - 16px); overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; text-align: left; font-size: 12.5px; font-weight: 400; line-height: 1.4; color: var(--text); text-transform: none; letter-spacing: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
 .helptip-pop strong { font-size: 13px; }
 .section-title .helptip { margin-left: 4px; }
 .timing { margin-top: 6px; font-family: var(--sans); }
@@ -531,6 +531,9 @@ body.resizing { user-select: none; cursor: col-resize; }
 
 /* first-run tour */
 .tour { position: fixed; inset: 0; z-index: 200; }
+.tour.open-spot { pointer-events: none; }
+.tour.open-spot .tour-card, .tour-block { pointer-events: auto; }
+.tour-block { position: absolute; }
 .tour-dim { position: absolute; inset: 0; background: rgba(5, 3, 10, 0.6); }
 .tour-spot { position: absolute; border-radius: 12px; box-shadow: 0 0 0 4000px rgba(5, 3, 10, 0.6); border: 2px solid var(--accent); pointer-events: none; transition: all .2s; }
 .tour-card { position: absolute; width: 420px; max-width: calc(100vw - 32px); background: var(--panel); color: var(--text); border: 1px solid var(--accent); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow); }
@@ -545,3 +548,7 @@ body.resizing { user-select: none; cursor: col-resize; }
 .dialog-back { position: fixed; inset: 0; z-index: 1100; background: rgba(5, 3, 10, 0.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .dialog { background: var(--panel); color: var(--text); border: 1px solid var(--accent); border-radius: 14px; padding: 18px 20px; width: 440px; max-width: 100%; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow); }
 .dialog-text { white-space: pre-wrap; line-height: 1.5; }
+
+/* the Aedo's answers outside the story */
+.msg.ooc .ooc-bubble { border: 1px dashed var(--accent); background: transparent; font-family: inherit; font-size: 0.95em; }
+.msg.ooc .tag { margin-bottom: 4px; }

@@ -41,7 +41,7 @@ DEFAULT_SETTINGS: dict = {
     "reply_length": "medium",     # short | medium | long
     "context_window": 8192,   # must match the context length loaded in LM Studio (the built-in engine uses it directly)
     # --- AI engine: LM Studio (default) or the built-in llama.cpp engine ---
-    "ai_engine": "lmstudio",      # lmstudio | builtin
+    "ai_engine": "builtin",       # builtin (no LM Studio needed) | lmstudio
     "engine_model_path": "",      # .gguf file for the story model
     "model_folders": "",          # extra folders with .gguf models (one per line), added in the Models window
     "engine_embedding_path": "",  # optional .gguf embedding model (memory search by meaning)

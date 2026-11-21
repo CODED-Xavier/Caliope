@@ -368,8 +368,6 @@ class ModelHub:
         p = Path(path)
         if p.suffix.lower() != ".gguf" or not p.is_file():
             raise ModelError("Model file not found.")
-        if not runtime.server_binary():
-            raise ModelError("Download the built-in engine first (button at the top of this window).")
         key = "engine_embedding_path" if role == "embedding" else "engine_model_path"
         return {"ai_engine": "builtin", key: str(p)}
 

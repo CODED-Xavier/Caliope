@@ -48,7 +48,7 @@ class PromptTests(unittest.IsolatedAsyncioTestCase):
         cid = new_game(s, "gm_world")
         await collect(s.engine.send(cid, "/what time is it in the story?"))
         self.assertEqual(llm.chat_calls, [])
-        self.assertIn("[message to the GM: what time is it in the story?]", llm.stream_calls[-1][-1]["content"])
+        self.assertEqual(llm.stream_calls[-1][-1]["content"], "what time is it in the story?")  # its own prompt (test_part6)
 
     async def test_weather_is_tracked(self):
         llm = FakeLLM()

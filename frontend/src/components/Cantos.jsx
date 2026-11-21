@@ -35,8 +35,8 @@ export function CantosBox({ convId, cantos, onCantos, busy }) {
       {open && (
         <div className="card canto open">
           <div className="small"><b>{open.label}</b> · in progress <span className="muted tiny">({open.messages} messages)</span></div>
-          <div className="row gap center">
-            <input className="field grow" placeholder="Title (optional: the Aedo names it)" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <div className="row gap center wrap">
+            <input className="field grow" style={{ minWidth: 150 }} placeholder="Title (optional: the Aedo names it)" value={title} onChange={(e) => setTitle(e.target.value)} />
             <button className="btn small primary" disabled={busy || working} onClick={close}>{working ? "Writing…" : "Close this Canto"}</button>
           </div>
         </div>

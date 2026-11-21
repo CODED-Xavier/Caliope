@@ -92,7 +92,7 @@
 "messages)": "mensagens)",
 "Rename": "Renomear",
 "· in progress": "· em andamento",
-"Title (optional: the Aedo names it)": "Título (opcional: o Aedo dá o nome)",
+"Title (optional: the Aedo names it)": "Título (opcional)",
 "Writing…": "Escrevendo…",
 "Close this Canto": "Fechar este Canto",
 "Name this picture:": "Dê um nome a esta imagem:",
@@ -1253,7 +1253,13 @@
 "A small model for 4 GB cards. Fast, but simpler stories than the bigger ones.": "Um modelo pequeno para placas de 4 GB. Rápido, mas com histórias mais simples que os maiores.",
 "No suitable graphics card was found, so it runs on the processor: it works, but replies are slow (a few words per second). A graphics card with 8 GB makes a big difference.": "Não foi encontrada uma placa de vídeo adequada, então roda no processador: funciona, mas as respostas são lentas (algumas palavras por segundo). Uma placa de vídeo de 8 GB faz uma grande diferença.",
 "This PC has little memory for AI models; a small model runs on the processor. Replies will be slow and simple.": "Este PC tem pouca memória para modelos de IA; um modelo pequeno roda no processador. As respostas serão lentas e simples.",
-"Q6_K (16 GB) or Q4_K_M (12 GB)": "Q6_K (16 GB) ou Q4_K_M (12 GB)"
+"Q6_K (16 GB) or Q4_K_M (12 GB)": "Q6_K (16 GB) ou Q4_K_M (12 GB)",
+"No AI model is running yet. Open": "Nenhum modelo de IA está rodando ainda. Abra o",
+"and press Load on a model.": "e aperte Carregar num modelo.",
+"Downloading the engine (about 30 MB). The model loads right after.": "Baixando o motor (cerca de 30 MB). O modelo carrega logo depois.",
+"Press Load on a model: the built-in engine (about 30 MB) is downloaded first, once.": "Aperte Carregar num modelo: o motor embutido (cerca de 30 MB) é baixado antes, uma vez só.",
+"🗨 The Aedo, outside the story": "🗨 O Aedo, fora da história",
+"Try it: click the highlighted button. The tour waits here.": "Experimente: clique no botão destacado. O tour espera aqui."
 },
 "patterns": [
 [
