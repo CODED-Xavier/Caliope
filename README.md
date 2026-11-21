@@ -87,7 +87,7 @@ Settings > *API key* also works with services that speak the same language (Open
 ## 3. Playing a game
 
 ### Starting
-Calíope opens on the **🏠 Main menu**: all your cards as tiles with their pictures, **▶ Play**, **✎ Edit**, **＋ New card**
+Calíope opens on the **🏠 Main menu** (Settings › *Continue from the last played card* opens your last game instead): all your cards as tiles with their pictures, **▶ Play**, **✎ Edit**, **＋ New card**
 and **⤒ Import a card**. The 🏠 button at the top of the left column brings you back to it from a game.
 
 1. **▶ Play** on a card (or **＋ New game** → pick a card). 👥 shows its characters with picture, name and role.
@@ -510,3 +510,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.22.4 | The top bar no longer moves when the mouse is over the music controls; the game's title stays on one line (full name on hover) |
 | 2.22.5 | The side panel's tab row scrolls sideways (mouse wheel, drag, or the ‹ › arrows); the open tab stays in view |
 | 2.23 | Bestiary: a folder per book (imports go to bestiary/<book>/, 📂 Open folder, filter by book); adventures: the story walks into the next scene by itself, and a **⚔ A fight!** offer under the reply starts the scene's fight in one click |
+| 2.23.1 | Starts on the main menu (Settings: *Continue from the last played card*); the top bar fits narrow windows instead of spilling over the side panel |

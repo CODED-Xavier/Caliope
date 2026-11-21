@@ -647,3 +647,18 @@ body.resizing { user-select: none; cursor: col-resize; }
 .tab-arrow.right { right: 0; background: linear-gradient(270deg, var(--bg2) 55%, transparent); text-align: right; }
 .fight-offer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--bad); border-radius: 10px; background: color-mix(in srgb, var(--bad) 10%, transparent); }
 .book-title { font-weight: 600; margin: 8px 0 2px; color: var(--accent); }
+/* the top bar fits its column: buttons lose their words and the song title shrinks before anything spills over the panel */
+.main { container-type: inline-size; }
+.topbar { flex-wrap: wrap; row-gap: 6px; }  /* very narrow: the buttons go to a second row instead of under the panel */
+.topbar > * { flex-shrink: 0; }
+.topbar > .grow { flex-shrink: 1; min-width: 90px; }
+.topbar .jukebox { flex-shrink: 1; min-width: 0; }
+@container (max-width: 820px) {
+  .topbar .btn-label { display: none; }
+  .topbar .jb-title { max-width: 80px; }
+  .topbar .jukebox input[type=range] { width: 50px; }
+}
+@container (max-width: 640px) {
+  .topbar .jb-mood, .topbar .jb-auto { display: none; }
+  .topbar .jb-title { max-width: 50px; }
+}

@@ -175,7 +175,7 @@ export default function App() {
     refreshHealth();
     const t = setInterval(refreshHealth, 20000);
     const last = parseInt(localStorage.getItem("activeConv") || "", 10);
-    if (last) openConversation(last, true);
+    if (last) api.settings().then((st) => { if (st.continue_last) openConversation(last, true); }).catch(() => {}); // else: the main menu
     return () => clearInterval(t);
     // eslint-disable-next-line
   }, []);
@@ -499,8 +499,8 @@ export default function App() {
                 <button className="btn small view-btn" title="Text size, column width, scrolling" onClick={() => setViewOpen(!viewOpen)}>Aa</button>
                 {viewOpen && <ViewMenu view={view} setView={setView} onClose={() => setViewOpen(false)} />}
               </div>
-              <button className="btn small" onClick={showRecap} disabled={busy} title="Previously, in this story… (written only when you ask; never added to the story)">📜 Recap</button>
-              <button className="btn small" onClick={undo} disabled={busy} title="Remove the last exchange">↶ Undo</button>
+              <button className="btn small" onClick={showRecap} disabled={busy} title="Previously, in this story… (written only when you ask; never added to the story)">📜<span className="btn-label"> Recap</span></button>
+              <button className="btn small" onClick={undo} disabled={busy} title="Remove the last exchange">↶<span className="btn-label"> Undo</span></button>
             </div>
             <ErrorBoundary label="The story" resetKey={game.conversation.id}><Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}

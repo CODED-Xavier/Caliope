@@ -1500,7 +1500,11 @@
 "⚔ A fight!": "⚔ Uma luta!",
 "Start the fight": "Começar a luta",
 "It isn't a fight (yet)": "Não é uma luta (ainda)",
-"Not now": "Agora não"
+"Not now": "Agora não",
+"Continue from the last played card": "Continuar do último card jogado",
+"When it is on, Calíope opens straight into the game you played last. When it is off (the default), it opens on the main menu with all your cards.": "Ligado, a Calíope abre direto no último jogo que você jogou. Desligado (o padrão), abre no menu principal com todos os seus cards.",
+"Turn it on if you usually play one long game.": "Ligue se você costuma jogar uma partida longa.",
+"Nothing.": "Nada."
 },
 "patterns": [
 [
