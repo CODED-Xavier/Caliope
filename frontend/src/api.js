@@ -98,6 +98,7 @@ export const api = {
   closeCanto: (id, title) => request("POST", `/api/conversations/${id}/cantos/close`, { title }),
   renameCanto: (id, title) => request("PATCH", `/api/cantos/${id}`, { title }),
   recap: (id) => request("POST", `/api/conversations/${id}/recap`),
+  epilogue: (id) => request("POST", `/api/conversations/${id}/epilogue`),
   warm: (id) => request("POST", `/api/conversations/${id}/warm`),
   sheetFromMessage: (id, messageId) => request("POST", `/api/conversations/${id}/messages/${messageId}/sheet`),
   gallery: (id) => request("GET", `/api/conversations/${id}/gallery`),

@@ -340,6 +340,14 @@ export default function App() {
     } catch (e) { setError(e.message); }
   };
 
+  const writeEpilogue = async () => {
+    if (!activeId) return;
+    try {
+      const r = await api.epilogue(activeId);
+      setGame((g) => (g ? { ...g, messages: [...g.messages, r.message] } : g));
+    } catch (e) { setError(e.message); }
+  };
+
   const sheetFrom = async (messageId) => {
     if (busy || !activeId) return;
     setBusy(true);
@@ -466,7 +474,7 @@ export default function App() {
             </div>
             <Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
-              onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt} onSheet={sheetFrom}
+              onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt} onSheet={sheetFrom} onEpilogue={writeEpilogue}
               follow={view.follow} portraitStyle={view.portraits} searchOpen={searchOpen}
               scenePictures={scenePictures} onPaint={paintScene} onCheck={rollCheck} onBuy={buyOffer}
               voiceOn={!!voice.name} speaking={speaking} onSpeak={playVoice} onCloseSearch={() => setSearchOpen(false)} />

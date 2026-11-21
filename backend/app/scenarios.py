@@ -107,6 +107,10 @@ def normalize_information(raw) -> dict:
     }
 
 
+STORY_LENGTHS = {"open": "", "one-shot": "a one-shot (one sitting, about 15-30 replies)",
+                 "short": "a short story (about 30-60 replies)", "long": "a long campaign (many chapters)"}
+
+
 def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
     raw = raw if isinstance(raw, dict) else {}
     mode = raw.get("mode") if raw.get("mode") in MODES else default_mode
@@ -164,6 +168,11 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "opening_message": str(raw.get("opening_message", "")),
         "starts": normalize_starts(raw.get("starts")),
         "places": normalize_places(raw.get("places")),
+        "fixed_facts": _clip(raw.get("fixed_facts"), 3000),
+        "known_at_start": _clip(raw.get("known_at_start"), 3000),
+        "secrets": _clip(raw.get("secrets"), 3000),
+        "length": str(raw.get("length") or "open") if str(raw.get("length") or "open") in STORY_LENGTHS else "open",
+        "ending": _clip(raw.get("ending"), 1500),
         "pictures_folder": truncate(re.sub(r'[<>:"/\\|?*]+', "", str(raw.get("pictures_folder") or "")).strip(" ."), 60),
         "player": raw.get("player") if isinstance(raw.get("player"), dict) else {},
         "npcs": npcs,
@@ -243,8 +252,9 @@ class ScenarioRepository:
         return cur.rowcount > 0
 
     def seed_defaults(self, seed_dir: Path) -> int:
-        """Install the bundled example scenarios, only on the very first run."""
+        """Install the bundled example scenarios, only on the very first run (later runs only upgrade untouched ones)."""
         if self.db.query_one("SELECT 1 FROM scenarios LIMIT 1"):
+            self.upgrade_bundled(seed_dir)
             return 0
         count = 0
         for path in sorted(Path(seed_dir).glob("scenarios/*.json")):
@@ -254,6 +264,31 @@ class ScenarioRepository:
             except (ValueError, OSError):
                 continue
         return count
+
+
+    def upgrade_bundled(self, seed_dir: Path) -> int:
+        """A bundled card that a new version improved is updated, but only while its opening is still one of the old
+        bundled ones (so a card you edited yourself is never touched)."""
+        done = 0
+        for path in sorted(Path(seed_dir).glob("scenarios/*.json")):
+            try:
+                seed = json.loads(path.read_text(encoding="utf-8"))
+            except (ValueError, OSError):
+                continue
+            old = [str(x).strip() for x in seed.get("upgrade_from") or []]
+            if not old:
+                continue
+            for sc in self.list():
+                if sc["name"] != seed.get("name"):
+                    continue
+                full = self.get(sc["id"])
+                if str(full["data"].get("opening_message") or "").strip() in old:
+                    keep = {k: v for k, v in full["data"].items() if k in ("npcs", "places", "starts", "pictures_folder", "rulebooks")
+                            and v}  # pictures and additions made here stay
+                    self.update(sc["id"], {**full["data"], **{k: v for k, v in seed.items() if k != "upgrade_from"}, **keep,
+                                           "name": full["name"]})
+                    done += 1
+        return done
 
 
 GENERATOR_PROMPT = """You design scenarios for a text roleplaying game. Output ONE JSON object and nothing else.

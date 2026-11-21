@@ -21,6 +21,14 @@ TITLE_PROMPT = """Give a title of 2 to 5 words to this chapter of a story, like 
 
 {chronicle}"""
 
+EPILOGUE_PROMPT = """The story "{title}" has ended. Write its epilogue in {language}, from what really happened below.
+
+1. Two to four paragraphs: what became of {player} and of each important character afterwards, true to their choices.
+2. Then a heading "The story in brief" and 3 to 6 short bullet points with the key moments, in order.
+No new adventures, no questions to the player.
+
+{facts}"""
+
 RECAP_PROMPT = """Write a "Previously, in {title}..." recap for the player who is coming back to this story:
 90 to 170 words, second person ("you"), vivid but clear, ending with where things stand right now and what is
 at stake. Use only the facts below. Write in {language}.
@@ -134,6 +142,17 @@ class CantoBook:
         lang = {"pt-BR": "Brazilian Portuguese"}.get(language, "English")
         text = await self.llm.chat([{"role": "user", "content": RECAP_PROMPT.format(title=title, facts=facts, language=lang)}],
                                    max_tokens=320, temperature=0.7)
+        return (text or "").strip()
+
+    async def epilogue(self, conv_id: int, title: str, summary: str, language: str, player: str) -> str:
+        """After THE END: what became of everyone, and the story in brief."""
+        chron = self.prompt_section(conv_id, 4000)
+        recent = self.db.query("SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 8", (conv_id,))
+        facts = "\n\n".join(x for x in (chron, f"Summary:\n{summary}" if summary else "",
+                                        "The last moments:\n" + _transcript(list(reversed(recent)), 6000)) if x)
+        lang = {"pt-BR": "Brazilian Portuguese"}.get(language, "English")
+        text = await self.llm.chat([{"role": "user", "content": EPILOGUE_PROMPT.format(
+            title=title, facts=facts, language=lang, player=player or "the player's character")}], max_tokens=700, temperature=0.7)
         return (text or "").strip()
 
     # ------------------------------------------------------------------ the map bag

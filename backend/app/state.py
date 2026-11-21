@@ -115,7 +115,10 @@ def _calendar_part(merged: dict) -> dict:
             "abilities": normalize_abilities(merged.get("abilities")),
             "card_status": {truncate(str(k), 40): truncate(str(v), 160) for k, v in list(
                 (merged.get("card_status") if isinstance(merged.get("card_status"), dict) else {}).items())[:40]},
-            "date_label": truncate(str(merged.get("date_label") or ""), 120)}
+            "date_label": truncate(str(merged.get("date_label") or ""), 120),
+            "wishes": truncate(str(merged.get("wishes") or ""), 600),          # the player's hints for the Aedo
+            "finished": bool(merged.get("finished")),                           # the card's ending was reached
+            "sheet_from_chat": bool(merged.get("sheet_from_chat"))}
 
 
 # ---------------------------------------------------------------- model updates

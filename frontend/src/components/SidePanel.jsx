@@ -182,6 +182,9 @@ function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, o
       <TextField value={p.traits || ""} placeholder="Personality" onCommit={(v) => onPatch({ player: { traits: v } })} />
       <label className="lbl">Appearance</label>
       <TextField multiline rows={3} value={p.description} placeholder="Describe your character…" onCommit={(v) => onPatch({ player: { description: v } })} />
+      <label className="lbl">✨ Wishes for the story <HelpTip id="wishes" /></label>
+      <TextField multiline rows={3} value={state.wishes || ""} placeholder="e.g. Kaida and I could go from rivals to lovers. I'd like a duel with Artemis someday."
+        onCommit={(v) => onPatch({ wishes: v })} />
       <label className="lbl">Your notes</label>
       <TextField multiline rows={3} value={state.notes} placeholder="Private notes (the AI does not see these)" onCommit={(v) => onPatch({ notes: v })} />
       {!numbers && <div className="muted small">Roleplay cards focus on characters and relationships, so the numbers (HP, abilities, gold) are hidden. Switch the card type to Adventure to use them.</div>}

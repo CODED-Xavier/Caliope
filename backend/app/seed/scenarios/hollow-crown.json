@@ -5,7 +5,7 @@
   "system_rules": "Simple narrative rules: for risky actions ask the player for a d20 roll with a DC (10 easy, 14 hard, 18 very hard). Social actions use the relevant NPC's relationship value: friendly NPCs are easier to persuade, hostile ones are much harder. Information can be hidden; NPCs lie when it suits them.",
   "world": "The court of Aldermere. King Edric is dying and has named no heir. The crown is rumored to be cursed. The player is a newly arrived court investigator with no allies yet.",
   "tone": "Tense, intrigue-focused, dialogue-heavy. Every NPC wants something.",
-  "opening_message": "The bells of Aldermere toll for the third night in a row. You arrive at the palace gates with a sealed letter that names you Royal Investigator, and no one seems pleased to see you.\n\nA steward leads you to a dim hall where three figures wait. Who do you speak to first?",
+  "opening_message": "The bells of Aldermere toll for the third night in a row. King Edric lies in the east tower, too weak to stand, and he has named no heir.\n\nYou arrive at the palace gates with a letter sealed by the king himself: it names you Royal Investigator. The royal physician, Master Orren, believes the king is being poisoned, slowly, by someone inside the palace. Your task: find the poisoner before the king dies and the court tears itself apart over the crown.\n\nA steward leads you to a dim hall where three people wait:\n- **Lady Seraphine Vael**, the chancellor: elegant and calm, in her fifties, watching you over steepled fingers.\n- **Captain Doran Hale**, head of the palace guard: broad and scarred, arms crossed, plainly unhappy that an outsider was called in.\n- **Wren**, a young palace scribe: ink-stained fingers, quick eyes, a ledger pressed to her chest.\n\nWho do you speak to first? (You can also ask the Aedo what your character knows: start a message with /.)",
   "player": {
     "name": "Investigator",
     "class": "Investigator",
@@ -86,5 +86,13 @@
     "attached": []
   },
   "kind": "roleplay",
-  "species": []
+  "species": [],
+  "known_at_start": "The king's own letter, brought by a royal courier, named you Royal Investigator; you have never been to this court before and have no allies here. You know the names and posts of the chancellor (Lady Seraphine Vael), the guard captain (Captain Doran Hale) and the scribe (Wren), and that Master Orren, the royal physician, believes the king is being poisoned.",
+  "fixed_facts": "King Edric is alive but dying, bedridden in the east tower; he does not die before the seventh night unless the poisoner is still free by then. The player was appointed by a letter sealed by the king himself (no one else hired them). Lady Seraphine Vael is a woman, Captain Doran Hale a man, Wren a young woman. The court is in the palace of Aldermere; the story starts on the third night of the bells.",
+  "secrets": "The poisoner is Lady Seraphine Vael: she adds nightshade to the king's evening wine to put her nephew, Lord Aric Vael, on the throne before the king can name an heir. Clues: a page torn from the kitchen ledger (Wren noticed it), nightshade berries in the chancellor's herb garden, the cupbearer Tomas who was paid to look away. Captain Doran suspects the chancellor but keeps quiet to protect his brother, a guard Seraphine caught stealing. Wren is afraid and will only talk if she trusts the player.",
+  "length": "short",
+  "ending": "the player accuses the poisoner before the court with enough proof, and the king lives; or the seventh night passes with the poisoner free and the king dies",
+  "upgrade_from": [
+    "The bells of Aldermere toll for the third night in a row. You arrive at the palace gates with a sealed letter that names you Royal Investigator, and no one seems pleased to see you.\n\nA steward leads you to a dim hall where three figures wait. Who do you speak to first?"
+  ]
 }

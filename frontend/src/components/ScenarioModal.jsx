@@ -338,6 +338,34 @@ function Editor({ initial, id, onCancel, onSaved }) {
       </>)}
       <label className="lbl">Tone / style <DraftButton field="tone" card={d} onText={(t) => set("tone", t)} /></label>
       <textarea className="field" rows={2} value={d.tone} onChange={(e) => set("tone", e.target.value)} />
+      <details className="story-frame" open={!!(d.fixed_facts || d.secrets || d.known_at_start || d.ending)}>
+        <summary className="lbl">Facts, secrets and the ending <HelpTip id="story_frame" /></summary>
+        <label className="lbl">What the player's character knows from the start</label>
+        <textarea className="field" rows={3} value={d.known_at_start || ""} onChange={(e) => set("known_at_start", e.target.value)}
+          placeholder="Who hired them, the mission, the people they already know… (anything else must be found out in play)" />
+        <label className="lbl">Fixed facts (always true, never contradicted)</label>
+        <textarea className="field" rows={3} value={d.fixed_facts || ""} onChange={(e) => set("fixed_facts", e.target.value)}
+          placeholder="The king is alive but dying. The player was hired by the king's letter. Wren is a young woman…" />
+        <label className="lbl">Secrets (discovered only through play)</label>
+        <textarea className="field" rows={3} value={d.secrets || ""} onChange={(e) => set("secrets", e.target.value)}
+          placeholder="Who the culprit is, hidden motives, the clues that lead to them…" />
+        <div className="row gap">
+          <div>
+            <label className="lbl">Story length</label>
+            <select className="field" value={d.length || "open"} onChange={(e) => set("length", e.target.value)}>
+              <option value="open">Open (no set ending)</option>
+              <option value="one-shot">One-shot (one sitting)</option>
+              <option value="short">Short story</option>
+              <option value="long">Long campaign</option>
+            </select>
+          </div>
+          <div className="grow">
+            <label className="lbl">It ends when…</label>
+            <input className="field" value={d.ending || ""} onChange={(e) => set("ending", e.target.value)}
+              placeholder="the poisoner is accused with proof, or the king dies on the seventh night" />
+          </div>
+        </div>
+      </details>
       <label className="lbl">Opening message <DraftButton field="opening_message" card={d} onText={(t) => set("opening_message", t)} /></label>
       <textarea className="field" rows={4} value={d.opening_message} onChange={(e) => set("opening_message", e.target.value)} />
       <StartsEditor starts={d.starts} npcs={d.npcs} onChange={(v) => set("starts", v)} />

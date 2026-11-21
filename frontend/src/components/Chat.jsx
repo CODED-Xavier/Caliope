@@ -155,7 +155,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
     return (
       <div className={`msg assistant ooc ${hit || ""}`} data-mid={m.id}>
         <div className="msg-body">
-          <div className="tag">🗨 The Aedo, outside the story</div>
+          <div className="tag">{m.meta?.epilogue ? "📜 Epilogue" : "🗨 The Aedo, outside the story"}</div>
           <div className="bubble ooc-bubble"><Markdown text={m.content} /></div>
           {actions}
         </div>
@@ -244,7 +244,7 @@ function withMode(t, mode) {
   return t;
 }
 
-export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, onSheet, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint, onCheck, onBuy, voiceOn, speaking, onSpeak }) {
+export default function Chat({ game, stream, busy, error, lastContext, onSend, onStop, onRegenerate, onContinue, onDismissError, onEdit, onResend, onRewind, onFork, onSheet, onEpilogue, follow, searchOpen, onCloseSearch, portraitStyle = "big", scenePictures, onPaint, onCheck, onBuy, voiceOn, speaking, onSpeak }) {
   const [text, setText] = useState("");
   const [fixing, setFixing] = useState(false);
   const [beforeFix, setBeforeFix] = useState(null);
@@ -338,6 +338,7 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
       onEdit: call("onEdit"), onResend: call("onResend"), onRewind: call("onRewind"), check: call("check"), buy: call("buy"), speak: call("onSpeak") };
   }, []);
 
+  const [epiloguing, setEpiloguing] = useState(false);
   const [sendMode, setSendMode] = useState(() => { try { return localStorage.getItem("caliope.mode") || "free"; } catch { return "free"; } });
   const pickMode = (m) => { setSendMode(m); try { localStorage.setItem("caliope.mode", m); } catch { /* ignore */ } taRef.current?.focus(); };
   const submit = () => {
@@ -386,6 +387,16 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
             <div className="retry">
               <button className="btn" onClick={regenerate}>↻ Generate reply</button>
               <span className="muted small"> The last message has no reply yet (the model may have been offline).</span>
+            </div>
+          )}
+          {!busy && game.state?.finished && !messages.some((x) => x.meta?.epilogue) && (
+            <div className="card story-end">
+              <b>🏁 The story reached its end.</b>
+              <div className="row gap center wrap">
+                <button className="btn small primary" disabled={!onEpilogue || epiloguing} onClick={async () => { setEpiloguing(true); await onEpilogue(); setEpiloguing(false); }}>
+                  {epiloguing ? "Writing…" : "📜 Write the epilogue"}</button>
+                <span className="muted small">You can also keep playing: undo the last reply, or go on after the end.</span>
+              </div>
             </div>
           )}
           {stream && (

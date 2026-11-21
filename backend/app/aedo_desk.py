@@ -17,8 +17,12 @@ SYSTEM = """You are the Aedo, the game master of a roleplay story, talking with 
 The player asked you a question or gave you an instruction about the game. Rules:
 - Answer it directly and clearly, as a helpful game master talking to a friend. Out of character.
 - Do NOT continue the story, do NOT narrate scenes, do NOT speak as any character, no dialogue in quotes.
-- Use the information below. When the player asks for something written there (their background, their sheet, a
-  character's details), give it to them in full, as written. If something is not in the information, say so.
+- Use the information below. When the player asks for something written there (their background, their sheet, what
+  happened in the story), give it to them in full, as written.
+- Answer only with what the player's character could know: their own background, what they saw and heard in the story,
+  and common knowledge of the world. Other characters' private lives, hidden motives and the story's secrets are not
+  handed out here: say plainly that the character doesn't know that yet and could find out in the story (ask someone,
+  search, investigate). Never invent facts to fill the gap.
 - Keep it short unless the player asks for everything. {lang}"""
 
 
@@ -60,7 +64,11 @@ def _sheet(state: dict) -> str:
 
 def build_messages(*, scenario: dict, state: dict, npcs: list[dict], summary: str, history: list[dict],
                    question: str, language: str, player_lore: list | None = None) -> list[dict]:
-    parts = [f"## The card\n{scenario.get('name', '')}: {truncate(scenario.get('description') or '', 800)}",
+    parts = [f"## The card\n{scenario.get('name', '')}: {truncate(scenario.get('description') or '', 800)}"]
+    for key, label in (("known_at_start", "What the player's character knows from the start"), ("fixed_facts", "Fixed facts")):
+        if str(scenario.get(key) or "").strip():
+            parts.append(f"## {label}\n{truncate(scenario[key], 1500)}")
+    parts += [
              f"## The player's character\n{truncate(_sheet(state), 4000)}"]
     lore = [e for e in player_lore or [] if isinstance(e, dict) and e.get("enabled", True) and e.get("name")]
     if lore:

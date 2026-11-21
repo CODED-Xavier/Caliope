@@ -123,6 +123,15 @@ class BusyError(Exception):
     """The conversation is generating a reply right now."""
 
 
+END_LINE = re.compile(r"^\s*[*_#\s]*(?:THE END|FIM)[.!*_\s]*$", re.I | re.M)
+
+
+def story_ended(reply: str) -> bool:
+    """The Aedo closed the story with its last line "THE END" (or "FIM"), as the card's ending section asks."""
+    lines = [ln for ln in (reply or "").strip().splitlines() if ln.strip()]
+    return bool(lines) and bool(END_LINE.match(lines[-1]))
+
+
 def involved_changes(changes: list[dict], exchanges: list[tuple[str, str]]) -> list[dict]:
     """Relationship changes only for characters who are in the exchange (named in the reply or in what the player
     said or did, not only in the player's 'thoughts') and only with a reason. Anything else is dropped."""
@@ -724,9 +733,15 @@ class ChatEngine:
             meta["offers"] = offers
         if timing:
             meta["timing"] = timing
+        ended = story_ended(reply) and bool(scenario.get("ending") or scenario.get("length", "open") != "open")
+        if ended:
+            meta["finished"] = True
         assistant_msg = self.repo.add_message(conv_id, "assistant", reply, meta)
         st = self.repo.get_state(conv_id)
-        if routes.advance(st, scenario.get("route")):  # the planned scene was written: the next one comes after it
+        moved = routes.advance(st, scenario.get("route"))  # the planned scene was written: the next one comes after it
+        if ended:
+            st["finished"] = True  # the card's ending happened: the chat offers the epilogue
+        if moved or ended:
             self.repo.save_state(conv_id, st)
         yield {"type": "assistant_message", "message": self.repo.get_message(assistant_msg["id"])}
 

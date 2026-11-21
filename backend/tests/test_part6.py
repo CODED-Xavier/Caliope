@@ -253,3 +253,57 @@ class GmPrefixTests(unittest.TestCase):
         self.assertFalse(is_gm_message("O mestre da guilda chega."))
         self.assertEqual(gm_question("mestre, e sua família?"), "e sua família?")
         self.assertEqual(gm_question("/what time is it?"), "what time is it?")
+
+
+class StoryFrameTests(unittest.IsolatedAsyncioTestCase):
+    async def test_facts_secrets_wishes_and_the_end(self):
+        from app.engine import story_ended
+        llm = FakeLLM()
+        s = make_services(llm)
+        sc = s.scenarios.create({"name": "Mystery", "mode": "gm_world", "opening_message": "Begin.",
+                                 "fixed_facts": "The king is alive.", "secrets": "The chancellor did it.",
+                                 "known_at_start": "You were named investigator.", "length": "short",
+                                 "ending": "the poisoner is accused with proof"})
+        cid = s.conversations.create(s.scenarios.get(sc["id"]))["id"]
+        st = s.conversations.get_state(cid)
+        st["wishes"] = "Wren and I could become close friends."
+        s.conversations.save_state(cid, st)
+        llm.reply = "Wren looks up."
+        await collect(s.engine.send(cid, "I look around."))
+        system = llm.stream_calls[-1][0]["content"]
+        for text in ("Fixed facts", "The king is alive.", "Secrets", "The chancellor did it.", "knows from the start",
+                     "short story", "the poisoner is accused with proof", "THE END"):
+            self.assertIn(text, system)
+        last = llm.stream_calls[-1][-1]["content"]
+        self.assertIn("Wren and I could become close friends.", last)
+        self.assertIn("Never force them", last)
+        self.assertIn("Never write", last)                                   # the closing rules
+
+        llm.reply = "The court gasps as the chancellor is led away.\n\n**THE END**"
+        events = await collect(s.engine.send(cid, "I accuse the chancellor."))
+        msg = next(e["message"] for e in events if e["type"] == "assistant_message")
+        self.assertTrue(msg["meta"]["finished"])
+        self.assertTrue(s.conversations.get_state(cid)["finished"])
+        self.assertTrue(story_ended("fim"))
+        self.assertFalse(story_ended("The end of the road is near."))
+
+        # the Aedo's answers outside the story never get the secrets
+        await collect(s.engine.send(cid, "/who did it?"))
+        self.assertNotIn("The chancellor did it.", llm.stream_calls[-1][0]["content"])
+        self.assertIn("You were named investigator.", llm.stream_calls[-1][0]["content"])
+
+    def test_bundled_card_upgrade_only_when_untouched(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        s = make_services()
+        seed = Path(tempfile.mkdtemp())
+        (seed / "scenarios").mkdir()
+        (seed / "scenarios" / "c.json").write_text(json.dumps({"name": "Crown", "mode": "gm_world", "opening_message": "New opening.",
+                                                               "secrets": "S", "upgrade_from": ["Old opening."]}))
+        a = s.scenarios.create({"name": "Crown", "mode": "gm_world", "opening_message": "Old opening."})
+        self.assertEqual(s.scenarios.upgrade_bundled(seed), 1)
+        self.assertEqual(s.scenarios.get(a["id"])["data"]["opening_message"], "New opening.")
+        self.assertEqual(s.scenarios.get(a["id"])["data"]["secrets"], "S")
+        s.scenarios.update(a["id"], {**s.scenarios.get(a["id"])["data"], "name": "Crown", "opening_message": "Mine."})
+        self.assertEqual(s.scenarios.upgrade_bundled(seed), 0)                # edited by you: left alone

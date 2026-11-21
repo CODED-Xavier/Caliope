@@ -705,6 +705,20 @@ async def recap(conv_id: int):
     return {"text": await svc().cantos.recap(conv_id, conv["title"], conv["summary"], language)}
 
 
+@app.post("/api/conversations/{conv_id}/epilogue")
+async def epilogue(conv_id: int):
+    """🏁 After the card's ending: the epilogue, kept in the chat (outside the story)."""
+    not_busy(conv_id)
+    conv = svc().conversations.get(conv_id)
+    state = svc().conversations.get_state(conv_id)
+    language = conv["scenario"].get("language") or svc().settings.get("response_language")
+    text = await svc().cantos.epilogue(conv_id, conv["title"], conv["summary"], language, state["player"].get("name") or "")
+    if not text:
+        raise HTTPException(502, "The model did not write the epilogue. Is the model running?")
+    msg = svc().conversations.add_message(conv_id, "assistant", text, {"ooc": True, "epilogue": True})
+    return {"message": svc().conversations.get_message(msg["id"])}
+
+
 @app.get("/api/conversations/{conv_id}/gallery")
 async def gallery(conv_id: int):
     return svc().cantos.gallery(conv_id)

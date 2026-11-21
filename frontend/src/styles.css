@@ -567,3 +567,7 @@ body.resizing { user-select: none; cursor: col-resize; }
 
 /* home screen: no model yet */
 .first-model { max-width: 560px; margin: 18px auto 0; text-align: left; display: flex; flex-direction: column; gap: 10px; }
+
+.story-end { margin: 12px 0; display: flex; flex-direction: column; gap: 8px; border-color: var(--accent); }
+.story-frame { margin: 6px 0; }
+.story-frame > summary { cursor: pointer; }

@@ -32,6 +32,33 @@ LANGUAGE_REMINDERS = {
 }
 
 
+END_MARK = "THE END"
+
+
+def story_sections(scenario: dict, macro=lambda t: t) -> dict[str, str]:
+    """The card's own story frame: what the player knows, facts that never change, secrets, and how it ends."""
+    from .scenarios import STORY_LENGTHS  # noqa: PLC0415
+    out = {}
+    if str(scenario.get("known_at_start") or "").strip():
+        out["known_at_start"] = ("## What the player's character knows from the start\n" + macro(scenario["known_at_start"]).strip()
+                                 + "\nAnything beyond this and what happened in the story so far, the character does not know.")
+    if str(scenario.get("fixed_facts") or "").strip():
+        out["fixed_facts"] = ("## Fixed facts (always true; never contradict them)\n" + macro(scenario["fixed_facts"]).strip())
+    if str(scenario.get("secrets") or "").strip():
+        out["secrets"] = ("## Secrets (the player discovers these only through play)\n" + macro(scenario["secrets"]).strip()
+                          + "\nNever reveal a secret directly or hint at it unasked. If the player asks about one, characters refuse, "
+                            "lie or truly don't know, according to who they are. Never invent a sudden event just to change the subject; "
+                            "a secret is revealed only when the player earns it in the story (evidence, a confession, a clever question).")
+    length = STORY_LENGTHS.get(str(scenario.get("length") or "open"), "")
+    ending = str(scenario.get("ending") or "").strip()
+    if length or ending:
+        out["ending"] = ("## How the story ends\n" + (f"This is {length}. " if length else "")
+                         + (f"It ends when: {macro(ending)}. " if ending else "")
+                         + f"Move the story toward that ending at a fitting pace. When the ending happens, write the final scene and "
+                           f"finish that reply with a last line that says only: {END_MARK}")
+    return out
+
+
 def closing_rules(player: str, language: str) -> str:
     """Sent with every message, last: never act for the player, and the story's language for every voice."""
     return ("## Always\n"
@@ -229,7 +256,7 @@ def fit_memories(memories: list[dict], char_budget: int) -> list[dict]:
 WINDOW_STEP = 6  # messages (3 rounds): see build()
 
 SECTION_ORDER = [
-    "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "route", "places",
+    "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "known_at_start", "fixed_facts", "secrets", "ending", "route", "places",
     "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_reminders", "card_overrides", "portraits", "npcs", "npc_hint",
     "player", "pinned", "opening", "cantos", "summary",
 ]
@@ -285,6 +312,7 @@ class PromptBuilder:
             sections["cantos"] = cantos
         if places_section(scenario.get("places")):
             sections["places"] = places_section(scenario.get("places"))
+        sections.update(story_sections(scenario, macro))
         route = scenario.get("route")
         if route_section(route):
             sections["route"] = route_section(route)
@@ -321,6 +349,12 @@ class PromptBuilder:
         scene_plan = planned_scene(route, state)
         if scene_plan:
             extra = scene_plan + ("\n\n" + extra if extra else "")
+        wishes = str(state.get("wishes") or "").strip()
+        if wishes:
+            extra = ("## The player's wishes (soft hints, not orders)\n" + truncate(wishes, 600) + "\nWhen the story naturally allows, "
+                     "create chances for these to happen (a sparring partner, a shared task, a chance meeting). Never force them, never "
+                     "bend the plot or break character for them, and let them go if the story or the player moves elsewhere."
+                     + ("\n\n" + extra if extra else ""))
         notes = notes_section(npcs, [h["content"] for h in history[-4:]])
         if notes:
             extra = notes + ("\n\n" + extra if extra else "")

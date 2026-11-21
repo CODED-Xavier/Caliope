@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.14**. The version history is at the end of this file.
+Current version: **v2.15**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -188,6 +188,15 @@ A card can be entered in different ways. In the card editor, under *Opening mess
 - **how the world is on this route** (the Aedo reads it every turn)
 - **who the story starts with**: everyone else is met in the story
 - **fixed scenes**, played one per reply in order and adapted to what you do (separate them with a line of `---`)
+
+### Facts, secrets and the ending
+In the card editor, **Facts, secrets and the ending** (all optional):
+- **Known from the start:** what the player's character already knows. Anything else must be found out in play.
+- **Fixed facts:** always true, never contradicted (who is alive, who hired the player, how characters look).
+- **Secrets:** discovered only through play. Characters refuse, lie or truly don't know; the Aedo never hands them out when asked outside the story, and doesn't invent sudden events to dodge the question.
+- **Story length** and **It ends when…:** the Aedo moves the story toward the ending and closes it with THE END. The chat then offers **📜 Write the epilogue** (what became of everyone, and the story in brief).
+
+On the **Sheet** tab, **✨ Wishes for the story** takes your soft hints ("Kaida and I could go from rivals to lovers"). The Aedo creates chances for them when the story allows, without forcing them or bending the plot.
 
 ### Character pictures from a folder
 Every card has its own folder in Calíope: `Pictures\<card name>\`, next to Play.bat (made the first time you open the card's *Characters* section). In the card editor > *Characters*:
@@ -421,6 +430,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.10 | A real app window (pywebview), and Calíope's own question boxes instead of the browser's "127.0.0.1 says…" popups |
 | 2.11 | The interface in English and Português (Brasil), switched in Settings or in the tour |
 | 2.11.1 | Audit 2 fixes (see AUDIT.md): start names, Places in .caliope files, repeated place pictures, safer imports |
+| 2.15 | Cards: what the player knows from the start, fixed facts, secrets (never handed out), story length and ending with THE END and an epilogue; ✨ Wishes for the story on the Sheet tab; the Aedo answers only what your character could know; The Hollow Crown rewritten |
 | 2.14 | Group 1 of the playtest notes: never speaking for your character, the story language next to every message, reputation only from your actions, speaking modes under the text box (and `mestre,` questions), a first-model card on the home screen, summaries in the background, roomier card titles; each card has its own Pictures folder with 🔍 Search |
 | 2.13 | Calíope runs its models itself (own models folder, LM Studio's copies moved in, LM Studio never opened), desktop and Start menu shortcuts, faster replies (story read ahead, card reminders read once, window moves in steps), your sheet in the chat fills the card's Status (📋 on any of your messages to read it again) |
 | 2.12.3 | Engine: unloads LM Studio's models first, and falls back to a lighter start when video memory runs out |
