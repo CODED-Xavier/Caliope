@@ -506,3 +506,20 @@ body.resizing { user-select: none; cursor: col-resize; }
 .bag-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .voice-row { padding: 3px 0; border-bottom: 1px dashed var(--border); }
 .icon-btn.speaking { color: var(--accent); }
+
+/* columns hide completely; a small bubble on the chat's edge brings them back */
+.main { position: relative; }
+.edge-bubble { position: absolute; top: 50%; transform: translateY(-50%); z-index: 30; width: 22px; height: 44px; padding: 0;
+  border: 1px solid var(--border); background: var(--panel); color: var(--muted); font-size: 16px; line-height: 1;
+  box-shadow: var(--shadow); opacity: 0.55; transition: opacity .15s, color .15s, border-color .15s; }
+.edge-bubble:hover, .edge-bubble.closed { opacity: 1; color: var(--accent); border-color: var(--accent); }
+.edge-bubble.left { left: 0; border-left: none; border-radius: 0 12px 12px 0; }
+.edge-bubble.right { right: 0; border-right: none; border-radius: 12px 0 0 12px; }
+
+/* no scrollbars anywhere: everything still scrolls with the mouse wheel, touchpad and keys */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.npc-notes { margin: 4px 0 0; padding-left: 16px; font-size: 12px; color: var(--muted); }
+.npc-notes li.aedo { color: var(--accent-2); }
+.npc-notes li.aedo::marker { content: "✒ "; }
+.persona-bar { flex-wrap: wrap; margin: 4px 0 10px; }

@@ -128,7 +128,7 @@ export function PicturesFolder({ cardId, npcs, onApplied }) {
   });
   const apply = () => run(async () => {
     const r = await api.cardPicturesApply(cardId, folder, picks);
-    setNote(`Pictures set for ${r.characters} characters${r.games ? `, also in ${r.games} game(s) using this card` : ""}.`);
+    setNote(`Pictures set for ${r.characters} characters${r.new?.length ? ` (new: ${r.new.join(", ")})` : ""}${r.games ? `, also in ${r.games} game(s) using this card` : ""}.`);
     setScan(null);
     onApplied(r.card);
   });
@@ -159,12 +159,13 @@ export function PicturesFolder({ cardId, npcs, onApplied }) {
           </div>
           {scan.unmatched.length > 0 && (
             <>
-              <div className="small" style={{ marginTop: 8 }}>Not matched to a character: pick who they are (or leave them out)</div>
+              <div className="small" style={{ marginTop: 8 }}>Not matched to a character: pick who they are, add them as new characters, or leave them out</div>
               {scan.unmatched.map((u) => (
                 <div key={u.folder} className="row gap center">
                   <span className="small grow">{u.folder} <span className="muted tiny">({u.count})</span></span>
                   <select className="field" value={picks[u.folder] || ""} onChange={(e) => setPicks((p) => ({ ...p, [u.folder]: e.target.value }))}>
                     <option value="">(leave out)</option>
+                    <option value="__new__">＋ Add as a new character ({u.folder.replace(/\.(png|jpe?g|webp|gif)$/i, "")})</option>
                     {(npcs || []).map((n) => <option key={n.name} value={n.name}>{n.name}</option>)}
                   </select>
                 </div>

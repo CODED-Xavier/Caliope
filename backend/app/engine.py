@@ -72,6 +72,27 @@ def strip_app_line(content: str, meta: dict) -> str:
     return "\n\n".join(keep).strip()
 
 
+NOTES_LIMIT = 1500
+
+
+def add_note(repo, npc: dict, note: str) -> bool:
+    """Append one of the Aedo's notes to a character (skipping repeats; his oldest notes go first when it gets long)."""
+    from .prompts import AEDO_MARK
+
+    lines = [x for x in (npc.get("notes") or "").splitlines() if x.strip()]
+    key = re.sub(r"\W+", " ", note.lower()).strip()
+    if any(re.sub(r"\W+", " ", x.lower()).strip().endswith(key) for x in lines):
+        return False
+    lines.append(AEDO_MARK + note)
+    while len("\n".join(lines)) > NOTES_LIMIT:
+        old = next((i for i, x in enumerate(lines) if x.startswith(AEDO_MARK)), None)
+        if old is None or old == len(lines) - 1:
+            break
+        lines.pop(old)
+    repo.update_npc(npc["id"], notes="\n".join(lines))
+    return True
+
+
 def trim_incomplete(text: str) -> str:
     """If the reply was cut off by the length limit, go back to the last finished sentence."""
     t = text.strip()
@@ -823,6 +844,11 @@ class ChatEngine:
                 self.repo.update_npc(npc["id"], relationship=value)
                 why = f" ({rc['reason']})" if rc["reason"] else ""
                 changes.append(f"{npc['name']}: relationship {value - npc['relationship']:+d} \u2192 {value}{why}")
+
+        for cn in updates.get("character_notes", []):  # the Aedo's own notes (marked ✒), beside the player's
+            npc = self.repo.find_npc(conv_id, cn["npc"])
+            if npc and add_note(self.repo, npc, cn["note"]):
+                changes.append(f"Note on {npc['name']}: {cn['note']}")
 
         added = 0
         for mem in updates["memories"]:

@@ -6,7 +6,6 @@ import SidePanel from "./components/SidePanel.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import SkillsModal from "./components/SkillsModal.jsx";
 import RulebooksModal from "./components/RulebooksModal.jsx";
-import { TABS as PANEL_TABS } from "./components/SidePanel.jsx";
 import ModelsModal from "./components/ModelsModal.jsx";
 import MuseModal from "./components/MuseModal.jsx";
 import { RecapView } from "./components/Cantos.jsx";
@@ -417,6 +416,10 @@ export default function App() {
         collapsed={view.sideCollapsed} onCollapse={setSideCollapsed}
       />
       <main className="main">
+        <button className={`edge-bubble left ${view.sideCollapsed ? "closed" : ""}`} onClick={() => setSideCollapsed(!view.sideCollapsed)}
+          title={view.sideCollapsed ? "Show your games" : "Hide your games (more room for the story)"}>{view.sideCollapsed ? "›" : "‹"}</button>
+        {game && <button className={`edge-bubble right ${panelOpen ? "" : "closed"}`} onClick={() => setPanelOpen(!panelOpen)}
+          title={panelOpen ? "Hide the panel (more room for the story)" : "Show the panel"}>{panelOpen ? "›" : "‹"}</button>}
         {game ? (
           <>
             <div className="topbar">
@@ -437,7 +440,6 @@ export default function App() {
               </div>
               <button className="btn small" onClick={showRecap} disabled={busy} title="Previously, in this story… (written only when you ask; never added to the story)">📜 Recap</button>
               <button className="btn small" onClick={undo} disabled={busy} title="Remove the last exchange">↶ Undo</button>
-              <button className="btn small" onClick={() => setPanelOpen(!panelOpen)} title="Show or hide the sheet panel">{panelOpen ? "Hide panel ⇥" : "⇤ Show panel"}</button>
             </div>
             <Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
@@ -457,14 +459,6 @@ export default function App() {
           </div>
         )}
       </main>
-      {game && !panelOpen && (
-        <aside className="panel-rail">
-          <button className="icon-btn" title="Show the panel" onClick={() => setPanelOpen(true)}>⇤</button>
-          {PANEL_TABS.map(([k, icon, label]) => (
-            <button key={k} className="icon-btn rail-tab" title={label} onClick={() => { setTab(k); setPanelOpen(true); }}>{icon}</button>
-          ))}
-        </aside>
-      )}
       {game && panelOpen && <div className="panel-resizer" onMouseDown={startResize} title="Drag to resize the panel" />}
       {game && panelOpen && (
         <SidePanel game={game} tab={tab} onTab={setTab} onPatch={patchState} onPay={payGold} onPower={usePower} onRest={restNow} busy={busy} onNpcUpdate={npcUpdate} onNpcDelete={npcDelete}

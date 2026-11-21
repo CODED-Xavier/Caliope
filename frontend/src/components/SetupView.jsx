@@ -5,6 +5,7 @@ const NO_LORE = [];
 import { api } from "../api.js";
 import HelpTip from "./HelpTip.jsx";
 import { CharacterPreview, StartPicker } from "./CardExtras.jsx";
+import PersonaBar from "./Personas.jsx";
 import { abilityMod, fmtMod } from "../utils.js";
 
 // Hit die per class (D&D 5e). Anything else uses d8.
@@ -98,6 +99,11 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
       <StartPicker card={card} value={startId} onChange={setStartId} />
 
       <div className="section-title">Your character</div>
+      <PersonaBar player={p} lore={lore} onLoad={(persona) => {
+        // the card's own sheet shape stays (stats, class list); the persona fills in who you are
+        setP((x) => ({ ...x, ...Object.fromEntries(Object.entries(persona.player || {}).filter(([k, v]) => v !== "" && v != null && !(k === "stats" && !Object.keys(v || {}).length))) }));
+        if ((persona.lore || []).length) setLore(persona.lore);
+      }} />
       <div className="way-pick">
         <label className={`way ${way === "app" ? "active" : ""}`}>
           <input type="radio" checked={way === "app"} onChange={() => setWay("app")} />

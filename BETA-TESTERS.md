@@ -71,6 +71,7 @@ The sidebar shows **Model server online** when it's ready.
 2. If the card has more than one start, choose one under **Choose your start**.
 3. Create your character: **Who are you?** (roleplay cards) or **Create your sheet** (adventure cards).
    - **✨ Fill the empty fields** suggests a background, looks and personality for you.
+   - **💾 Save as persona** keeps your character for other games; **🎭 Personas** loads one.
 4. Read the opening scene and write what you do.
 
 ### How to write
@@ -87,7 +88,8 @@ The sidebar shows **Model server online** when it's ready.
 - Under a reply: **Continue ▸** (keep writing), **↻** (write it again), **⏪** (rewind to there), **⑂** (start a new game from that moment).
 - Top of the chat: **↶ Undo**, **📜 Recap** ("Previously, in…"), **🎵 Music**, **Aa** (text size and colours), **🔍** (search).
 - 🎲 **roll buttons** appear when the Aedo asks for a check, and 🛒 **buy buttons** when something has a price.
-- The **right panel** has your Sheet, Bag, People (relationships from −100 to +100), Journal and more.
+- The **right panel** has your Sheet, Bag, People (relationships from −100 to +100, plus notes about each character: yours and the Aedo's ✒), Journal and more.
+- The small **‹ ›** bubbles on the edges of the chat hide the side columns for more room.
 - **🪶 The Muse** (left sidebar): brainstorm stories with the AI and turn them into new cards.
 - **☾ / ☀** switches between the dark and light themes.
 

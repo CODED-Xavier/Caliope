@@ -8,7 +8,7 @@ Inside Calíope:
 - the chapters of a story are **Cantos**
 - the AI that helps you write stories and cards is **the Muse**
 
-Current version: **v2.5**. The version history is at the end of this file.
+Current version: **v2.6**. The version history is at the end of this file.
 
 **Beta testers:** start with [BETA-TESTERS.md](BETA-TESTERS.md), a step-by-step guide to install, play and report bugs.
 
@@ -92,6 +92,7 @@ Settings > *API key* also works with services that speak the same language (Open
    - Or choose *Let the story ask me* for cards that create your character in the chat.
    - **✨ Fill the empty fields** suggests a background, looks and personality.
    - **Your world additions**: lore of your own (a great house, a home village, a secret order). It is canon in this game, even where the card says otherwise.
+   - **🎭 Personas**: pick one of your saved characters to fill this screen, or **💾 Save as persona** to reuse this one in other games (name, background, looks, personality and world additions).
 
 ### How to write
 | You write | Meaning |
@@ -103,6 +104,8 @@ Settings > *API key* also works with services that speak the same language (Open
 | `/roll 1d20+3` | Dice, rolled by the app (`adv`, `dis`, `4d6kh3` work too) |
 | `/wait 3 days`, `/wait until morning` | Time passes, only when you choose |
 | no marks | The Aedo decides |
+
+The message box checks your spelling as you type (red underline; right-click for suggestions), in the story's language.
 
 ### Under the replies
 - **Continue ▸**: keeps writing the same reply. **↻ Regenerate**: writes it again.
@@ -120,10 +123,11 @@ Settings > *API key* also works with services that speak the same language (Open
 - The **date and hour** of the story.
 
 ### The side panel
-Tabs appear when the card uses them. Drag the panel's edge to resize it; « and » collapse the sidebars.
+Tabs appear when the card uses them. Drag the panel's edge to resize it. The small **‹ ›** bubbles on the chat's edges hide the games list or the panel completely, giving the story the whole window; click them again to bring the columns back.
 - **Sheet**: HP, attributes, money, place, time and weather, resource bars (Mana, Aura…), powers with **Use**, short and long rest.
 - **Bag**: items, quests (when a quest seems finished, you confirm it), **Pay** box.
 - **People**: everyone you have met, with relationships from −100 to +100. Characters count as met only when they actually interact with you.
+  - **Notes** under each character: yours (what you think of them, a promise, a debt), plus the Aedo's own, marked ✒, which he adds after important moments ("promised to train the player at dawn"). The Aedo keeps them in mind whenever that character is in the scene; edit or delete any line.
 - **Status**: the card's INFO block, kept by the app (cards like Lumencia).
 - **Map**: places, plus the **🎒 map bag** of kept scene pictures.
 - **⚔ Combat**: fights with a battle map ([below](#combat)).
@@ -193,7 +197,7 @@ pictures\
 - `1` Standard, `2` Happy, `3` Sad, `4` Angry, `5` Disgusted, `6` Blushing (or the card's own mood names).
 - A single `Name.png` is used as the Standard picture.
 - Folder names match characters without caring about capitals, accents or a missing surname.
-- A preview shows what matched; unmatched folders get a list to pick the character by hand. Nothing changes until **Apply**.
+- A preview shows what matched. Unmatched folders get a list: pick the character by hand, or **＋ Add as a new character** (the folder's name becomes a new character of the card, also added to games already using it). Nothing changes until **Apply**.
 - Missing moods use the closest one (Disgusted → Angry, Blushing → Happy, otherwise Standard).
 - The pictures are copied into Calíope and also update games already using the card. Run it again whenever you finish more pictures.
 
@@ -399,3 +403,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.3 | Cantos, recap, map bag |
 | 2.4 | Daily backups and .caliope card files |
 | 2.5 | Narration voice |
+| 2.6 | Columns hide fully, no scrollbars, spell check, character notes (yours and the Aedo's), Personas, new characters from a picture folder |

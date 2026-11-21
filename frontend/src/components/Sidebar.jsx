@@ -4,22 +4,7 @@ import { MODE_LABELS, timeAgo } from "../utils.js";
 export default function Sidebar({ convs, activeId, onSelect, onNew, onRename, onDelete, onSkills, onRulebooks, onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
   const online = health?.llm?.ok;
   const [filter, setFilter] = useState("");
-  if (collapsed) {
-    return (
-      <aside className="sidebar rail">
-        <button className="icon-btn" title="Show your games" onClick={() => onCollapse(false)}>☰</button>
-        <button className="icon-btn rail-new" title="New game" onClick={onNew}>＋</button>
-        <span className="grow" />
-        <button className="icon-btn" title="The Muse: write stories and cards" onClick={onMuse}>🪶</button>
-        <button className="icon-btn" title="Download and manage AI models" onClick={onModels}>🧠</button>
-        <button className="icon-btn" title="Skills" onClick={onSkills}>🧩</button>
-        <button className="icon-btn" title="Rulebooks" onClick={onRulebooks}>📚</button>
-        <button className="icon-btn" title="Settings" onClick={onSettings}>⚙</button>
-        <button className="icon-btn" onClick={onToggleTheme} title="Toggle light/dark">{theme === "dark" ? "☀" : "☾"}</button>
-        <span className={`dot ${online ? "on" : "off"}`} title={online ? "Model server online" : "Model server offline"} />
-      </aside>
-    );
-  }
+  if (collapsed) return null; // fully hidden: the bubble on the chat's edge brings it back
   const shown = filter.trim() ? convs.filter((c) => (c.title || "").toLowerCase().includes(filter.trim().toLowerCase())) : convs;
   return (
     <aside className="sidebar">

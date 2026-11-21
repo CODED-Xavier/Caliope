@@ -533,6 +533,28 @@ async def import_card(body: dict[str, Any] = Body(...)):
     return svc().scenarios.create(data)
 
 
+# ------------------------------------------------------------------ personas
+@app.get("/api/personas")
+async def personas_list():
+    return svc().personas.list()
+
+
+@app.post("/api/personas")
+async def personas_create(body: dict = Body(...)):
+    return svc().personas.save(body)
+
+
+@app.put("/api/personas/{persona_id}")
+async def personas_update(persona_id: int, body: dict = Body(...)):
+    return svc().personas.save(body, persona_id)
+
+
+@app.delete("/api/personas/{persona_id}")
+async def personas_delete(persona_id: int):
+    svc().personas.delete(persona_id)
+    return {"deleted": True}
+
+
 # ------------------------------------------------------------------ narration voice (Piper)
 @app.get("/api/voice")
 async def voice_status():
@@ -746,6 +768,7 @@ async def card_to_file(body: dict = Body(...)):
 
 # ------------------------------------------------------------------ a card's pictures from a folder on this PC
 CARDPIC_DIR = Path(DB_PATH).parent / "cardpics"
+NEW_CHARACTER = "__new__"
 
 
 def _card_names(scenario_id: int) -> tuple[dict, list[str]]:
@@ -777,13 +800,24 @@ async def card_pictures_apply(scenario_id: int, body: dict = Body(...)):
     """Copy the pictures into the app and use them for the card (and, if asked, for games already using it)."""
     sc, names = _card_names(scenario_id)
     found = await asyncio.to_thread(cardpics.scan, str(body.get("folder", "")), names)
-    overrides = {str(k): str(v) for k, v in (body.get("overrides") or {}).items() if str(v) in names}
+    raw_over = {str(k): str(v) for k, v in (body.get("overrides") or {}).items()}
+    new_names = []  # "＋ Add as a new character": the folder's name becomes a character of the card
+    for folder, who in raw_over.items():
+        if who == NEW_CHARACTER:
+            name = re.sub(r"\.(png|jpe?g|webp|gif)$", "", folder, flags=re.I).strip()[:60]
+            if name and name.lower() not in {n.lower() for n in names + new_names}:
+                new_names.append(name)
+            raw_over[folder] = name
+    names_all = names + new_names
+    overrides = {k: v for k, v in raw_over.items() if v in names_all}
     labels = {n["name"]: {m["n"]: m["label"] for m in (n.get("portraits") or {}).get("moods", []) if m.get("n")}
               for n in sc["data"].get("npcs", [])}
     pics = await asyncio.to_thread(cardpics.apply, found, labels, CARDPIC_DIR / str(scenario_id),
                                    f"/api/cardpics/{scenario_id}", overrides)
     data = dict(sc["data"])
     data["npcs"] = [{**n, "portraits": pics[n["name"]]} if n["name"] in pics else n for n in data.get("npcs", [])]
+    data["npcs"] += [{"name": n, "description": "", "met": False, "in_prompt": True, "relationship": 0,
+                      "portraits": pics.get(n) or {}} for n in new_names]
     svc().scenarios.update(scenario_id, {**data, "name": sc["name"]})
     games = 0
     if body.get("update_games", True):
@@ -794,8 +828,12 @@ async def card_pictures_apply(scenario_id: int, body: dict = Body(...)):
                 if npc["name"] in pics:
                     svc().conversations.update_npc(npc["id"], portraits=pics[npc["name"]])
                     touched = True
+            for n in new_names:  # new characters join games already using the card (not met yet)
+                if not svc().conversations.find_npc(r["id"], n):
+                    svc().conversations.add_npc(r["id"], n, portraits=pics.get(n), met=False)
+                    touched = True
             games += touched
-    return {"characters": len(pics), "games": games, "card": svc().scenarios.get(scenario_id)}
+    return {"characters": len(pics), "new": new_names, "games": games, "card": svc().scenarios.get(scenario_id)}
 
 
 @app.post("/api/scenarios/{scenario_id}/pictures/r2")

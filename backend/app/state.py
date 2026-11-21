@@ -138,6 +138,7 @@ def normalize_updates(raw) -> dict:
         "scene_mood": str(raw.get("scene_mood") or "").strip().lower(),
         "new_locations": [],
         "relationship_changes": [],
+        "character_notes": [],
         "new_npcs": [],
         "memories": [],
         "minutes_passed": max(0, as_int(raw.get("minutes_passed", 0))),
@@ -180,6 +181,9 @@ def normalize_updates(raw) -> dict:
                 updates["relationship_changes"].append(
                     {"npc": str(rc["npc"]).strip(), "delta": delta, "reason": truncate(str(rc.get("reason", "")), 120)}
                 )
+    for cn in _list(raw.get("character_notes"))[:3]:
+        if isinstance(cn, dict) and str(cn.get("npc", "")).strip() and len(str(cn.get("note", "")).strip()) >= 6:
+            updates["character_notes"].append({"npc": str(cn["npc"]).strip(), "note": truncate(" ".join(str(cn["note"]).split()), 160)})
     for npc in _list(raw.get("new_npcs")):
         if isinstance(npc, dict) and str(npc.get("name", "")).strip():
             updates["new_npcs"].append(

@@ -1,6 +1,8 @@
 """Builds what the model actually sees each turn, and fits it into the context window."""
 from __future__ import annotations
 
+import re
+
 from .appearance import appearance_line
 from .combat import COMBAT_RULES, describe_combat
 from .jukebox import MOODS
@@ -283,6 +285,9 @@ class PromptBuilder:
         scene_plan = planned_scene(route, state)
         if scene_plan:
             extra = scene_plan + ("\n\n" + extra if extra else "")
+        notes = notes_section(npcs, [h["content"] for h in history[-4:]])
+        if notes:
+            extra = notes + ("\n\n" + extra if extra else "")
         lore_hits = triggered(player_lore or [], [h["content"] for h in reversed(history)], int(ctx * 0.06))
         if lore_hits:
             mine = "## The player's world additions (relevant right now, canon)\n" + "\n\n".join(
@@ -519,6 +524,8 @@ class PromptBuilder:
             "- relationship_changes: how an NPC's feelings toward the player changed (npc, delta between -20 and 20, reason). Only NPCs involved.",
             "- new_npcs: named characters appearing for the first time (name, description, personality, appearance). "
             "appearance has race, hair, eyes, build, skin, outfit, extra: copy ONLY what the text says about their looks, use \"\" when it does not say.",
+            "- character_notes: 0-2 lasting things about ONE character that matter for how they treat the player: a promise made, "
+            "a debt, a secret shared, a deal, a grudge or a change of heart (npc, note). Short, with the reason. Only when it really happened.",
             "- memories: 0-3 short, self-contained facts worth remembering long-term, for example \"Doran swore loyalty to Seraphine\" or "
             "\"Wren sold the player's secret\". Include names. importance 1-5. characters: the names of the characters involved "
             "(use the exact names from Known NPCs).",
@@ -577,12 +584,13 @@ ANALYSIS_SCHEMA = {
         "relationship_changes": {"type": "array", "items": {"type": "object", "properties": {"npc": {"type": "string"}, "delta": {"type": "integer"}, "reason": {"type": "string"}}, "required": ["npc", "delta", "reason"]}},
         "new_npcs": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "description": {"type": "string"}, "personality": {"type": "string"}, "appearance": _APPEARANCE_SCHEMA}, "required": ["name", "description", "personality", "appearance"]}},
         "memories": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "importance": {"type": "integer"}, "characters": {"type": "array", "items": {"type": "string"}}}, "required": ["text", "importance", "characters"]}},
+        "character_notes": {"type": "array", "items": {"type": "object", "properties": {"npc": {"type": "string"}, "note": {"type": "string"}}, "required": ["npc", "note"]}},
     },
     "required": ["hp_change", "gold_change", "inventory_add", "inventory_remove", "quests", "location", "time", "weather", "scene_mood",
-                 "new_locations", "relationship_changes", "new_npcs", "memories"],
+                 "new_locations", "relationship_changes", "new_npcs", "memories", "character_notes"],
 }
 
-_LITE_KEYS = ("location", "time", "weather", "scene_mood", "relationship_changes", "new_npcs", "memories")
+_LITE_KEYS = ("location", "time", "weather", "scene_mood", "relationship_changes", "new_npcs", "memories", "character_notes")
 ANALYSIS_SCHEMA_LITE = {
     "type": "object",
     "properties": {k: ANALYSIS_SCHEMA["properties"][k] for k in _LITE_KEYS},
@@ -616,3 +624,28 @@ def analysis_schema(tracker: str, calendar: bool = False, status: bool = False, 
             "required": ["resource", "delta", "reason"]}}
         required.append("resource_changes")
     return {"type": "object", "properties": props, "required": required}
+
+
+AEDO_MARK = "\u2712 "  # lines the Aedo added to a character's notes start with ✒
+
+
+def notes_section(npcs: list[dict], recent: list[str], limit: int = 1200) -> str:
+    """Notes (the player's and the Aedo's) about characters who are in the scene right now.
+
+    Characters that are always in the prompt already carry their notes; this covers the ones that reach the model
+    only through the lorebook (big casts), so a promise or a grudge is not forgotten."""
+    text = " ".join(recent).lower()
+    out, used = [], 0
+    for n in npcs:
+        if n.get("in_prompt", True) or not (n.get("notes") or "").strip():
+            continue
+        first = n["name"].split()[0].lower()
+        if n["name"].lower() not in text and not re.search(rf"\b{re.escape(first)}\b", text):
+            continue
+        line = f"{n['name']}: " + "; ".join(x.strip().lstrip("\u2712").strip() for x in n["notes"].splitlines() if x.strip())
+        line = truncate(line, 400)
+        if used + len(line) > limit:
+            break
+        out.append(line)
+        used += len(line)
+    return ("## Notes about characters in this scene (promises, debts, feelings: keep them in mind)\n" + "\n".join(out)) if out else ""

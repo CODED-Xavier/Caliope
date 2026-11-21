@@ -93,6 +93,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
   const editor = (
     <div className="edit-box">
       <textarea
+        spellCheck
         className="field" autoFocus rows={Math.min(14, Math.max(3, draft.split("\n").length + 1))} value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
@@ -382,6 +383,7 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
           <textarea
             ref={taRef}
             rows={1}
+            spellCheck lang={chatLang(game)}
             value={text}
             placeholder={`What do you do?   "speech"   *action*   'thought'   /to the Aedo`}
             onChange={(e) => setText(e.target.value)}
@@ -402,4 +404,11 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
       </div>
     </div>
   );
+}
+
+
+/** The language of this story, for the spell checker (red underline, suggestions on right-click). */
+function chatLang(game) {
+  const l = game?.conversation?.scenario?.language || game?.language || "";
+  return /^pt/i.test(l) ? "pt-BR" : "en";
 }

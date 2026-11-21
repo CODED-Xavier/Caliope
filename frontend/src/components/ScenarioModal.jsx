@@ -344,7 +344,11 @@ function Editor({ initial, id, onCancel, onSaved }) {
       <div className="section-title">{d.mode === "character" ? "The character" : "Characters (NPCs)"} <span className="muted tiny">({d.npcs.length})</span></div>
       <PicturesFolder cardId={id} npcs={d.npcs} onApplied={(card) => {
         const pics = Object.fromEntries((card.data.npcs || []).map((n) => [n.name, n.portraits]));
-        setD((p) => ({ ...p, npcs: p.npcs.map((n) => (pics[n.name] ? { ...n, portraits: pics[n.name] } : n)) }));
+        setD((p) => {
+          const have = new Set(p.npcs.map((n) => n.name));
+          const added = (card.data.npcs || []).filter((n) => !have.has(n.name)); // "＋ Add as a new character"
+          return { ...p, npcs: [...p.npcs.map((n) => (pics[n.name] ? { ...n, portraits: pics[n.name] } : n)), ...added] };
+        });
       }} />
       {d.npcs.length > 8 && <div className="row gap center"><input className="field grow" placeholder="Find a character…" value={npcFilter} onChange={(e) => setNpcFilter(e.target.value)} /></div>}
       {d.npcs.map((n, i) => (npcFilter && !n.name.toLowerCase().includes(npcFilter.toLowerCase())) ? null : (

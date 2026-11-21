@@ -117,6 +117,10 @@ export const api = {
     if (!res.ok) throw new Error(await errorMessage(res));
     return res.json();
   },
+  personas: () => request("GET", "/api/personas"),
+  createPersona: (body) => request("POST", "/api/personas", body),
+  updatePersona: (id, body) => request("PUT", `/api/personas/${id}`, body),
+  deletePersona: (id) => request("DELETE", `/api/personas/${id}`),
   voice: () => request("GET", "/api/voice"),
   voiceInstall: (voice) => request("POST", "/api/voice/install", { voice }),
   voiceRemove: (voice) => request("POST", "/api/voice/remove", { voice }),

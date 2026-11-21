@@ -66,6 +66,13 @@ CREATE TRIGGER IF NOT EXISTS rule_chunks_ad AFTER DELETE ON rule_chunks BEGIN
     INSERT INTO rule_chunks_fts(rule_chunks_fts, rowid, heading, text) VALUES ('delete', old.id, old.heading, old.text);
 END;
 
+CREATE TABLE IF NOT EXISTS personas (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
+    data       TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS cantos (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id  INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,

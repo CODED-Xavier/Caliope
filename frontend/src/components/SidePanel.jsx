@@ -311,6 +311,13 @@ function NpcCard({ npc, onUpdate, onDelete }) {
       <RelBar value={npc.relationship} />
       <RelSlider value={npc.relationship} onCommit={(v) => onUpdate(npc.id, { relationship: v })} />
       <div className="relscale muted small"><span>enemy −100</span><span>0</span><span>+100 bond</span></div>
+      {!open && (npc.notes || "").trim() && (
+        <ul className="npc-notes">
+          {npc.notes.split("\n").filter((x) => x.trim()).slice(-4).map((x, i) => (
+            <li key={i} className={x.startsWith("\u2712") ? "aedo" : ""} title={x.startsWith("\u2712") ? "Noted by the Aedo" : "Your note"}>{x.replace(/^\u2712\s*/, "")}</li>
+          ))}
+        </ul>
+      )}
       {open && (
         <div className="npc-detail">
           <label className="lbl">Description</label>
@@ -332,8 +339,8 @@ function NpcCard({ npc, onUpdate, onDelete }) {
             Profile always in the prompt <HelpTip id="in_prompt" /></label>
           <label className="check small"><input type="checkbox" checked={npc.met !== false} onChange={(e) => onUpdate(npc.id, { met: e.target.checked })} />
             Already met</label>
-          <label className="lbl">Notes (the AI sees these)</label>
-          <TextField multiline rows={2} value={npc.notes} onCommit={(v) => onUpdate(npc.id, { notes: v })} />
+          <label className="lbl">Notes: yours, and the Aedo's (✒) <HelpTip id="npc_notes" /></label>
+          <TextField multiline rows={4} value={npc.notes} placeholder="What you think of them, a promise, a debt… one per line" onCommit={(v) => onUpdate(npc.id, { notes: v })} />
           <div className="row gap">
             <button className="btn small" onClick={() => onUpdate(npc.id, { active: !npc.active })}>{npc.active ? "Hide from scene" : "Bring back"}</button>
             <button className="btn small danger" onClick={() => { if (window.confirm(`Delete ${npc.name}?`)) onDelete(npc.id); }}>Delete</button>
