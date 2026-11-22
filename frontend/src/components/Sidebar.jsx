@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { MODE_LABELS, timeAgo } from "../utils.js";
 
-export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onRename, onDelete, onSkills, onRulebooks, onBestiary, onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
+export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onRename, onRestart, onDelete, onSkills, onRulebooks, onBestiary, onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
   const online = health?.llm?.ok;
   const [filter, setFilter] = useState("");
   if (collapsed) return null; // fully hidden: the bubble on the chat's edge brings it back
@@ -28,6 +28,7 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onRe
             </div>
             <div className="conv-actions">
               <button className="icon-btn" title="Rename" onClick={(e) => { e.stopPropagation(); onRename(c); }}>✎</button>
+              <button className="icon-btn" title="Restart from the beginning" onClick={(e) => { e.stopPropagation(); onRestart(c); }}>↺</button>
               <button className="icon-btn" title="Delete" onClick={(e) => { e.stopPropagation(); onDelete(c); }}>✕</button>
             </div>
           </div>

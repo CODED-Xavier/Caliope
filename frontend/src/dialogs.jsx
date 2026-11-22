@@ -13,6 +13,8 @@ export const ask = {
   confirm: (text, { ok = "OK", danger = false } = {}) => open({ kind: "confirm", text, ok, danger }),
   prompt: (text, value = "") => open({ kind: "prompt", text, value: value ?? "" }),
   alert: (text) => open({ kind: "alert", text }),
+  // several answers: resolves to the picked option's value, or null when cancelled
+  choose: (text, options) => open({ kind: "choose", text, options }),
 };
 
 export function DialogHost() {
@@ -24,7 +26,7 @@ export function DialogHost() {
   useEffect(() => { if (d) { setValue(d.value || ""); setTimeout(() => input.current?.focus(), 30); } }, [d]);
   const close = (result) => { d.resolve(result); setQueue((q) => q.slice(1)); };
   const cancel = () => close(d.kind === "confirm" ? false : null);
-  const accept = () => close(d.kind === "confirm" ? true : d.kind === "prompt" ? value : null);
+  const accept = () => close(d.kind === "confirm" ? true : d.kind === "prompt" ? value : d.kind === "choose" ? d.options[0].value : null);
   const keys = useRef(null);
   keys.current = { cancel, accept };
   useEffect(() => {
@@ -45,7 +47,9 @@ export function DialogHost() {
         {d.kind === "prompt" && <input ref={input} className="field" value={value} onChange={(e) => setValue(e.target.value)} />}
         <div className="row gap end">
           {d.kind !== "alert" && <button className="btn small" onClick={cancel}>Cancel</button>}
-          <button ref={d.kind === "prompt" ? null : input} className={`btn small ${d.danger ? "danger" : "primary"}`} onClick={accept}>{d.kind === "alert" ? "OK" : d.ok || "OK"}</button>
+          {d.kind === "choose" ? d.options.map((o, i) => (
+            <button key={o.value} ref={i === 0 ? input : null} className={`btn small ${o.danger ? "danger" : i === 0 ? "primary" : ""}`} onClick={() => close(o.value)}>{o.label}</button>
+          )) : <button ref={d.kind === "prompt" ? null : input} className={`btn small ${d.danger ? "danger" : "primary"}`} onClick={accept}>{d.kind === "alert" ? "OK" : d.ok || "OK"}</button>}
         </div>
       </div>
     </div>

@@ -300,7 +300,7 @@
 "Memory search model": "Modelo de busca na memória",
 "(none, keyword search only)": "(nenhum, só busca por palavras)",
 "GPU layers": "Camadas na GPU",
-"Restart": "Reiniciar",
+"Restart": "Recomeçar",
 "Start": "Iniciar",
 "Saving these settings reloads the engine by itself.": "Salvar estas configurações recarrega o motor sozinho.",
 "Engine log": "Registro do motor",
@@ -1518,7 +1518,11 @@
 "Scroll left": "Rolar para a esquerda",
 "Scroll right": "Rolar para a direita",
 "Recap": "Resumo",
-"Undo": "Desfazer"
+"Undo": "Desfazer",
+"↺ Restart, keep the old run": "↺ Recomeçar, manter a partida antiga",
+"Restart and delete the old run": "Recomeçar e apagar a partida antiga",
+"Restart from the beginning": "Recomeçar do início",
+"Start this game over from the opening (same character, HP full)": "Recomeçar este jogo da abertura (mesmo personagem, PV cheio)"
 },
 "patterns": [
 [
@@ -1928,6 +1932,10 @@
 [
 "📍 Scene: {0}",
 "📍 Cena: {0}"
+],
+[
+"Restart \"{0}\" from the beginning? You keep your character (HP full); the story, items, gold, fights and scenes start over.",
+"Recomeçar \"{0}\" do início? Você mantém seu personagem (PV cheio); a história, os itens, o ouro, as lutas e as cenas recomeçam."
 ]
 ]
 }

@@ -126,6 +126,7 @@ The message box checks your spelling as you type (red underline; right-click for
 
 ### At the top of the chat
 - **📜 Recap**: "Previously, in…", written only when you ask and never added to the story.
+- **↺ Restart** (also ↺ next to the game in the left list): the same card from its opening, with the same character at full HP; the story, items, gold, fights and scenes start over. Keep the old run (renamed *… (old run)*) or delete it.
 - **🎵 Music**, **🔍 search** (Ctrl+F), **⤓ export** to Markdown.
 - **Aa**: text size, wider column, compact mode, story colours (grey narration, bright speech, coloured thoughts), character picture size, follow the text as it is written.
 - The **date and hour** of the story.
@@ -514,3 +515,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.23.1 | Starts on the main menu (Settings: *Continue from the last played card*); the top bar fits narrow windows instead of spilling over the side panel |
 | 2.23.2 | The adventure's scene changes show under the reply (📍 Scene: Goblin Ambush) |
 | 2.24 | Painted battle maps: Calíope paints a map (Watabou style, grid lined up) for scenes and fights that have none, keeps it in the card, and can repaint a plain-grid fight mid-fight |
+| 2.24.1 | ↺ Restart: start a game over from the card's opening with the same character (full HP), keeping or deleting the old run |

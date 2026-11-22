@@ -177,6 +177,27 @@ class ConversationRepository:
     def touch(self, conv_id: int) -> None:
         self.db.execute("UPDATE conversations SET updated_at = ? WHERE id = ?", (now(), conv_id))
 
+    def restart(self, conv_id: int, card: dict | None = None, keep: bool = True) -> dict:
+        """The same game from the beginning: the card's opening (its current version, or this game's copy if the card is gone),
+        the same start and character (HP full, the card's starting gold and items), the player's lore. The old run is kept
+        (renamed "… (old run)") or deleted."""
+        conv = self.get(conv_id)
+        state = self.get_state(conv_id)
+        snap = {k: v for k, v in conv["scenario"].items() if k != "route"}
+        scenario = card or {"id": conv.get("scenario_id"), "name": snap.get("name", ""), "data": normalize_scenario(snap)}
+        player = {k: v for k, v in (state.get("player") or {}).items() if k in PLAYER_FIELDS}
+        hp = player.get("hp")
+        if isinstance(hp, dict) and hp.get("max"):
+            player["hp"] = {**hp, "current": hp["max"]}
+        new = self.create(scenario, title=scenario["name"], player=player, setup=str(state.get("setup") or ""),
+                          player_lore=conv.get("player_lore") or [], start=str((conv["scenario"].get("route") or {}).get("id") or ""))
+        if keep:
+            title = re.sub(r"\s*\(old run\)$", "", conv["title"] or scenario["name"])[:100]
+            self.rename(conv_id, f"{title} (old run)")
+        else:
+            self.delete(conv_id)
+        return new
+
     def delete(self, conv_id: int) -> None:
         self.get(conv_id)
         self.db.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))

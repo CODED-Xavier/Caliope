@@ -1483,6 +1483,17 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
     return full_conversation(conv["id"])
 
 
+@app.post("/api/conversations/{conv_id}/restart")
+async def restart_conversation(conv_id: int, body: dict[str, Any] = Body(default={})):
+    """↺ Restart: a new game of the same card from its opening, same character with full HP; the old run kept or deleted."""
+    s = svc()
+    not_busy(conv_id)
+    conv = s.conversations.get(conv_id)
+    card = s.scenarios.get(conv["scenario_id"]) if conv.get("scenario_id") else None
+    new = s.conversations.restart(conv_id, card, keep=body.get("keep", True) is not False)
+    return full_conversation(new["id"])
+
+
 def _card_has_resources(conv_id: int) -> bool:
     sid = svc().conversations.get(conv_id)["scenario_id"]
     card = svc().scenarios.get(sid) if sid else None

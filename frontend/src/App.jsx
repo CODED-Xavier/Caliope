@@ -444,6 +444,19 @@ export default function App() {
     const title = await ask.prompt("Rename this game:", c.title);
     if (title && title.trim()) { await api.renameConversation(c.id, title.trim()).catch((e) => setError(e.message)); refreshConvs(); if (c.id === activeId) reloadGame(); }
   };
+  const restartConv = async (c) => { // ↺ the same card from its opening, same character (HP full)
+    const pick = await ask.choose(`Restart "${c.title}" from the beginning? You keep your character (HP full); the story, items, gold, fights and scenes start over.`,
+      [{ label: "↺ Restart, keep the old run", value: "keep" }, { label: "Restart and delete the old run", value: "delete", danger: true }]);
+    if (!pick) return;
+    try {
+      const data = await api.restartConversation(c.id, pick === "keep");
+      setActiveId(data.conversation.id);
+      localStorage.setItem("activeConv", String(data.conversation.id));
+      setGame(data); setLastContext(null); setError("");
+      setTab(data.features?.panels?.[0] || "sheet");
+      refreshConvs();
+    } catch (e) { setError(e.message); }
+  };
   const deleteConv = async (c) => {
     if (!await ask.confirm(`Delete "${c.title}" permanently? Its memories are deleted too.`)) return;
     await api.deleteConversation(c.id).catch((e) => setError(e.message));
@@ -472,7 +485,7 @@ export default function App() {
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => { setMenuInit(null); setModal("new"); }}
         onHome={() => { if (!busy) { setActiveId(null); setGame(null); localStorage.removeItem("activeConv"); } }}
-        onRename={renameConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onBestiary={() => setModal("bestiary")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
+        onRename={renameConv} onRestart={restartConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onBestiary={() => setModal("bestiary")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         collapsed={view.sideCollapsed} onCollapse={setSideCollapsed}
       />
@@ -501,6 +514,7 @@ export default function App() {
               </div>
               <button className="btn small" onClick={showRecap} disabled={busy} title="Previously, in this story… (written only when you ask; never added to the story)">📜<span className="btn-label"> Recap</span></button>
               <button className="btn small" onClick={undo} disabled={busy} title="Remove the last exchange">↶<span className="btn-label"> Undo</span></button>
+              <button className="btn small" onClick={() => restartConv(game.conversation)} disabled={busy} title="Start this game over from the opening (same character, HP full)">↺<span className="btn-label"> Restart</span></button>
             </div>
             <ErrorBoundary label="The story" resetKey={game.conversation.id}><Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
