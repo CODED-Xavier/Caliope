@@ -44,6 +44,7 @@ export function timeAgo(ts) {
 }
 
 export const KIND_LABELS = { roleplay: "Roleplay", adventure: "Adventure" };
+export const SYSTEM_LABELS = { "dnd5e-2014": "D&D 5e", "dnd5e-2024": "D&D 5e (2024)" };
 export const KIND_INFO = {
   roleplay: { icon: "🎭", title: "Roleplay", text: "Characters, relationships and conversation. Simple and fast." },
   adventure: { icon: "⚔️", title: "Adventure", text: "Rules, items, quests and map. More to track, slower." },

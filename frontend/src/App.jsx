@@ -11,6 +11,8 @@ import RulebooksModal from "./components/RulebooksModal.jsx";
 import ModelsModal, { FirstModel } from "./components/ModelsModal.jsx";
 import BestiaryModal from "./components/BestiaryModal.jsx";
 import Lightbox from "./components/Lightbox.jsx";
+import EngineStrip from "./components/EngineStrip.jsx";
+import Library from "./components/Library.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import MainMenu from "./components/MainMenu.jsx";
 import MuseModal from "./components/MuseModal.jsx";
@@ -18,7 +20,7 @@ import { RecapView } from "./components/Cantos.jsx";
 import Tour from "./components/Tour.jsx";
 import { JukeboxModal, JukeboxPlayer } from "./components/Jukebox.jsx";
 import ScenarioModal from "./components/ScenarioModal.jsx";
-import { KIND_LABELS, MODE_LABELS } from "./utils.js";
+import { KIND_LABELS, MODE_LABELS, SYSTEM_LABELS } from "./utils.js";
 
 const VIEW_DEFAULTS = { fontSize: 16, wide: false, compact: false, follow: false, panelWidth: 372, portraits: "full",
   sideCollapsed: false, panelHidden: false,
@@ -484,6 +486,7 @@ export default function App() {
 
   const online = health?.llm?.ok;
   const scenario = game?.conversation?.scenario;
+  const sceneName = (scenario?.adventure?.scenes || []).find((x) => x.id === game?.state?.adventure?.scene)?.name || "";
 
   return (
     <div className={`app ${view.wide ? "wide" : ""} ${view.compact ? "compact" : ""}`}
@@ -493,13 +496,11 @@ export default function App() {
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => { setMenuInit(null); setModal("new"); }}
         onHome={() => { if (!busy) { setActiveId(null); setGame(null); localStorage.removeItem("activeConv"); } }}
-        onRename={renameConv} onRestart={restartConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onBestiary={() => setModal("bestiary")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
+        onRename={renameConv} onRestart={restartConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onBestiary={() => setModal("bestiary")} onLibrary={() => setModal("library")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         collapsed={view.sideCollapsed} onCollapse={setSideCollapsed}
       />
       <main className="main">
-        <button className={`edge-bubble left ${view.sideCollapsed ? "closed" : ""}`} onClick={() => setSideCollapsed(!view.sideCollapsed)}
-          title={view.sideCollapsed ? "Show your games" : "Hide your games (more room for the story)"}>{view.sideCollapsed ? "›" : "‹"}</button>
         {game && <button className={`edge-bubble right ${panelOpen ? "" : "closed"}`} onClick={() => setPanelOpen(!panelOpen)}
           title={panelOpen ? "Hide the panel (more room for the story)" : "Show the panel"}>{panelOpen ? "›" : "‹"}</button>}
         {game ? (
@@ -507,11 +508,13 @@ export default function App() {
             <div className="topbar">
               <div className="grow">
                 <div className="top-title" title={game.conversation.title}>{game.conversation.title}</div>
-                <div className="muted small top-sub" title={`${scenario?.name || ""} · ${MODE_LABELS[scenario?.mode] || ""}`}>{scenario?.name} · {MODE_LABELS[scenario?.mode] || ""}
-                  {game.features?.kind && <span className={`tag kind-${game.features.kind} kind-badge`}>{KIND_LABELS[game.features.kind]}</span>}
-                  {game.state?.date_label && <span className="tag date-badge" title="In-story date and time (kept by the app)">📅 {game.state.date_label}</span>}
+                <div className="muted small top-sub" title={`${scenario?.name || ""} · ${MODE_LABELS[scenario?.mode] || ""}`}>
+                  {`${scenario?.name || ""} · ${SYSTEM_LABELS[scenario?.system] || KIND_LABELS[game.features?.kind] || MODE_LABELS[scenario?.mode] || ""}`}
                 </div>
               </div>
+              {sceneName && <span className="chip" title="The adventure's current scene">{`📍 ${sceneName}`}</span>}
+              {(game.state?.date_label || game.state?.time) && <span className="chip" title="In-story date and time (kept by the app)">
+                {`📅 ${game.state.date_label || game.state.time}${game.state.weather ? ` · ${game.state.weather}` : ""}`}</span>}
               {!online && <button className="btn small danger" onClick={() => setModal("settings")}>Model offline</button>}
               <button className="icon-btn" title="Search this story (Ctrl+F)" onClick={() => setSearchOpen(!searchOpen)}>🔍</button>
               <a className="icon-btn" title="Export this story as a text file (Markdown)" href={api.exportChatUrl(game.conversation.id)} download>⤓</a>
@@ -524,6 +527,7 @@ export default function App() {
               <button className="btn small" onClick={undo} disabled={busy} title="Remove the last exchange">↶<span className="btn-label"> Undo</span></button>
               <button className="btn small" onClick={() => restartConv(game.conversation)} disabled={busy} title="Start this game over from the opening (same character, HP full)">↺<span className="btn-label"> Restart</span></button>
             </div>
+            <EngineStrip game={game} />
             <ErrorBoundary label="The story" resetKey={game.conversation.id}><Chat game={game} stream={stream} busy={busy} error={error} lastContext={lastContext}
               onSend={send} onStop={stop} onRegenerate={regenerate} onContinue={continueReply} onDismissError={() => setError("")}
               onEdit={editMessage} onResend={resendMessage} onRewind={rewindTo} onFork={forkAt} onSheet={sheetFrom} onEpilogue={writeEpilogue}
@@ -568,6 +572,7 @@ export default function App() {
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}
       {modal === "rulebooks" && <RulebooksModal onClose={() => setModal(null)} />}
       {modal === "bestiary" && <BestiaryModal onClose={() => setModal(null)} />}
+      {modal === "library" && <Library onClose={() => setModal(null)} />}
       {modal === "jukebox" && <JukeboxModal onClose={() => setModal(null)} onChanged={setTracks} />}
     </div>
   );

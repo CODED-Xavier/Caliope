@@ -277,6 +277,45 @@ async def update_scenario(scenario_id: int, data: dict[str, Any] = Body(...)):
     return scenario
 
 
+_LIBRARY: dict = {}
+
+
+def library5e():
+    """The 5e library (SRD built in + the user's files in data/compendium/dnd5e), loaded on first use."""
+    from .dnd5e.library import default_library
+    if "lib" not in _LIBRARY:
+        lib = default_library(Path(DB_PATH).parent)
+        lib.load()
+        _LIBRARY["lib"] = lib
+    return _LIBRARY["lib"]
+
+
+@app.get("/api/library/5e")
+async def library_search(type: str = Query("spell"), q: str = Query(""), edition: str = Query("2014"), limit: int = Query(60)):
+    lib = await asyncio.to_thread(library5e)
+    return {"results": lib.search(type, q, "2024" if edition == "2024" else "2014", max(1, min(500, limit)))}
+
+
+@app.get("/api/library/5e/entry")
+async def library_entry(type: str = Query(...), source: str = Query(...), name: str = Query(...)):
+    got = (await asyncio.to_thread(library5e)).get(type, source, name)
+    if not got:
+        raise NotFound("That entry is not in the library.")
+    return got
+
+
+@app.get("/api/library/5e/status")
+async def library_status():
+    lib = await asyncio.to_thread(library5e)
+    return {**lib.info, "folder": str(Path(DB_PATH).parent / "compendium" / "dnd5e")}
+
+
+@app.post("/api/library/5e/reload")
+async def library_reload():
+    _LIBRARY.pop("lib", None)
+    return await library_status()
+
+
 @app.post("/api/scenarios/{scenario_id}/companions/draft")
 async def draft_companions(scenario_id: int):
     """✨ Write companions: 3 new characters who fit the card, with fight sheets (you edit them before saving)."""

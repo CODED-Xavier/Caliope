@@ -112,6 +112,9 @@ STORY_LENGTHS = {"open": "", "one-shot": "a one-shot (one sitting, about 15-30 r
                  "short": "a short story (about 30-60 replies)", "long": "a long campaign (many chapters)"}
 
 
+SYSTEMS = ("dnd5e-2014", "dnd5e-2024")
+
+
 def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
     raw = raw if isinstance(raw, dict) else {}
     mode = raw.get("mode") if raw.get("mode") in MODES else default_mode
@@ -155,6 +158,9 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "name": truncate(str(raw.get("name") or "Untitled scenario").strip(), 100),
         "mode": mode,
         "kind": raw.get("kind") if raw.get("kind") in KINDS else default_kind(mode),
+        # Adventure cards are tied to a game system whose rules never change (app/dnd5e); role-play cards have none.
+        "system": (raw.get("system") if raw.get("system") in SYSTEMS else "dnd5e-2014")
+        if (raw.get("kind") if raw.get("kind") in KINDS else default_kind(mode)) == "adventure" else "",
         "features": normalize_features(raw.get("features")),
         "description": truncate(str(raw.get("description", "")), 400),
         "language": raw.get("language") if raw.get("language") in ("en", "pt-BR", "auto") else "",

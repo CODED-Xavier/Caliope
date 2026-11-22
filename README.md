@@ -124,6 +124,12 @@ The message box checks your spelling as you type (red underline; right-click for
 - **🔊** reads the reply aloud (needs a voice, [section 6](#6-pictures-music-and-voice)).
 - **🖼** paints the scene; **📌** keeps a picture in the map bag.
 
+### The new look
+- **The rail** on the left: Menu, Games (your games slide out in a drawer), New, Library, Bestiary, Rules, Skills, Muse, Models, Theme, Settings. The dot at the bottom shows if the model is online.
+- **Top bar**: the game, its card and system, and chips for the scene (📍) and the day, time and weather (📅).
+- **The strip under the top bar**: in adventures, your party (you and your companions) with HP bars and AC; in role-play cards, the card's own tracker as chips (Tier, Body D+ with its EXP bar, Battles today; Day 3/100, Rank, Credits…), kept by the app.
+- Bigger tabs, buttons and text, in both themes (dark with violet, light with orange).
+
 ### At the top of the chat
 - **📜 Recap**: "Previously, in…", written only when you ask and never added to the story.
 - **↺ Restart** (also ↺ next to the game in the left list): the same card from its opening, with the same character at full HP; the story, items, gold, fights and scenes start over. Keep the old run (renamed *… (old run)*) or delete it.
@@ -194,6 +200,12 @@ Card editor > **Resources and powers**: pools (Mana, Aura, Stamina…) with maxi
 - When the story spends a resource without a button ("you pour your aura into the barrier"), the tracker subtracts it.
 
 ---
+
+### The D&D 5e Library
+Rail → **Library**: classes, subclasses, class features, races, backgrounds, feats, options (fighting styles, invocations, maneuvers), spells, weapons and armour, magic items. Search, pick a section, choose the rules (5e 2014 or 2024), and read any entry.
+- **Built in:** the free SRD (System Reference Document 5.1/5.2, CC-BY-4.0): 12 classes, 319 spells, the SRD races, feats and items.
+- **Your own books:** put 5e.tools data files in `backend\data\compendium\dnd5e\` (any sub-folders) and press **Reload**. They add everything you own and stay on your PC (that folder is never sent to GitHub). Files to save from your browser (Ctrl+S): `https://5e.tools/data/class/class-<name>.json` (one per class), `spells/spells-phb.json`, `spells-xge.json`, `spells-tce.json` (and `spells-xphb.json` for 2024), `races.json`, `backgrounds.json`, `feats.json`, `optionalfeatures.json`, `items-base.json`, `items.json`.
+- Adventure cards are tied to a **system** (D&D 5e, 2014 by default): its rules never change from card to card. Coming next: the 5e sheet you build by dragging from the Library, the builder and level-ups.
 
 ## 4. Cards
 
@@ -537,3 +549,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.25.2 | Enemies find their way on wide plain grids; tests skip when a test-only package is missing |
 | 2.25.3 | Click a story picture to see it big; card pictures reach running games; the face follows the text when the Aedo forgets the mood |
 | 2.26.0 | Companions (up to 3 per card, the Aedo voices them, Calíope plays them in fights, healers heal), Play solo with fights scaled to one hero, 5e death saving throws |
+| 2.27.0 | The new look (rail, top bar chips, party / tracker strip, bigger tabs, both themes); the D&D 5e Library (SRD built in + your own 5e.tools files); adventure cards tied to a system |

@@ -1565,7 +1565,37 @@
 "A few more lines in each reply.": "Algumas linhas a mais em cada resposta.",
 "In an adventure, when the enemies of the scene attack (or you attack them), the fight starts on its own right after the reply: turn order, the battle map, and the app rolls every attack. When it is off (the default), a ⚔ A fight! button appears under the reply and you start it.": "Numa aventura, quando os inimigos da cena atacam (ou você os ataca), a luta começa sozinha logo depois da resposta: ordem de turnos, mapa de batalha, e o app rola todos os ataques. Desligado (o padrão), aparece um botão ⚔ Uma luta! embaixo da resposta e você a começa.",
 "Turn it on if you want fights to start without the button.": "Ligue se quiser que as lutas comecem sem o botão.",
-"· stable": "· estável"
+"· stable": "· estável",
+"The adventure's current scene": "A cena atual da aventura",
+"Party": "Grupo",
+"Tracker": "Rastreador",
+"Classes": "Classes",
+"Subclasses": "Subclasses",
+"Class features": "Habilidades de classe",
+"Races": "Raças",
+"Backgrounds": "Antecedentes",
+"Feats": "Talentos",
+"Options": "Opções",
+"Spells": "Magias",
+"Weapons & armour": "Armas e armaduras",
+"Magic items": "Itens mágicos",
+"Library · D&D 5e": "Biblioteca · D&D 5e",
+"Fireball, Second Wind, longsword…": "Bola de Fogo, Retomar o Fôlego, espada longa…",
+"Sections": "Seções",
+"· SRD": "· SRD",
+"Pick an entry to read it.": "Escolha uma entrada para ler.",
+"· Your files:": "· Seus arquivos:",
+"Reload": "Recarregar",
+"Contains material from the System Reference Document 5.1 and 5.2 by Wizards of the Coast (CC-BY-4.0). Everything else comes from your own files and stays on your PC.": "Contém material do System Reference Document 5.1 e 5.2 da Wizards of the Coast (CC-BY-4.0). O resto vem dos seus próprios arquivos e fica no seu PC.",
+"Menu": "Menu",
+"Games": "Jogos",
+"New": "Novo",
+"Library": "Biblioteca",
+"D&D 5e library: classes, spells, feats, items": "Biblioteca de D&D 5e: classes, magias, talentos, itens",
+"Muse": "Musa",
+"Theme": "Tema",
+"Model server offline: open settings": "Servidor do modelo offline: abrir configurações",
+"Roleplay": "Roleplay"
 },
 "patterns": [
 [
@@ -2023,6 +2053,14 @@
 [
 "🖼 Pictures and moods ({0})",
 "🖼 Imagens e humores ({0})"
+],
+[
+"{0} entries · {1} files",
+"{0} entradas · {1} arquivos"
+],
+[
+" · {0} files could not be read",
+" · {0} arquivos não puderam ser lidos"
 ]
 ]
 }
