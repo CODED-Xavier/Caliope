@@ -567,7 +567,7 @@ class PromptBuilder:
             lines += [
                 "- hp_change: net change to the player's hit points (negative = damage, positive = healing), else 0.",
                 "- gold_change: net change to the player's gold, else 0.",
-                "- inventory_add / inventory_remove: items the player gained, or lost/used up (name, qty).",
+                "- inventory_add / inventory_remove: items the player gained, or lost/used up (name, qty). Dropping an item or having it knocked away is NOT losing it: it stays unless someone takes it or it is destroyed.",
                 "- quests: quests started, updated or finished (title, status: active|completed|failed, notes).",
             ]
         if calendar:

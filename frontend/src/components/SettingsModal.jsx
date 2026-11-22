@@ -175,7 +175,7 @@ export default function SettingsModal({ onClose, onSaved, onTour }) {
         <input type="checkbox" checked={!!s.continue_last} onChange={(e) => set("continue_last", e.target.checked)} />
       </Row>
       <Row label="Start fights by themselves" help="auto_fight">
-        <input type="checkbox" checked={s.auto_fight !== false} onChange={(e) => set("auto_fight", e.target.checked)} />
+        <input type="checkbox" checked={!!s.auto_fight} onChange={(e) => set("auto_fight", e.target.checked)} />
       </Row>
       <Row label="Open in its own window" help="app_window">
         <input type="checkbox" checked={s.app_window !== false} onChange={(e) => set("app_window", e.target.checked)} />

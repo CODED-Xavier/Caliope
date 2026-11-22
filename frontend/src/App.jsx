@@ -297,7 +297,7 @@ export default function App() {
       refreshHealth();
       const fight = fightRef.current;
       fightRef.current = null;
-      if (fight) api.settings().then((st) => { if (st.auto_fight !== false) setTimeout(() => startFightRef.current?.(fight), 30); }).catch(() => {});
+      if (fight) api.settings().then((st) => { if (st.auto_fight === true) setTimeout(() => startFightRef.current?.(fight), 30); }).catch(() => {});
     }
   }
 

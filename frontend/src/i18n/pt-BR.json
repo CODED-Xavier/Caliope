@@ -1970,6 +1970,10 @@
 [
 "Too far: you can move {0} more squares ({1} ft) this turn.",
 "Longe demais: você ainda pode se mover {0} quadrados ({1} pés) neste turno."
+],
+[
+"Starting HP {0} (d{1} {2} CON) · AC {3} ({4}). You can change them on the sheet later.",
+"PV iniciais {0} (d{1} {2} CON) · CA {3} ({4}). Você pode mudar isso na ficha depois."
 ]
 ]
 }

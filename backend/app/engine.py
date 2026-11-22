@@ -119,6 +119,9 @@ CONTINUE_PROMPT = ("[Continue your last reply exactly where it stopped. Do not r
                    "wrote, do not start over, and do not act for the player. Stop when it is the player's turn again.]")
 
 
+USED_UP = re.compile(r"\b(potion|po[cç][aã]o|scroll|pergaminho|arrow|flecha|bolt|virote|dart|dardo|ration|ra[cç][aã]o|torch|tocha|"
+                     r"oil|[oó]leo|bomb|bomba|flask|frasco|herb|erva|bandage|bandagem|antidote|ant[ií]doto|javelin|dagger)s?\b", re.I)
+
 class BusyError(Exception):
     """The conversation is generating a reply right now."""
 
@@ -1026,6 +1029,8 @@ class ChatEngine:
             updates["new_npcs"] = []
         if (state.get("combat") or {}).get("active") or any("\u2694" in u for u, _ in exchanges):
             updates["hp_change"] = 0  # in a fight the app already applied the damage
+            # a sword "clattering from your grasp" is dropped, not lost: in a fight only used-up things leave the bag
+            updates["inventory_remove"] = [i for i in updates["inventory_remove"] if USED_UP.search(str(i.get("name", "")))]
         if any(is_trade(u) for u, _ in exchanges):  # the app already moved the money and the items
             updates["gold_change"] = 0
             updates["inventory_add"] = updates["inventory_remove"] = []

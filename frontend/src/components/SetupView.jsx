@@ -24,6 +24,22 @@ const roll4d6 = () => {
  * Roleplay cards: "Who are you?" (name, looks, personality, background).
  * Cards that run their own character creation in the story can skip it.
  */
+// 5e armour: [pattern, base AC, most DEX that counts]; a shield adds 2
+const ARMOR = [[/half[- ]?plate/i, 15, 2], [/\bplate\b/i, 18, 0], [/splint/i, 17, 0], [/chain ?mail|cota de malha/i, 16, 0],
+  [/ring ?mail/i, 14, 0], [/breastplate|peitoral/i, 14, 2], [/scale ?mail/i, 14, 2], [/chain ?shirt|camis[aã]o de malha/i, 13, 2],
+  [/\bhide\b|gibão de peles/i, 12, 2], [/studded|tachas/i, 12, 99], [/leather|couro/i, 11, 99], [/padded|acolchoad/i, 11, 99]];
+function armorClass(items, dex, cardAc) {
+  const names = (items || []).map((i) => String(i?.name || i || ""));
+  const found = ARMOR.map((a) => [a, names.find((n) => a[0].test(n))]).find(([, n]) => n);
+  const shield = names.some((n) => /shield|escudo/i.test(n));
+  const cap = found ? found[0][2] : 99; // heavy armour: DEX does not count at all, not even a penalty
+  let ac = found ? found[0][1] + (cap ? Math.min(dex, cap) : 0) : 10 + dex;
+  let how = found ? `${found[1]} ${found[0][1]}${found[0][2] ? ` ${fmtMod(Math.min(dex, found[0][2]))} DEX` : ""}` : `10 ${fmtMod(dex)} DEX`;
+  if (shield) { ac += 2; how += " + shield 2"; }
+  if (!found && !shield && cardAc > ac) return { ac: cardAc, acHow: "the card's AC" };
+  return { ac, acHow: how };
+}
+
 export default function SetupView({ scenarioId, onBack, onStart }) {
   const [card, setCard] = useState(null);
   const [p, setP] = useState(null);
@@ -62,7 +78,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   const con = abilityMod(p.stats.CON ?? 10);
   const dex = abilityMod(p.stats.DEX ?? 10);
   const hp = Math.max(1, die + con);
-  const ac = 10 + dex;
+  const { ac, acHow } = armorClass(card.player?.inventory || card.inventory || [], dex, card.player?.ac);
 
   const help = async () => {
     setDrafting(true); setError("");
@@ -149,7 +165,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
                   </div>
                 ))}
               </div>
-              <div className="muted small">Starting HP {hp} (d{die} {fmtMod(con)} CON) · AC {ac} (10 {fmtMod(dex)} DEX). You can change them on the sheet later.</div>
+              <div className="muted small">{`Starting HP ${hp} (d${die} ${fmtMod(con)} CON) · AC ${ac} (${acHow}). You can change them on the sheet later.`}</div>
             </>
           )}
 

@@ -128,3 +128,10 @@ class CheckDcTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DroppedGearTests(unittest.TestCase):
+    def test_only_used_up_things_leave_the_bag_in_a_fight(self):
+        from app.engine import USED_UP
+        kept = [n for n in ("Longsword", "Shield", "Chain mail", "Potion of healing", "Arrows", "Torch") if not USED_UP.search(n)]
+        self.assertEqual(kept, ["Longsword", "Shield", "Chain mail"])
