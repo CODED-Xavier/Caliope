@@ -93,7 +93,8 @@ and **⤒ Import a card**. The 🏠 button at the top of the left column brings 
 1. **▶ Play** on a card (or **＋ New game** → pick a card). 👥 shows its characters with picture, name and role.
 2. If the card has several starts, choose one in **Choose your start** (for example, Lumencia's default start or another route).
 3. **Create your sheet** (Adventure cards) or **Who are you?** (Roleplay cards).
-   - Or choose *Let the story ask me* for cards that create your character in the chat (like Lumencia). When you answer with your sheet (name, origin, department, attributes…), the app reads it once and fills your **Sheet** tab.
+   - Cards with their own sheet (like Lumencia) show it right on this screen, like a D&D sheet: Tier, Affiliation, Attributes 1–10, and each Stat as a grade plus its EXP bar (*0 / 100 EXP*). **What the card asks for** shows the card's creation rules. The story starts with your sheet ready and does not ask again. As you play, the EXP the card gives (after a spar, a battle…) fills each bar, and a full bar raises that stat's grade one step (C- → C → C+…). Everything lives in the **Sheet** tab, where **✎ Edit the values** opens the same form.
+   - Or choose *Let the story ask me* to create your character in the chat. When you answer with your sheet (name, origin, department, attributes…), the app reads it once and fills your **Sheet** tab.
    - **✨ Fill the empty fields** suggests a background, looks and personality.
    - **Your world additions**: lore of your own (a great house, a home village, a secret order). It is canon in this game, even where the card says otherwise.
    - **🎭 Personas**: pick one of your saved characters to fill this screen, or **💾 Save as persona** to reuse this one in other games (name, background, looks, personality and world additions).
@@ -127,7 +128,7 @@ The message box checks your spelling as you type (red underline; right-click for
 ### The new look
 - **The rail** on the left: Menu, Games (your games slide out in a drawer), New, Library, Bestiary, Rules, Skills, Muse, Models, Theme, Settings. The dot at the bottom shows if the model is online.
 - **Top bar**: the game, its card and system, and chips for the scene (📍) and the day, time and weather (📅).
-- **The strip under the top bar**: in adventures, your party (you and your companions) with HP bars and AC; in role-play cards, the card's own tracker as chips (Tier, Body D+ with its EXP bar, Battles today; Day 3/100, Rank, Credits…), kept by the app.
+- **The strip under the top bar**: in adventures, your party (you and your companions) with HP bars and AC. Role-play cards have no strip: their values (Tier, Body D+ with its EXP bar…) are in the **Sheet** tab.
 - Bigger tabs, buttons and text, in both themes (dark with violet, light with orange).
 
 ### At the top of the chat
@@ -574,4 +575,5 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.29.0 | Your turn by the 5e rules (action, bonus action, movement, reaction, End turn) with the option list sorted by cost; companions with 5e sheets built by the system around your hero or step by step; class and race emblems; ▸ details on classes, races and backgrounds; equipment categories; one Sheet tab (Status merged into it); the sheet owns gear and notes; fight damage reaches the sheet; the Aedo no longer acts for you when the app starts a fight; personas bring their world additions |
 | 2.29.1 | A book's placeholder classes are left out of the builder; hide repeated entries and choose each book's rules list (2014, 2024 or both) in the Library |
 | 2.30.0 | 📦 Export on every card tile and in the card editor; "Want to describe it?" after each part of your turn; the round card told by turns with your words and companion flavour; portrait tokens on the battle map; companion pictures on their sheets; 18 more race emblems (Goliath, Halfling, Minotaur, Kobold, Lizardfolk, Satyr, Vampire…) |
+| 2.32.0 | Cards with their own sheet (Lumencia) are filled on the start screen like a D&D sheet; Stats with EXP bars that raise the grade when full; the card's rule text (">=8") is never taken as a value; no tracker strip over role-play stories |
 | 2.31.0 | The new home: four illustrated doors (Games, Library, Calíope settings, The Muse); the Library by system (D&D 5e: compendium folders, bestiary, rulebooks); quick links on the left bar (Home, Continue, Games, Saves, Library, Muse, Models); ornaments in both themes |

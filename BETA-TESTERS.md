@@ -69,7 +69,8 @@ The sidebar shows **Model server online** when it's ready.
    - If you received a **`.caliope`** file, click **Import a card** and choose it.
 2. If the card has more than one start, choose one under **Choose your start**.
 3. Create your character: **Who are you?** (roleplay cards) or **Create your sheet** (adventure cards).
-   - Cards like Lumencia ask for your sheet in the chat (Tier, Attributes, Stats…). Answer in the chat: the Sheet and Status tabs fill in by themselves. If something didn't arrive, press **📋** under your message to read it again.
+   - Cards like Lumencia have their own sheet, and you fill it right here, like a D&D sheet: Tier, Affiliation, Attributes (1–10) and Stats (a grade like C- and its EXP, 0 / 100). Open **What the card asks for** to see the card's rules. The story then starts with your sheet ready. As you play, EXP fills each Stat's bar; a full bar raises its grade. See and correct it all in the **Sheet** tab (**✎ Edit the values**).
+   - If you chose *Let the story ask me*, answer in the chat: the Sheet tab fills in by itself. If something didn't arrive, press **📋** under your message to read it again.
    - **✨ Fill the empty fields** suggests a background, looks and personality for you.
    - **💾 Save as persona** keeps your character for other games; **🎭 Personas** loads one.
 4. Read the opening scene and write what you do.

@@ -28,7 +28,7 @@ export function trackerChips(statusText) {
 
 /**
  * Under the top bar. Adventure cards: the party (you and your companions) with HP bars.
- * Role-play cards: the card's own tracker as chips (Lumencia: Tier, Body C+ with its EXP bar; Black Sheep: Day, Rank, Credits).
+ * Role-play cards: nothing (their sheet is in the Sheet tab).
  */
 export default function EngineStrip({ game }) {
   const st = game.state || {};
@@ -63,17 +63,5 @@ export default function EngineStrip({ game }) {
       </div>
     );
   }
-  const chips = trackerChips(game.status_now);
-  if (!chips.length) return null;
-  return (
-    <div className="engine-strip" aria-label="Tracker">
-      {chips.map((c) => (
-        <div className="tracker-chip" key={c.label}>
-          <span className="tracker-label">{c.label}</span>
-          <span className="tracker-value">{c.value}</span>
-          {c.bar !== null && <span className="tracker-bar"><span style={{ width: `${Math.round(c.bar * 100)}%` }} /></span>}
-        </div>
-      ))}
-    </div>
-  );
+  return null; // role-play cards: the card's values live in the Sheet tab, not in a strip over the story
 }

@@ -267,6 +267,15 @@ async def get_scenario(scenario_id: int):
     return scenario
 
 
+@app.get("/api/scenarios/{scenario_id}/start-sheet")
+async def scenario_start_sheet(scenario_id: int):
+    """The card's own sheet (Tier, Attributes, Stats with EXP...) to fill on the start screen."""
+    scenario = svc().scenarios.get(scenario_id)
+    if not scenario:
+        raise NotFound(f"Scenario {scenario_id} not found")
+    return statusbook.start_sheet(scenario["data"])
+
+
 @app.put("/api/scenarios/{scenario_id}")
 async def update_scenario(scenario_id: int, data: dict[str, Any] = Body(...)):
     before = svc().scenarios.get(scenario_id)
@@ -1265,6 +1274,24 @@ async def set_sheet_template(conv_id: int, data: dict[str, Any] = Body(...)):
     return {"ok": True}
 
 
+@app.post("/api/conversations/{conv_id}/card-status")
+async def save_card_status(conv_id: int, data: dict[str, Any] = Body(...)):
+    """✎ The card's own sheet edited in the Sheet tab: saved, and the status under the last reply shows it at once."""
+    not_busy(conv_id)
+    s = svc()
+    tpl = s.engine._status_template(s.conversations.get(conv_id)["scenario"], s.settings.all())
+    if not tpl:
+        raise HTTPException(400, "This game keeps no sheet of its own.")
+    state = s.conversations.get_state(conv_id)
+    state["card_status"] = {**(state.get("card_status") or {}), **statusbook.clean_values(tpl, data.get("values") or {})}
+    state["sheet_from_chat"] = True
+    s.conversations.save_state(conv_id, state)
+    last = s.conversations.last_message(conv_id)
+    if last and last["role"] == "assistant":
+        s.conversations.update_message_meta(last["id"], {"status": statusbook.render(tpl, state, s.conversations.list_npcs(conv_id))})
+    return full_conversation(conv_id)
+
+
 @app.post("/api/conversations/{conv_id}/epilogue")
 async def epilogue(conv_id: int):
     """🏁 After the card's ending: the epilogue, kept in the chat (outside the story)."""
@@ -1747,6 +1774,7 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
                                       start=str(body.get("start") or ""),
                                       party_mode=str(body.get("party") or ""),
                                       player=player, setup=str(body.get("setup") or ""),
+                                      card_status=body.get("card_status") if isinstance(body.get("card_status"), dict) else None,
                                       player_lore=body.get("player_lore") if isinstance(body.get("player_lore"), list) else None)
     return full_conversation(conv["id"])
 
@@ -1791,6 +1819,8 @@ def full_conversation(conv_id: int) -> dict:
         "pinned_limit": int(s.settings.get("pinned_memory_limit")),
         "features": resolve_features(s.conversations.get(conv_id)["scenario"], s.settings.all()),
         "status_fields": statusbook.custom_fields(statusbook.template_of(s.conversations.get(conv_id)["scenario"]) or ""),
+        "status_form": statusbook.sheet_form(statusbook.template_of(s.conversations.get(conv_id)["scenario"]) or "",
+                                             s.conversations.get_state(conv_id).get("card_status")),
         "status_by_app": bool(s.engine._status_template(s.conversations.get(conv_id)["scenario"], s.settings.all())),
         "sheet_own": bool(statusbook.template_of({**s.conversations.get(conv_id)["scenario"], "sheet_template": ""})),
         "status_now": _status_now(conv_id),

@@ -6,6 +6,7 @@ import { api } from "../api.js";
 import HelpTip from "./HelpTip.jsx";
 import { CharacterPreview, StartPicker } from "./CardExtras.jsx";
 import PersonaBar from "./Personas.jsx";
+import CardSheetForm, { startValues } from "./CardSheetForm.jsx";
 import { abilityMod, fmtMod } from "../utils.js";
 
 // Hit die per class (D&D 5e). Anything else uses d8.
@@ -52,6 +53,8 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   const [loreKey, setLoreKey] = useState(0); // a loaded persona redraws the world additions box with its entries
   const [startId, setStartId] = useState("default");
   const [showCast, setShowCast] = useState(false);
+  const [sheet, setSheet] = useState(null); // the card's own sheet (Lumencia: Tier, Attributes, Stats with EXP)
+  const [sheetValues, setSheetValues] = useState({});
 
   useEffect(() => {
     api.scenario(scenarioId).then((s) => {
@@ -63,8 +66,12 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
         stats: { ...(tpl.stats || { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }) },
         background: "", description: "", traits: "", // your own story, not the card's example
       });
-      // Imported cards usually create the character inside the story: offer that first.
-      if ((d.information?.description || "").trim()) setWay("card");
+      // Imported cards usually create the character inside the story: offer that first,
+      // unless the card keeps its own sheet: then it is filled here, like a D&D sheet.
+      api.startSheet(scenarioId).then((sh) => {
+        if (sh?.groups?.length && d.kind !== "adventure") { setSheet(sh); setSheetValues(startValues(sh.groups)); setWay("app"); }
+        else if ((d.information?.description || "").trim()) setWay("card");
+      }).catch(() => { if ((d.information?.description || "").trim()) setWay("card"); });
     }).catch((e) => setError(e.message));
   }, [scenarioId]);
 
@@ -109,7 +116,9 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
         const player = { ...p, name: p.name.trim() };
         if (adventure) { player.hp = { current: hp, max: hp }; player.ac = ac; }
         else delete player.stats;
-        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo" });
+        // only what you filled: an empty box or a stat without a grade ("- [0/100]") keeps the card's own value
+        const own = sheet ? Object.fromEntries(Object.entries(sheetValues).filter(([, v]) => { const t = String(v || "").trim(); return t && !/^-?\s*\[\d+\/\d+\]$/.test(t); })) : null;
+        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", ...(own ? { card_status: own } : {}) });
       }
     } catch (e) { setError(e.message); setBusy(false); }
   };
@@ -210,6 +219,19 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
           <textarea className="field" rows={2} value={p.description} onChange={(e) => set("description", e.target.value)} placeholder="Hair, eyes, build, clothes" />
           <label className="lbl">Personality</label>
           <input className="field" value={p.traits} onChange={(e) => set("traits", e.target.value)} placeholder="Two or three words are enough" />
+          {sheet && (
+            <>
+              <div className="section-title">{`${card.name}'s sheet`}</div>
+              <div className="muted tiny">The card's own values. The story raises them as you play: EXP fills each stat's bar, and a full bar raises its grade. They live in the Sheet tab.</div>
+              {sheet.rules && (
+                <details className="card-rules-box">
+                  <summary className="small">What the card asks for</summary>
+                  <div className="card-rules muted">{sheet.rules}</div>
+                </details>
+              )}
+              <CardSheetForm groups={sheet.groups} values={sheetValues} onChange={setSheetValues} />
+            </>
+          )}
         </>
       )}
 

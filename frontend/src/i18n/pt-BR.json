@@ -1786,7 +1786,10 @@
 "No game yet": "Nenhum jogo ainda",
 "Your saved games, to pick up where you left": "Seus jogos salvos, para continuar de onde parou",
 "Library: D&D 5e compendium, bestiary, rulebooks": "Biblioteca: compêndio de D&D 5e, bestiário, livros de regras",
-"Your saved games": "Seus jogos salvos"
+"Your saved games": "Seus jogos salvos",
+"Grade": "Grau",
+"The card's own values. The story raises them as you play: EXP fills each stat's bar, and a full bar raises its grade. They live in the Sheet tab.": "Os valores do próprio card. A história os aumenta enquanto você joga: a EXP enche a barra de cada atributo, e uma barra cheia sobe o grau. Eles ficam na aba Ficha.",
+"What the card asks for": "O que o card pede"
 },
 "patterns": [
 [
@@ -2380,6 +2383,18 @@
 [
 "{0} cards",
 "{0} cards"
+],
+[
+"/ {0} EXP",
+"/ {0} EXP"
+],
+[
+"{0}'s sheet",
+"Ficha de {0}"
+],
+[
+"{0} / {1} EXP",
+"{0} / {1} EXP"
 ]
 ]
 }

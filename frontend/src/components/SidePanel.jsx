@@ -12,6 +12,7 @@ import { latestStatus, portraitSrc } from "../portraits.js";
 import SheetPicker from "./SheetPicker.jsx";
 import { GridOverlay } from "./AdventureEditor.jsx";
 import PlayerLore from "./PlayerLore.jsx";
+import CardSheetForm, { startValues } from "./CardSheetForm.jsx";
 import { CalendarBox } from "./Calendar.jsx";
 import { CantosBox, MapBag } from "./Cantos.jsx";
 
@@ -40,11 +41,12 @@ function GameSheet({ convId, current, onReload, onDone }) {
 const GENERIC_STATUS = /^(location|place|time|date|weather|relationships?|inventory|items|gold|quests?|conditions?|hp|ac|class|level|xp|str|dex|con|int|wis|cha|spell slots|inspiration|hit dice)$/i;
 
 /** The card's tracker values, inside the role-play Sheet tab. */
-function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, picked, convId, onReload, now }) {
+function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, picked, convId, onReload, now, form }) {
   const status = latestStatus(messages) || (byApp && now ? { text: now, messageId: null } : null);  // before the first reply: the sheet as it stands
   const [editing, setEditing] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [draft, setDraft] = useState({});
+  const [saveErr, setSaveErr] = useState("");
   if (choosing) {
     return <div className="card-status"><GameSheet convId={convId} current={picked} onReload={onReload} onDone={() => setChoosing(false)} /></div>;
   }
@@ -61,7 +63,15 @@ function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, 
   const lines = status.text.split("\n").map((l) => l.replace(/\*\*/g, "").trim()).filter((l) => l && !/^\[?INFO\]?$/i.test(l))
     .map((l) => l.split(/\s+\|\s+/).filter((c) => { const k = c.indexOf(":"); return !(k > 0 && GENERIC_STATUS.test(c.slice(0, k).replace(/^-\s*/, "").trim())); }).join(" | "))
     .filter(Boolean);
-  const save = async () => { await onPatch({ card_status: { ...(values || {}), ...draft } }); setEditing(false); };
+  const grouped = (form || []).length > 0;
+  const save = async () => {
+    setSaveErr("");
+    try {
+      if (grouped) { await api.saveCardStatus(convId, draft); await onReload?.(); }
+      else await onPatch({ card_status: { ...(values || {}), ...draft } });
+      setEditing(false);
+    } catch (e) { setSaveErr(e.message); }
+  };
   return (
     <div className="card-status status-tab">
       {lines.length === 0 && <div className="muted tiny">This card keeps no values of its own.</div>}
@@ -71,9 +81,11 @@ function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, 
           <div className="status-line" key={i}>
             {cells.map((c, j) => {
               const k = c.indexOf(":");
+              const bar = c.match(/\[(\d+)\s*\/\s*(\d+)\]\s*$/); // "Body: C- [40/100]": the stat's EXP bar
+              const exp = bar ? <span className="tracker-bar" title={`${bar[1]} / ${bar[2]} EXP`}><span style={{ width: `${Math.min(100, Math.round((Number(bar[1]) / Math.max(1, Number(bar[2]))) * 100))}%` }} /></span> : null;
               return k > 0 && k < 40
-                ? <span className="status-cell" key={j}><span className="status-key">{c.slice(0, k)}</span>{c.slice(k + 1)}</span>
-                : <span className="status-cell" key={j}>{c}</span>;
+                ? <span className="status-cell" key={j}><span className="status-key">{c.slice(0, k)}</span>{c.slice(k + 1)}{exp}</span>
+                : <span className="status-cell" key={j}>{c}{exp}</span>;
             })}
           </div>
         );
@@ -82,10 +94,17 @@ function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, 
         <>
           <div className="muted tiny">The card's own values, kept by the app: they change when the story changes them. Correct them here if needed.</div>
           <div className="row gap">
-            {fields?.length > 0 && !editing && <button className="btn small" onClick={() => { setDraft({}); setEditing(true); }}>✎ Edit the values</button>}
+            {fields?.length > 0 && !editing && <button className="btn small" onClick={() => { setDraft(grouped ? startValues(form) : {}); setEditing(true); }}>✎ Edit the values</button>}
             {!sheetOwn && !editing && <button className="btn small" onClick={() => setChoosing(true)}>🗂 Change the sheet</button>}
           </div>
-          {editing && (
+          {editing && grouped && (
+            <div className="status-edit">
+              <CardSheetForm groups={form} values={draft} onChange={setDraft} />
+              {saveErr && <div className="error-text small">{saveErr}</div>}
+              <div className="row gap"><button className="btn small primary" onClick={save}>Save</button><button className="btn small" onClick={() => setEditing(false)}>Cancel</button></div>
+            </div>
+          )}
+          {editing && !grouped && (
             <div className="status-edit">
               {fields.map((f) => (
                 <label key={f} className="lbl">{f}
@@ -842,7 +861,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
               cardStatus={kind === "roleplay" ? <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every}
                 byApp={!!game.status_by_app} fields={game.status_fields} sheetOwn={!!game.sheet_own}
                 picked={conversation.scenario?.sheet_template || ""} convId={conversation.id} onReload={onReload} now={game.status_now}
-                values={state.card_status} onPatch={onPatch} /> : null} />
+                values={state.card_status} onPatch={onPatch} form={game.status_form} /> : null} />
           </>
         )}
         {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}

@@ -51,8 +51,9 @@ class ConversationRepository:
     # ------------------------------------------------------------ conversations
     def create(self, scenario: dict | None = None, title: str = "", player_name: str | None = None,
                player: dict | None = None, setup: str = "", player_lore: list | None = None, start: str = "",
-               party_mode: str = "") -> dict:
+               party_mode: str = "", card_status: dict | None = None) -> dict:
         """`player` comes from the start screen and is laid over the card's starting sheet.
+        `card_status`: the card's own sheet (Tier, Attributes, Stats...) filled on the start screen.
         `setup` is "app" (made on the start screen), "card" (the card asks in the story) or ""."""
         """Start a new playthrough. `scenario` is a full scenario row (with `data`) or None for freeform."""
         data = scenario["data"] if scenario else normalize_scenario({"name": "Freeform adventure", "mode": "gm_world"})
@@ -126,9 +127,22 @@ class ConversationRepository:
                 if tpl and extra.get("status") and resolve_features(data).get("status_by", "app") == "app":
                     statusbook.harvest(state, tpl, extra["status"])  # the opening's block gives the card's starting values
                     self.save_state(conv_id, state)
+                mine = statusbook.clean_values(tpl, card_status) if tpl and card_status else {}
+                if mine:  # the sheet filled on the start screen: the story does not ask for it again
+                    state["card_status"] = {**(state.get("card_status") or {}), **mine}
+                    state["sheet_from_chat"] = True
+                    self.save_state(conv_id, state)
+                    if extra.get("status"):
+                        extra["status"] = statusbook.render(tpl, state, self.list_npcs(conv_id))
                 for npc_id in met:
                     self.update_npc(npc_id, met=True)
                 self.add_message(conv_id, "assistant", opening, {"opening": True, **extra})
+            tpl = statusbook.template_of(data)
+            mine = statusbook.clean_values(tpl, card_status) if tpl and card_status and not state.get("sheet_from_chat") else {}
+            if mine:  # no opening: the start screen's sheet still counts
+                state["card_status"] = {**(state.get("card_status") or {}), **mine}
+                state["sheet_from_chat"] = True
+                self.save_state(conv_id, state)
         return self.get(conv_id)
 
     def get(self, conv_id: int) -> dict:

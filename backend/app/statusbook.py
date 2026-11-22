@@ -52,7 +52,8 @@ def _parse_segment(seg: str) -> dict | None:
     outer = prefix.strip().lstrip("-").strip().split(":")[0].strip()
     if not label:  # "[X] Crowns / [Y] Merits"
         label = re.sub(r"\s+", " ", PLACEHOLDER.sub(" ", seg)).strip(" /")
-    return {"key": label, "prefix": prefix, "suffix": suffix, "known": _known(label) or _known(outer)}
+    return {"key": label, "prefix": prefix, "suffix": suffix, "known": _known(label) or _known(outer),
+            "middle": middle, "outer": outer if outer != label else ""}
 
 
 def _parse(template: str) -> list:
@@ -186,15 +187,42 @@ def harvest(state: dict, template: str, block: str | None) -> None:
             state["card_status"] = {**(state.get("card_status") or {}), **found}
 
 
+# Grades from the weakest to the strongest (Lumencia's D- to SSS+; F and E for cards that go lower)
+GRADES = [g + s for g in ("F", "E", "D", "C", "B", "A", "S", "SS", "SSS") for s in ("-", "", "+")]
+PROGRESS = re.compile(r"^(?P<grade>[A-Z]{1,3}[+-]?|-)\s*\[\s*(?P<x>-?\d+)\s*/\s*(?P<max>\d+)\s*\]\s*$")
+RULE_TEXT = re.compile(r"^\s*(?:[<>]=?|=<|=>|≥|≤)\s*\d")  # ">=8": the card's rule, not a value
+
+
+def bump_progress(value: str) -> str:
+    """'C- [115/100]' -> 'C [15/100]': each full bar of EXP raises the grade one step (the card's 100 EXP/Sub-Grade)."""
+    m = PROGRESS.match(str(value or "").strip())
+    if not m or m["grade"] not in GRADES:
+        return value
+    grade, x, top = m["grade"], int(m["x"]), max(1, int(m["max"]))
+    while x >= top and GRADES.index(grade) < len(GRADES) - 1:
+        grade, x = GRADES[GRADES.index(grade) + 1], x - top
+    if x > top:
+        x = top
+    return f"{grade} [{max(0, x)}/{top}]"
+
+
 def apply_changes(state: dict, template: str, changes: list[dict]) -> list[str]:
     allowed = set(custom_fields(template))
     custom = dict(state.get("card_status") or {})
     out = []
     for ch in changes:
         field, value = str(ch.get("field", "")).strip(), truncate(str(ch.get("value", "")).strip(), 160)
-        if field in allowed and value and custom.get(field) != value:
-            custom[field] = value
-            out.append(f"{field}: {value}")
+        if field not in allowed or not value or RULE_TEXT.match(value) or PLACEHOLDER.fullmatch(value):
+            continue
+        value = bump_progress(value)
+        if custom.get(field) == value:
+            continue
+        before = PROGRESS.match(str(custom.get(field) or ""))
+        after = PROGRESS.match(value)
+        custom[field] = value
+        up = before and after and before["grade"] != after["grade"] and before["grade"] in GRADES and after["grade"] in GRADES \
+            and GRADES.index(after["grade"]) > GRADES.index(before["grade"])
+        out.append(f"{field}: {value}" + (f" (grade up: {before['grade']} → {after['grade']})" if up else ""))
     state["card_status"] = custom
     return out
 
@@ -205,8 +233,59 @@ def tracker_lines(state: dict, template: str) -> str:
         return ""
     custom = state.get("card_status") or {}
     now = "; ".join(f"{f} = {custom.get(f, 'unknown')}" for f in fields)
+    bars = [f for f in fields if PROGRESS.match(str(custom.get(f) or ""))]
+    exp = (f" Fields written as 'Grade [EXP/100]' ({', '.join(bars)}): add the EXP the card's rules give to the number and "
+           "write the new total, keeping the grade (the app raises the grade when the bar fills).") if bars else ""
     return ("- status_changes: the card's own status fields that CHANGED in these exchanges (field, new value), following the "
-            f"card's rules (for example EXP gained after a fight). Current values: {now}. Fill unknown ones once from the story.")
+            f"card's rules (for example EXP gained after a fight). Current values: {now}.{exp} Write real values only, never "
+            "the card's rule text (not '>=8' or '[1-10]'). Fill unknown ones once from the story.")
+
+
+def sheet_form(template: str, values: dict | None = None) -> list[dict]:
+    """The card's own fields as a sheet to fill on the start screen, grouped as the card's INFO block groups them.
+    Each field: key, hint (the card's placeholder: '1-10', 'Tier'), value (the opening's), and for 'Grade [EXP/100]'
+    fields progress=True with grade, exp and max."""
+    values = values or {}
+    groups: list[dict] = []
+    heading = ""
+
+    def group(title: str) -> dict:
+        if not groups or groups[-1]["title"] != title:
+            groups.append({"title": title, "fields": []})
+        return groups[-1]
+
+    for line in _parse(template):
+        if not isinstance(line, list):
+            text = line.strip()
+            heading = text.rstrip(":").strip() if text and not re.fullmatch(r"\[?INFO\]?", text, re.I) else ""
+            continue
+        dashed = line[0]["prefix"].lstrip().startswith("-")
+        for seg in line:
+            if seg["known"]:
+                continue
+            title = seg["outer"] or line[0]["outer"] or (heading if dashed else "")
+            value = str(values.get(seg["key"]) or "").strip()
+            hints = [h[1:-1] for h in PLACEHOLDER.findall(seg["middle"]) if not h.startswith("[[")]
+            bar = re.search(r"\[\[[^\]]*\]\s*/\s*(\d+)\]", seg["middle"])
+            field = {"key": seg["key"], "hint": " ".join(hints) or seg["key"], "value": value}
+            if bar and hints:
+                m = PROGRESS.match(value)
+                field.update(progress=True, max=int(bar[1]), grade=m["grade"] if m else (value or "-"), exp=int(m["x"]) if m else 0)
+            group(title)["fields"].append(field)
+        if not dashed:
+            heading = ""
+    return [g for g in groups if g["fields"]]
+
+
+def clean_values(template: str, values: dict) -> dict[str, str]:
+    """A sheet sent by the start screen: only the card's own fields, no empty or rule-text values."""
+    allowed = set(custom_fields(template))
+    out = {}
+    for k, v in (values or {}).items():
+        k, v = str(k).strip(), truncate(str(v or "").strip(), 160)
+        if k in allowed and v and not RULE_TEXT.match(v):
+            out[k] = bump_progress(v)
+    return out
 
 
 def latest_block(messages: list[dict]) -> str | None:
@@ -218,3 +297,19 @@ def latest_block(messages: list[dict]) -> str | None:
 
 def strip_block(text: str) -> str:
     return split_status(text)[0]
+
+
+CREATION = re.compile(r"^.*(character creation|create your character|build your character|cria[cç][aã]o de personagem|crie seu personagem|ficha).*$", re.I | re.M)
+
+
+def start_sheet(data: dict) -> dict:
+    """For the start screen: the card's own sheet (groups of fields with the opening's values) and the opening's
+    character creation rules, so the player fills the sheet like a D&D one instead of answering in the chat."""
+    tpl = template_of(data)
+    if not tpl:
+        return {"groups": [], "rules": ""}
+    story, block = split_status(str(data.get("opening_message") or ""))
+    values = read_block(tpl, block) if block else {}
+    m = CREATION.search(story)
+    rules = re.sub(r"\*\*|(?<!\w)\*(?!\s)|(?<!\s)\*(?!\w)|`", "", story[m.start():]).strip() if m else ""
+    return {"groups": sheet_form(tpl, values), "rules": truncate(rules, 2500)}
