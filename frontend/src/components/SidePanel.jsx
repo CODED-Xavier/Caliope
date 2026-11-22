@@ -156,7 +156,9 @@ function Convert5e({ convId, state, busy, onState, openBuilder, onBuilderShown }
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => { if (openBuilder) { setBuilding(true); onBuilderShown?.(); } }, [openBuilder]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pending = useRef(null); // while the builder is open the sheet waits, or this box (and the builder) would close after the first choice
   const took = (r) => onState({ ...state, character5e: r.character, ...(r.player ? { player: r.player } : {}) });
+  const closeBuilder = () => { setBuilding(false); if (pending.current) { took(pending.current); pending.current = null; } };
   const convert = async () => {
     setWorking(true); setError("");
     try { took(await api.convertCharacter5e(convId)); } catch (e) { setError(e.message); } finally { setWorking(false); }
@@ -170,7 +172,7 @@ function Convert5e({ convId, state, busy, onState, openBuilder, onBuilderShown }
         <button type="button" className="btn small grow" disabled={busy || working} onClick={() => setBuilding(true)}>Build with the 5e builder</button>
       </div>
       {error && <div className="error-text tiny">{error}</div>}
-      {building && <Builder convId={convId} onClose={() => setBuilding(false)} onChanged={took} />}
+      {building && <Builder convId={convId} onClose={closeBuilder} onChanged={(r) => { pending.current = r; }} />}
     </div>
   );
 }
