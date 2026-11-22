@@ -5,6 +5,8 @@ import { NumberField, TextField } from "./Fields.jsx";
 import HelpTip from "./HelpTip.jsx";
 import MoodEditor from "./MoodEditor.jsx";
 import CombatTab from "./CombatTab.jsx";
+import Sheet5e from "./Sheet5e.jsx";
+import Builder from "./Builder.jsx";
 import { abilityMod, clamp, fmtMod, relationshipColor, relationshipEffect, relationshipLabel } from "../utils.js";
 import { latestStatus, portraitSrc } from "../portraits.js";
 import SheetPicker from "./SheetPicker.jsx";
@@ -145,6 +147,31 @@ function ResourcesBox({ state, onPatch, onPower, onRest, busy, convId, onState }
       <button className="link-btn tiny" disabled={busy} onClick={sync} title="After editing the card's resources or powers">↻ Update from the card</button>
       {err && <div className="error-text small">{err}</div>}
     </>
+  );
+}
+
+/** A game without a 5e sheet: turn the free-form sheet into one, or build one from scratch. */
+function Convert5e({ convId, state, busy, onState, openBuilder, onBuilderShown }) {
+  const [building, setBuilding] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { if (openBuilder) { setBuilding(true); onBuilderShown?.(); } }, [openBuilder]); // eslint-disable-line react-hooks/exhaustive-deps
+  const took = (r) => onState({ ...state, character5e: r.character, ...(r.player ? { player: r.player } : {}) });
+  const convert = async () => {
+    setWorking(true); setError("");
+    try { took(await api.convertCharacter5e(convId)); } catch (e) { setError(e.message); } finally { setWorking(false); }
+  };
+  return (
+    <div className="tab-body convert5e">
+      <div className="small"><strong>D&D 5e sheet</strong></div>
+      <div className="muted tiny">Let the app keep your numbers: AC, HP, attacks, features and level-ups worked out from the 5e rules.</div>
+      <div className="row gap">
+        <button type="button" className="btn small primary grow" disabled={busy || working} onClick={convert} title="Your class, race, background and items are matched in the Library">Convert to a 5e sheet</button>
+        <button type="button" className="btn small grow" disabled={busy || working} onClick={() => setBuilding(true)}>Build with the 5e builder</button>
+      </div>
+      {error && <div className="error-text tiny">{error}</div>}
+      {building && <Builder convId={convId} onClose={() => setBuilding(false)} onChanged={took} />}
+    </div>
   );
 }
 
@@ -762,7 +789,7 @@ export const TABS = [
   ["journal", "📖", "Journal"],
 ];
 
-export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onPay, onPower, onRest, onCombat, onCombatEdit, onCantos, onReload, style }) {
+export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNpcDelete, onNpcAdd, onRollToChat, canRoll, memoryKey, onClose, onPinnedSave, onLoreSaved, onStateLoaded, onPay, onPower, onRest, onCombat, onCombatEdit, onCantos, onReload, onFeature, openBuilder, onBuilderShown, style }) {
   const { state, npcs, conversation } = game;
   const mode = conversation.scenario?.mode;
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
@@ -793,8 +820,17 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
           byApp={!!game.status_by_app} fields={game.status_fields} sheetOwn={!!game.sheet_own}
           picked={conversation.scenario?.sheet_template || ""} convId={conversation.id} onReload={onReload} now={game.status_now}
           values={state.card_status} onPatch={onPatch} />}
-        {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} onPower={onPower} onRest={onRest} busy={!canRoll}
-          convId={conversation.id} onState={onStateLoaded} />}
+        {active === "sheet" && kind === "adventure" && state.character5e && (
+          <Sheet5e convId={conversation.id} state={state} busy={!canRoll} onUse={onFeature} onRest={onRest} onRoll={onRollToChat}
+            onState={onStateLoaded} openBuilder={openBuilder} onBuilderShown={onBuilderShown} />
+        )}
+        {active === "sheet" && !(kind === "adventure" && state.character5e) && (
+          <>
+            {kind === "adventure" && <Convert5e convId={conversation.id} state={state} busy={!canRoll} onState={onStateLoaded} openBuilder={openBuilder} onBuilderShown={onBuilderShown} />}
+            <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} onPower={onPower} onRest={onRest} busy={!canRoll}
+              convId={conversation.id} onState={onStateLoaded} />
+          </>
+        )}
         {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} repLog={state.rep_log || []}
           party={state.party_mode === "companions" ? state.party || {} : {}} />}

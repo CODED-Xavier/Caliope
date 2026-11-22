@@ -100,6 +100,9 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
     try {
       if (way === "card") {
         await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo" });
+      } else if (way === "builder") {
+        if (!p.name.trim()) { setError("Give your character a name."); setBusy(false); return; }
+        await onStart(scenarioId, { setup: "app", player: { ...p, name: p.name.trim() }, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", open_builder: true });
       } else {
         if (!p.name.trim()) { setError("Give your character a name."); setBusy(false); return; }
         const player = { ...p, name: p.name.trim() };
@@ -140,13 +143,25 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
           <input type="radio" checked={way === "app"} onChange={() => setWay("app")} />
           <span><strong>Create my character here</strong><br /><span className="muted tiny">Fill in the form below. The story starts with your character ready.</span></span>
         </label>
+        {adventure && String(card.system || "dnd5e-2014").startsWith("dnd5e") && (
+          <label className={`way ${way === "builder" ? "active" : ""}`}>
+            <input type="radio" checked={way === "builder"} onChange={() => setWay("builder")} />
+            <span><strong>Build with the 5e builder</strong><br /><span className="muted tiny">Pick a class, race, background and equipment from the Library. The app works out every number.</span></span>
+          </label>
+        )}
         <label className={`way ${way === "card" ? "active" : ""}`}>
           <input type="radio" checked={way === "card"} onChange={() => setWay("card")} />
           <span><strong>Let the story ask me</strong><br /><span className="muted tiny">The card creates your character in the chat, its own way.</span></span>
         </label>
       </div>
 
-      {way === "card" ? (
+      {way === "builder" ? (
+        <>
+          <label className="lbl">Your character's name</label>
+          <input className="field" value={p.name} onChange={(e) => set("name", e.target.value)} autoFocus />
+          <div className="muted tiny">The builder opens as soon as the game starts.</div>
+        </>
+      ) : way === "card" ? (
         <>
           <label className="lbl">Your character's name (optional)</label>
           <input className="field" value={p.name} onChange={(e) => set("name", e.target.value)} placeholder="Leave empty to decide in the story" />

@@ -205,7 +205,17 @@ Card editor > **Resources and powers**: pools (Mana, Aura, Stamina…) with maxi
 Rail → **Library**: classes, subclasses, class features, races, backgrounds, feats, options (fighting styles, invocations, maneuvers), spells, weapons and armour, magic items. Search, pick a section, choose the rules (5e 2014 or 2024), and read any entry.
 - **Built in:** the free SRD (System Reference Document 5.1/5.2, CC-BY-4.0): 12 classes, 319 spells, the SRD races, feats and items.
 - **Your own books:** put 5e.tools data files in `backend\data\compendium\dnd5e\` (any sub-folders) and press **Reload**. They add everything you own and stay on your PC (that folder is never sent to GitHub). Files to save from your browser (Ctrl+S): `https://5e.tools/data/class/class-<name>.json` (one per class), `spells/spells-phb.json`, `spells-xge.json`, `spells-tce.json` (and `spells-xphb.json` for 2024), `races.json`, `backgrounds.json`, `feats.json`, `optionalfeatures.json`, `items-base.json`, `items.json`.
-- Adventure cards are tied to a **system** (D&D 5e, 2014 by default): its rules never change from card to card. Coming next: the 5e sheet you build by dragging from the Library, the builder and level-ups.
+- Adventure cards are tied to a **system** (D&D 5e, 2014 by default): its rules never change from card to card.
+
+### The D&D 5e sheet
+In an adventure, the **Sheet** tab can be a real D&D 5e sheet kept by the app. Every number is worked out from your class, race, background, ability scores and what you wear: AC (hover it to see why: *Chain Mail 16 + Shield 2 + Defense 1*), HP, proficiency, initiative, saves, skills, passive Perception, attacks, features and spell slots.
+- **Getting one:** a game without it shows **Convert to a 5e sheet** (your class, race, background and items are matched in the Library) or **Build with the 5e builder**. When you start a 5e card you can also pick **Build with the 5e builder**: the builder opens as soon as the game starts.
+- **The builder** (like Roll20's): Class → Race → Background → Ability scores (standard array, point buy, 4d6 or type them in) → Skills → Fighting style → Equipment, with big cards. Every choice goes on the sheet at once, so you can close it and come back with **✎ Builder**.
+- **Drag and drop:** press **📚 Open the Library** under the sheet, then drag a spell, item, feat or option onto the sheet, or press **＋**. The rules are checked first (a level 3 spell needs a level 3 slot, a feat needs its prerequisite); if something is refused you can still **Add anyway (house rule)**.
+- **Use and roll:** click an ability, save or skill to roll it; each attack has a to-hit and a damage button. Features with uses (Second Wind, Action Surge, Rage…) have pips and a **Use** button: the app spends it, applies it (Second Wind heals) and tells the Aedo. Short and long rests refill them.
+- **Equipment:** tick an item to wear or hold it: armour counts for AC, weapons become attacks.
+- **⬆ Level up:** the app adds what the class table gives and asks only for your real choices: hit points (the average or a roll), a subclass, an Ability Score Improvement or a feat, a new option. A sheet that skipped its subclass is asked at the next level.
+- Fights and checks read this sheet: your attack bonus, damage, AC, initiative, saves and skills come from it.
 
 ## 4. Cards
 
@@ -550,3 +560,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.25.3 | Click a story picture to see it big; card pictures reach running games; the face follows the text when the Aedo forgets the mood |
 | 2.26.0 | Companions (up to 3 per card, the Aedo voices them, Calíope plays them in fights, healers heal), Play solo with fights scaled to one hero, 5e death saving throws |
 | 2.27.0 | The new look (rail, top bar chips, party / tracker strip, bigger tabs, both themes); the D&D 5e Library (SRD built in + your own 5e.tools files); adventure cards tied to a system |
+| 2.28.0 | The D&D 5e sheet kept by the app: drag and drop from the Library with rules checks, the builder, level-ups, features with Use buttons, convert an old sheet; fights and checks read it |

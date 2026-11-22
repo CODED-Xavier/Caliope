@@ -94,6 +94,7 @@ export default function App() {
   const [theme, setTheme] = useState(initialTheme);
   const [convs, setConvs] = useState([]);
   const [activeId, setActiveId] = useState(null);
+  const [openBuilder, setOpenBuilder] = useState(false); // a new game made with "Build with the 5e builder"
   const [game, setGame] = useState(null); // {conversation, messages, state, npcs, memory_count}
   const [stream, setStream] = useState(null); // {text, phase, context}
   const [lastContext, setLastContext] = useState(null);
@@ -327,6 +328,7 @@ export default function App() {
   };
   const buyOffer = (messageId, index) => runTurn(`/api/conversations/${activeRef.current}/buy`, { message_id: messageId, index, qty: 1 });
   const usePower = (id) => runTurn(`/api/conversations/${activeRef.current}/ability`, { ability: id });
+  const useFeature5e = (name) => runTurn(`/api/conversations/${activeRef.current}/character/use`, { name });
   const restNow = (kind) => runTurn(`/api/conversations/${activeRef.current}/rest`, { kind });
   const payGold = (body) => runTurn(`/api/conversations/${activeRef.current}/pay`, body);
   const rollCheck = (messageId, index, mode) => runTurn(`/api/conversations/${activeRef.current}/check`, { message_id: messageId, index, mode });
@@ -439,14 +441,16 @@ export default function App() {
   };
 
   // --- conversations -------------------------------------------------------
-  const startGame = async (scenarioId, opts = {}) => {
+  const startGame = async (scenarioId, { open_builder: openB, ...opts } = {}) => {
     const data = await api.createConversation({ scenario_id: scenarioId, ...opts });
+    setOpenBuilder(!!openB);
     setModal(null);
     setActiveId(data.conversation.id);
     localStorage.setItem("activeConv", String(data.conversation.id));
     setGame(data);
     setLastContext(null);
-    setTab(data.features?.panels?.[0] || "sheet");
+    setTab(openB ? "sheet" : data.features?.panels?.[0] || "sheet");
+    if (openB) setPanelOpen(true);
     refreshConvs();
   };
 
@@ -559,7 +563,8 @@ export default function App() {
           onStateLoaded={(st) => setGame((g) => (g ? { ...g, state: st } : g))}
           onLoreSaved={(conv) => setGame((g) => (g ? { ...g, conversation: { ...g.conversation, player_lore: conv.player_lore } } : g))}
           onCombat={(body) => { setTab("combat"); combatAction(body); }} onCombatEdit={combatEdit}
-          onCantos={(list) => setGame((g) => (g ? { ...g, cantos: list } : g))} onReload={reloadGame} /></ErrorBoundary>
+          onCantos={(list) => setGame((g) => (g ? { ...g, cantos: list } : g))} onReload={reloadGame}
+          onFeature={useFeature5e} openBuilder={openBuilder} onBuilderShown={() => setOpenBuilder(false)} /></ErrorBoundary>
       )}
       {recap && <RecapView text={recap.text} loading={recap.loading} onClose={() => setRecap(null)} onAgain={showRecap} />}
       {modal === "muse" && <MuseModal onClose={() => setModal(null)} />}

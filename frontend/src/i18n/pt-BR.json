@@ -1595,7 +1595,91 @@
 "Muse": "Musa",
 "Theme": "Tema",
 "Model server offline: open settings": "Servidor do modelo offline: abrir configurações",
-"Roleplay": "Roleplay"
+"Roleplay": "Roleplay",
+"Point buy (27)": "Compra de pontos (27)",
+"Roll 4d6": "Rolar 4d6",
+"Type them in": "Digitar",
+"Animal Handling": "Lidar com Animais",
+"Sleight of Hand": "Prestidigitação",
+"🎲 Roll again": "🎲 Rolar de novo",
+"Bonuses from your race are added on the sheet.": "Os bônus da raça são somados na ficha.",
+"Save the scores": "Salvar os valores",
+"5e character builder": "Criador de personagem 5e",
+"Done": "Pronto",
+"Steps": "Etapas",
+"Search feats…": "Buscar talentos…",
+"Search feats": "Buscar talentos",
+"Level up": "Subir de nível",
+"You gain": "Você ganha",
+"No new class features at this level.": "Nenhuma característica de classe nova neste nível.",
+"Plus your CON modifier.": "Mais o seu modificador de CON.",
+"Choose your subclass": "Escolha a sua subclasse",
+"No subclass for this class is in your Library.": "Nenhuma subclasse desta classe está na sua Biblioteca.",
+"Ability Score Improvement or a feat": "Aumento de Atributo ou um talento",
+"+2 to scores": "+2 nos atributos",
+"A feat": "Um talento",
+"Search the Library…": "Buscar na Biblioteca…",
+"Search the Library": "Buscar na Biblioteca",
+"Drag onto the sheet, or press ＋": "Arraste para a ficha, ou aperte ＋",
+"Add to the sheet": "Adicionar à ficha",
+"Build with the 5e builder": "Criar com o criador 5e",
+"Pick a class, race, background and equipment from the Library. The app works out every number.": "Escolha classe, raça, antecedente e equipamento na Biblioteca. O app calcula todos os números.",
+"Your character's name": "Nome do seu personagem",
+"The builder opens as soon as the game starts.": "O criador abre assim que o jogo começar.",
+"Acrobatics": "Acrobacia",
+"Arcana": "Arcanismo",
+"Athletics": "Atletismo",
+"Deception": "Enganação",
+"History": "História",
+"Insight": "Intuição",
+"Intimidation": "Intimidação",
+"Investigation": "Investigação",
+"Medicine": "Medicina",
+"Nature": "Natureza",
+"Perception": "Percepção",
+"Performance": "Atuação",
+"Persuasion": "Persuasão",
+"Religion": "Religião",
+"Stealth": "Furtividade",
+"Survival": "Sobrevivência",
+"Loading the sheet…": "Carregando a ficha…",
+"Your hero": "Seu herói",
+"Nothing chosen yet": "Nada escolhido ainda",
+"Class, race, background, scores, skills, equipment": "Classe, raça, antecedente, atributos, perícias, equipamento",
+"✎ Builder": "✎ Criador",
+"⬆ Level up": "⬆ Subir de nível",
+"Saving throw proficiency": "Proficiência em salvaguarda",
+"Lose 1 HP": "Perder 1 PV",
+"Heal 1 HP": "Curar 1 PV",
+"Proficiency": "Proficiência",
+"Speed (ft)": "Deslocamento (pés)",
+"Passive Perception": "Percepção passiva",
+"▾ Saves & skills": "▾ Salvaguardas e perícias",
+"▸ Saves & skills": "▸ Salvaguardas e perícias",
+"Attacks": "Ataques",
+"Roll to hit": "Rolar o ataque",
+"Roll damage": "Rolar o dano",
+"Spell slots": "Espaços de magia",
+"house rule": "regra da casa",
+"Features": "Características",
+"Choose a class to get its features.": "Escolha uma classe para ganhar as características dela.",
+"Use it: the app spends it and tells the Aedo": "Usar: o app gasta e avisa o Aedo",
+"Equipment": "Equipamento",
+"No items yet.": "Nenhum item ainda.",
+"Worn or held: armour counts for AC, weapons become attacks": "Vestido ou empunhado: a armadura conta na CA, as armas viram ataques",
+"Add anyway (house rule)": "Adicionar mesmo assim (regra da casa)",
+"Drop it on the sheet": "Solte na ficha",
+"Drag spells, items and feats here from the Library, or press ＋.": "Arraste magias, itens e talentos da Biblioteca para cá, ou aperte ＋.",
+"Hide the Library": "Esconder a Biblioteca",
+"📚 Open the Library": "📚 Abrir a Biblioteca",
+"D&D 5e sheet": "Ficha de D&D 5e",
+"Let the app keep your numbers: AC, HP, attacks, features and level-ups worked out from the 5e rules.": "Deixe o app cuidar dos seus números: CA, PV, ataques, características e subidas de nível calculados pelas regras da 5e.",
+"Your class, race, background and items are matched in the Library": "Sua classe, raça, antecedente e itens são encontrados na Biblioteca",
+"Convert to a 5e sheet": "Converter para ficha 5e",
+"Status": "Status",
+"Search…": "Buscar…",
+"Used up: back after a short rest": "Esgotado: volta depois de um descanso curto",
+"Used up: back after a long rest": "Esgotado: volta depois de um descanso longo"
 },
 "patterns": [
 [
@@ -2061,6 +2145,94 @@
 [
 " · {0} files could not be read",
 " · {0} arquivos não puderam ser lidos"
+],
+[
+"Your numbers: {0}. Give each ability one of them.",
+"Seus números: {0}. Dê um deles para cada atributo."
+],
+[
+"Points spent: {0} of 27",
+"Pontos gastos: {0} de 27"
+],
+[
+"Choose {0}.",
+"Escolha {0}."
+],
+[
+" · now: {0}",
+" · agora: {0}"
+],
+[
+"Weapons and armour from the Library. On your sheet now: {0}. Tick \"worn\" on the sheet to wear armour and hold weapons.",
+"Armas e armaduras da Biblioteca. Na sua ficha agora: {0}. Marque na ficha para vestir a armadura e empunhar as armas."
+],
+[
+"Level up to {0}",
+"Subir para o nível {0}"
+],
+[
+"⬆ Become level {0}",
+"⬆ Ir para o nível {0}"
+],
+[
+"Hit points ({0})",
+"Pontos de vida ({0})"
+],
+[
+"Take the average: {0}",
+"Usar a média: {0}"
+],
+[
+"Rolled: {0}",
+"Rolou: {0}"
+],
+[
+"Roll a {0}",
+"Rolar um {0}"
+],
+[
+"+2 to one score, or +1 to two. {0} left.",
+"+2 em um atributo, ou +1 em dois. Faltam {0}."
+],
+[
+"Choose {0}",
+"Escolha {0}"
+],
+[
+" · level {0}",
+" · nível {0}"
+],
+[
+" · level {0} at {1}",
+" · nível {0} com {1}"
+],
+[
+"{0} XP · highest level",
+"{0} XP · nível máximo"
+],
+[
+"{0} {1}{2} · click to roll a check",
+"{0} {1}{2} · clique para rolar um teste"
+],
+[
+"Level {0}: {1}",
+"Nível {0}: {1}"
+],
+[
+"Pact: {0} × level {1}",
+"Pacto: {0} × nível {1}"
+],
+[
+"· level {0}",
+"· nível {0}"
+],
+[
+"{0} of {1} left · back after a short rest",
+"Restam {0} de {1} · volta depois de um descanso curto"
+],
+[
+"{0} of {1} left · back after a long rest",
+"Restam {0} de {1} · volta depois de um descanso longo"
 ]
 ]
 }

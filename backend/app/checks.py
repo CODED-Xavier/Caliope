@@ -109,6 +109,14 @@ def ability_score(stats: dict, ability: str):
 def bonus_for(state: dict, check: dict) -> tuple[int, str]:
     """(bonus, how it was made) from the player's sheet."""
     p = state.get("player") or {}
+    sheet = state.get("character5e_sheet")
+    if sheet:  # a 5e sheet: its worked-out save and skill bonuses
+        k = check["ability"].lower()
+        if check["kind"] == "save" and k in (sheet.get("saves") or {}):
+            return sheet["saves"][k], f"{check['ability']} save {sheet['saves'][k]:+d}"
+        sk = (sheet.get("skills") or {}).get((check.get("skill") or "").lower())
+        if sk:
+            return sk["bonus"], f"{check['skill']} {sk['bonus']:+d}" + (" (proficient)" if sk.get("proficient") else "")
     score = ability_score(p.get("stats") or {}, check["ability"])
     mod = (as_int(score, 10) - 10) // 2 if score is not None else 0
     prof = 2 + max(0, as_int(p.get("level", 1), 1) - 1) // 4

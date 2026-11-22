@@ -316,6 +316,107 @@ async def library_reload():
     return await library_status()
 
 
+def _sheet_reply(state: dict) -> dict:
+    from .dnd5e.character import derive
+    char = state.get("character5e")
+    return {"character": char, "sheet": derive(char, library5e()) if char else None, "player": state.get("player")}
+
+
+@app.get("/api/conversations/{conv_id}/character")
+async def get_character(conv_id: int):
+    s = svc()
+    s.conversations.get(conv_id)
+    return await asyncio.to_thread(_sheet_reply, s.conversations.get_state(conv_id))
+
+
+@app.patch("/api/conversations/{conv_id}/character")
+async def change_character(conv_id: int, body: dict[str, Any] = Body(...)):
+    """Add from the Library (drag and drop), remove, equip, pick, set: the numbers are worked out again."""
+    from .dnd5e import store
+    s = svc()
+    s.conversations.get(conv_id)
+    not_busy(conv_id)
+    state = s.conversations.get_state(conv_id)
+    lib = await asyncio.to_thread(library5e)
+    base = state.get("character5e")
+    if not base:
+        from .dnd5e.character import new_character
+        base = new_character("2024" if (s.conversations.get(conv_id)["scenario"].get("system") == "dnd5e-2024") else "2014")
+    state["character5e"] = store.apply_change(base, body.get("change") or {}, lib)
+    store.sync_player(state, lib)
+    s.conversations.save_state(conv_id, state)
+    return _sheet_reply(state)
+
+
+@app.get("/api/conversations/{conv_id}/character/builder")
+async def character_builder(conv_id: int):
+    from .dnd5e import build
+    s = svc()
+    char = s.conversations.get_state(conv_id).get("character5e")
+    if not char:
+        from .dnd5e.character import new_character
+        char = new_character()
+    return {"steps": await asyncio.to_thread(build.builder_steps, char, library5e()), "methods": build.ABILITY_METHODS}
+
+
+@app.get("/api/conversations/{conv_id}/character/levelup")
+async def character_levelup_plan(conv_id: int):
+    from .dnd5e import build
+    char = svc().conversations.get_state(conv_id).get("character5e")
+    if not char:
+        raise ValueError("This game has no 5e sheet.")
+    return await asyncio.to_thread(build.level_up_plan, char, library5e())
+
+
+@app.post("/api/conversations/{conv_id}/character/levelup")
+async def character_levelup(conv_id: int, body: dict[str, Any] = Body(...)):
+    """Level up: HP (average or a roll), the class table's new features, and the player's choices."""
+    from .dnd5e import build, store
+    s = svc()
+    not_busy(conv_id)
+    state = s.conversations.get_state(conv_id)
+    if not state.get("character5e"):
+        raise ValueError("This game has no 5e sheet.")
+    lib = await asyncio.to_thread(library5e)
+    state["character5e"] = build.apply_level_up(state["character5e"], body.get("answers") or {}, lib)
+    store.sync_player(state, lib)
+    s.conversations.save_state(conv_id, state)
+    return _sheet_reply(state)
+
+
+@app.post("/api/conversations/{conv_id}/character/convert")
+async def character_convert(conv_id: int):
+    """Turn a game's free-form sheet into a 5e sheet: class, race, background and items matched in the Library."""
+    from .dnd5e import store
+    s = svc()
+    not_busy(conv_id)
+    state = s.conversations.get_state(conv_id)
+    lib = await asyncio.to_thread(library5e)
+    edition = "2024" if s.conversations.get(conv_id)["scenario"].get("system") == "dnd5e-2024" else "2014"
+    state["character5e"] = store.convert(state, lib, edition)
+    store.sync_player(state, lib)
+    s.conversations.save_state(conv_id, state)
+    return _sheet_reply(state)
+
+
+@app.post("/api/conversations/{conv_id}/character/use")
+async def use_character_feature(conv_id: int, body: dict[str, Any] = Body(...)):
+    """A feature with uses (Second Wind, Action Surge, Rage…): spent, applied, and told to the Aedo."""
+    from .dnd5e import store
+    s = svc()
+    s.conversations.get(conv_id)
+    lib = await asyncio.to_thread(library5e)
+
+    def prepare(st):
+        if not st.get("character5e"):
+            raise ValueError("This game has no 5e sheet.")
+        st["character5e"], line = store.use_feature(st["character5e"], str(body.get("name", "")), lib)
+        store.sync_player(st, lib)
+        return st, line
+
+    return stream_response(s.engine.send(conv_id, "", prepare=prepare))
+
+
 @app.post("/api/scenarios/{scenario_id}/companions/draft")
 async def draft_companions(scenario_id: int):
     """✨ Write companions: 3 new characters who fit the card, with fight sheets (you edit them before saving)."""

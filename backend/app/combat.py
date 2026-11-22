@@ -77,6 +77,16 @@ def player_defaults(state: dict, system: str) -> dict:
         # sheets with D&D scores: turn 10 into a 2-dot attribute
         dots = lambda v: v if v <= 5 else max(1, min(5, (v - 4) // 3))  # noqa: E731
         return {"pool": dots(max(strength, dexterity)) + 2, "defense": dots(dexterity) + 2, "damage": "1", "hp": max(3, as_int(p["hp"]["max"], 7))}
+    sheet = state.get("character5e_sheet")
+    if sheet:  # a 5e sheet (app/dnd5e): the real weapon, AC and initiative
+        melee = [a for a in sheet.get("attacks") or [] if "ft" in a.get("range", "") and "/" not in a.get("range", "")]
+        att = (melee or sheet.get("attacks") or [None])[0]
+        out = {"ac": as_int(sheet.get("ac", 10), 10), "init_bonus": as_int(sheet.get("initiative", 0), 0), "hp": as_int(p["hp"]["max"], 10)}
+        if att:
+            out.update(attack_bonus=att["bonus"], damage=att["damage"], weapon=att["name"])
+        else:
+            out.update(attack_bonus=sheet.get("prof", 2) + max(ability_mod(stats.get("STR", 10)), 0), damage=f"1{ability_mod(stats.get('STR', 10)) + 1:+d}", weapon="Unarmed")
+        return out
     mod = max(ability_mod(stats.get("STR", 10)), ability_mod(stats.get("DEX", 10)))
     prof = 2 + max(0, as_int(p.get("level", 1), 1) - 1) // 4
     return {"attack_bonus": mod + prof, "damage": f"1d8{mod:+d}" if mod else "1d8", "ac": as_int(p.get("ac", 10), 10),

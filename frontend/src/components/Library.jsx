@@ -72,3 +72,55 @@ export default function Library({ onClose }) {
     </Modal>
   );
 }
+
+export const DRAG_TYPE = "application/x-caliope-5e";
+const PICK_SECTIONS = [["spell", "Spells"], ["baseitem", "Weapons & armour"], ["item", "Magic items"], ["feat", "Feats"], ["optionalfeature", "Options"],
+  ["class", "Class"], ["race", "Race"], ["background", "Background"]];
+
+/** The compact Library beside a 5e sheet: drag a row onto the sheet, or press ＋. */
+export function LibraryPicker({ edition = "2014", onAdd, busy }) {
+  const [type, setType] = useState("spell");
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => { api.librarySearch(type, q, edition).then((r) => { setResults((r?.results || []).slice(0, 40)); setError(""); }).catch((e) => setError(e.message)); }, 200);
+    return () => clearTimeout(t);
+  }, [type, q, edition]);
+  const toggle = async (r) => {
+    if (open && open.name === r.name && open.source === r.source) { setOpen(null); return; }
+    try { setOpen(await api.libraryEntry(r.type || type, r.source, r.name)); } catch (e) { setError(e.message); }
+  };
+  return (
+    <div className="lib-picker">
+      <input className="field" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the Library…" aria-label="Search the Library" />
+      <div className="chip-row tight">
+        {PICK_SECTIONS.map(([k, label]) => (
+          <button key={k} type="button" className={`pill small ${type === k ? "on" : ""}`} onClick={() => { setType(k); setOpen(null); }}>{label}</button>
+        ))}
+      </div>
+      {error && <div className="error-text tiny">{error}</div>}
+      <div className="lib-picker-list">
+        {results.length === 0 && <div className="muted tiny pad">Nothing found.</div>}
+        {results.map((r) => {
+          const ref = { type: r.type || type, name: r.name, source: r.source };
+          const isOpen = open && open.name === r.name && open.source === r.source;
+          return (
+            <div key={`${r.source}-${r.name}-${r.class || ""}`} className="lib-row" draggable
+              onDragStart={(e) => { e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(ref)); e.dataTransfer.effectAllowed = "copy"; }}
+              title="Drag onto the sheet, or press ＋">
+              <span className="lib-grip" aria-hidden="true">⠿</span>
+              <button type="button" className="lib-row-main" onClick={() => toggle(r)}>
+                <span className="lib-name">{r.name}</span>
+                <span className="lib-src">{[r.level !== undefined && r.level !== null ? `lv ${r.level}` : "", r.source].filter(Boolean).join(" · ")}</span>
+              </button>
+              <button type="button" className="icon-btn add" disabled={busy} onClick={() => onAdd(ref)} title="Add to the sheet">＋</button>
+              {isOpen && <div className="lib-row-text small">{open.text}</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

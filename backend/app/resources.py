@@ -149,7 +149,16 @@ def regenerate(state: dict, when: str, times: int = 1) -> list[str]:
         p["current"] = p["max"] if amount < 0 else min(p["max"], p["current"] + amount * times)
         out.append(f"{name} {p['current']}/{p['max']}")
     from .party import rest as party_rest
+    if state.get("character5e") and when in ("short_rest", "long_rest"):  # 5e features come back on rests
+        from .dnd5e.store import rest as char_rest
+        state["character5e"] = char_rest(state["character5e"], when, _library())
+        out.append("features refreshed")
     return out + party_rest(state, when)
+
+
+def _library():
+    from .main import library5e
+    return library5e()
 
 
 def rest_kind(minutes: int) -> str | None:

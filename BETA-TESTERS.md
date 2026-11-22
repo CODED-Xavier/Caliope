@@ -99,6 +99,7 @@ Easier: pick a mode under the text box (**🗣 Speak · ✋ Act · 💭 Think ·
 - **Click any picture in the story** to see it big. Pictures you add to a character in the card editor now also show up in games you already started.
 - **Companions**: cards can have up to 3 companions (card editor → 👥 Companions). Start a game with **Play with companions** to have them fight beside you, or **Play solo** for fights scaled to one hero. At 0 HP you make death saving throws instead of losing at once.
 - **New look**: the icons on the left are the main menu (Games opens your list of games). Under the top bar you see your party's HP (adventures) or your card's tracker (role-play). **Library** opens the D&D 5e rules: classes, spells, feats, items.
+- **D&D 5e sheet** (adventures): in the Sheet tab press **Convert to a 5e sheet** or **Build with the 5e builder**. The app works out AC, HP, attacks and features. Drag spells and items onto it from **📚 Open the Library**, click a skill to roll it, press **Use** on Second Wind, and **⬆ Level up** when you have the XP. Tell us if a number looks wrong (hover AC to see how it was counted).
 - **In a fight**, just write your attack (*"I swing at the goblin's neck"*) or type **/attack goblin 2**: the app rolls it and the fight updates. On your turn, click a lit square on the grid to move. Check buttons show the DC before you roll.
 - **📚 Research a work** (in the Muse): type an anime/game/book name, tick the wiki pages, and get a draft card with its world, characters and lore.
 - **🔁** in the music controls loops the current song.
