@@ -797,7 +797,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} repLog={state.rep_log || []} />}
         {active === "map" && <MapTab state={state} convId={conversation.id} refreshKey={game.messages?.length} />}
-        {active === "combat" && <CombatTab game={game} busy={!canRoll} onCombat={onCombat} onCombatEdit={onCombatEdit} />}
+        {active === "combat" && <CombatTab game={game} busy={!canRoll} onCombat={onCombat} onCombatEdit={onCombatEdit} onState={onStateLoaded} />}
         {active === "dice" && <DiceTab onRollToChat={onRollToChat} canRoll={canRoll} />}
         {active === "journal" && <JournalTab convId={conversation.id} summary={conversation.summary} refreshKey={memoryKey}
           pinned={conversation.pinned_memory} pinnedLimit={game.pinned_limit || 2000} onPinnedSave={onPinnedSave}

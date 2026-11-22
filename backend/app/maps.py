@@ -4,6 +4,7 @@ A map is a list of equal-length strings, one character per 5-foot square:
 
     .  floor / grass           ,  shallow water or mud (difficult)   "  bushes (difficult, light cover)
     #  wall (blocks)           ~  deep water (blocks)                 D  door (open floor)
+    :  road / path (floor)
     T  tree (blocks, cover)    R  rock (blocks, cover)                B  barrel / crate / table (blocks, cover)
 
 Generators are plain code (always work, instant, repeatable with a seed). The AI only picks which
@@ -19,13 +20,14 @@ TILES = {
     ",": {"name": "shallow water / mud", "block": False, "cover": False, "difficult": True},
     '"': {"name": "bushes", "block": False, "cover": False, "difficult": True},
     "D": {"name": "door", "block": False, "cover": False, "difficult": False},
+    ":": {"name": "road / path", "block": False, "cover": False, "difficult": False},
     "#": {"name": "wall", "block": True, "cover": True, "difficult": False},
     "~": {"name": "deep water", "block": True, "cover": False, "difficult": False},
     "T": {"name": "tree", "block": True, "cover": True, "difficult": False},
     "R": {"name": "rock", "block": True, "cover": True, "difficult": False},
     "B": {"name": "barrel / crate", "block": True, "cover": True, "difficult": False},
 }
-TYPES = ("field", "forest", "dungeon", "cave", "tavern", "river", "street")
+TYPES = ("field", "forest", "road", "dungeon", "cave", "tavern", "river", "street")
 FEATURES = ("rocks", "trees", "bushes", "barrels", "water", "mud")
 MIN_W, MIN_H, MAX_SIDE = 6, 4, 24
 
@@ -176,6 +178,30 @@ def generate(kind: str, w: int = 12, h: int = 8, seed: int | None = None, featur
             for x in range(w):
                 if (x - cx) ** 2 / max(1, (w / 4) ** 2) + (y - cy) ** 2 / max(1, (h / 3.2) ** 2) < 1:
                     g[y][x] = "."
+    elif kind == "road":  # a trail through the woods: trees thick at the sides, cover along the road (an ambush spot)
+        y = h // 2
+        path = []
+        for x in range(w):
+            if x and rng.random() < 0.35:
+                y = max(2, min(h - 4, y + rng.choice((-1, 1))))
+            path.append(y)
+        for yy in range(h):
+            for x in range(w):
+                d = min(abs(yy - path[x]), abs(yy - path[x] - 1))
+                if yy in (path[x], path[x] + 1):
+                    continue
+                if rng.random() < min(0.75, 0.06 + 0.1 * (d - 1)):
+                    g[yy][x] = "T"
+                elif d <= 2 and rng.random() < 0.18:
+                    g[yy][x] = '"'
+                elif d <= 3 and rng.random() < 0.05:
+                    g[yy][x] = "R"
+        for x in range(w):
+            g[path[x]][x] = g[path[x] + 1][x] = ":"
+            if x and path[x] != path[x - 1]:  # no diagonal gaps in the road
+                g[path[x - 1]][x] = g[path[x - 1] + 1][x] = ":"
+        mid = w // 2 + rng.randint(-2, 2)  # something blocking the road
+        g[path[mid]][mid] = "B"
     elif kind == "dungeon":
         g = [["#" for _ in range(w)] for _ in range(h)]
         rooms = []
@@ -256,7 +282,7 @@ def generate(kind: str, w: int = 12, h: int = 8, seed: int | None = None, featur
     for y in range(h):
         for x in range(w):
             if not TILES[g[y][x]]["block"] and (x, y) not in region:
-                g[y][x] = "#" if kind in ("dungeon", "cave", "tavern", "street") else "T" if kind == "forest" else "R"
+                g[y][x] = "#" if kind in ("dungeon", "cave", "tavern", "street") else "T" if kind in ("forest", "road") else "R"
     return ["".join(row) for row in g]
 
 

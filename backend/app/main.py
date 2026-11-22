@@ -21,10 +21,12 @@ from .conversations import NotFound
 from .drafts import draft_card_field, draft_player
 from .exporting import export_markdown
 from .combat import CombatError, player_defaults, suggest_fight
+from .combat import _picture_geometry as combat_geometry
 from .maps import FEATURES as MAP_FEATURES
 from .maps import TILES as MAP_TILES
 from .maps import TYPES as MAP_TYPES
 from .maps import MapError, generate as generate_map
+from .maps import clean_tiles as clean_map_tiles
 from .jukebox import MOODS as MUSIC_MOODS
 from .jukebox import MusicError
 from .rulebooks import RulebookError, ocr_available, read_pdf, read_text
@@ -41,7 +43,7 @@ from .playerlore import parse_suggestions, suggest_prompt
 from .checks import roll_line
 from . import shop
 from . import resources
-from . import adventure, bestiary, sheets, statusbook, wikiresearch
+from . import adventure, bestiary, mappaint, sheets, statusbook, wikiresearch
 from . import worldtime
 from .engine import BusyError
 from .llm import LLMError
@@ -297,6 +299,8 @@ async def combat_suggest(conv_id: int, body: dict[str, Any] = Body(default={})):
     scene_foes = adventure.combat_enemies(adv, state)
     if scene_foes and system == "d20":  # the adventure says who is here: no need to ask the model
         battle = adventure.battle_map(adv, state)
+        if battle is None and adventure.get_scene(adv, (state.get("adventure") or {}).get("scene", "")):
+            battle = (await asyncio.to_thread(_paint_scene_map, conv_id))["battle"]  # no map for this scene: paint one
         return {"system": system, "enemies": scene_foes, "map": None, "battle": battle, "from_scene": True}
     msgs = s.conversations.list_messages(conv_id)[-6:]
     scene = "\n\n".join(f"{'PLAYER' if m['role'] == 'user' else 'GM'}: {m['content']}" for m in msgs)
@@ -315,10 +319,14 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
     s = svc()
     action = body.get("action")
     if action == "start":
+        fight_map = body.get("map") if isinstance(body.get("map"), dict) else None
+        if fight_map and fight_map.get("tiles") and not fight_map.get("background"):
+            fight_map = await asyncio.to_thread(_paint_fight_map, fight_map)  # the little tile map becomes a painted picture
+
         def prepare(st):
             new, line = s.combat.start(st, body.get("system", "d20"), BESTIARY.enrich(body.get("enemies") or []),
                                        body.get("allies") or [], body.get("player") or {}, body.get("grid") or {},
-                                       body.get("map") if isinstance(body.get("map"), dict) else None,
+                                       fight_map,
                                        body.get("near") if isinstance(body.get("near"), list) else None)
             if body.get("scene"):  # this scene's fight happened: the chat stops offering it
                 adv_st = new.setdefault("adventure", {"scene": "", "visited": [], "xp_given": []})
@@ -334,6 +342,101 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
     else:
         raise CombatError("Unknown combat action.")
     return stream_response(s.engine.send(conv_id, str(body.get("text", "")), prepare=prepare))
+
+
+def _guess_kind(tiles: list[str]) -> str:
+    text = "".join(tiles)
+    count = {ch: text.count(ch) for ch in "#T~:"}
+    if count[":"]:
+        return "road"
+    if count["~"] > len(text) // 20:
+        return "river"
+    if count["#"] > len(text) // 3:
+        return "dungeon"
+    return "forest" if count["T"] > len(text) // 8 else "field"
+
+
+def _paint_fight_map(fight_map: dict) -> dict:
+    """Paint a tile map (Combat tab's generated or saved map) as a picture lined up with its squares."""
+    try:
+        tiles = clean_map_tiles(fight_map["tiles"])
+        kind = str(fight_map.get("type") or "")
+        kind = kind if kind in MAP_TYPES else _guess_kind(tiles)
+        url = f"/api/uploads/{save_upload(mappaint.paint(tiles, kind, len(''.join(tiles))), UPLOAD_DIR)}"
+    except Exception:  # noqa: BLE001 - a picture is a nicety: the fight still runs on the plain tiles
+        logging.getLogger("rpg").exception("could not paint the battle map")
+        return fight_map
+    return {**fight_map, "tiles": tiles, "background": url, "geom": mappaint.geometry(tiles), "painted": True}
+
+
+def _paint_scene_map(conv_id: int, kind: str = "", seed: int | None = None, scene_id: str = "") -> dict:
+    """Paint a map for an adventure scene that has none, and keep it in the card (and this game) as the scene's map."""
+    import random as _r
+    s = svc()
+    conv = s.conversations.get(conv_id)
+    adv = conv["scenario"].get("adventure") or {}
+    state = s.conversations.get_state(conv_id)
+    scene = adventure.get_scene(adv, scene_id or (state.get("adventure") or {}).get("scene", ""))
+    if not scene:
+        raise HTTPException(404, "There is no adventure scene to paint a map for.")
+    kind = kind if kind in MAP_TYPES else adventure.pick_kind(scene)
+    seed = seed if isinstance(seed, int) else _r.randrange(1_000_000)
+    tiles = generate_map(kind, 24, 16, seed)
+    url = f"/api/uploads/{save_upload(mappaint.paint(tiles, kind, seed), UPLOAD_DIR)}"
+    new_adv = adventure.add_painted_map(adv, scene["id"], kind, tiles, url, mappaint.geometry(tiles))
+    s.conversations.set_adventure(conv_id, new_adv)
+    if conv.get("scenario_id"):
+        card = s.scenarios.get(conv["scenario_id"])
+        if card:
+            card_adv = card["data"].get("adventure") or {}
+            if adventure.get_scene(card_adv, scene["id"]):
+                s.scenarios.update(card["id"], {**card["data"], "name": card["name"],
+                                                "adventure": adventure.add_painted_map(card_adv, scene["id"], kind, tiles, url,
+                                                                                       mappaint.geometry(tiles))})
+    return {"battle": adventure.battle_map(new_adv, state), "kind": kind, "seed": seed, "scene": scene["id"]}
+
+
+@app.post("/api/conversations/{conv_id}/adventure/paint-map")
+async def adventure_paint_map(conv_id: int, body: dict[str, Any] = Body(default={})):
+    """🎨 Paint a map for the current scene (or a new one: 🎲), like the map sites do, and use it for the fight."""
+    seed = body.get("seed")
+    return await asyncio.to_thread(_paint_scene_map, conv_id, str(body.get("kind") or ""),
+                                   int(seed) if str(seed or "").isdigit() else None, str(body.get("scene") or ""))
+
+
+@app.post("/api/conversations/{conv_id}/combat/paint-map")
+async def combat_paint_map(conv_id: int, body: dict[str, Any] = Body(default={})):
+    """A fight running on a plain grid gets a painted map: everyone is placed again on it."""
+    s = svc()
+    if s.engine.is_busy(conv_id):
+        raise CombatError("Wait for the current reply to finish.")
+    state = s.conversations.get_state(conv_id)
+    combat = state.get("combat") or {}
+    if not combat.get("active"):
+        raise CombatError("There is no fight going on.")
+    adv = s.conversations.get(conv_id)["scenario"].get("adventure") or {}
+    if adventure.get_scene(adv, (state.get("adventure") or {}).get("scene", "")):
+        battle = (await asyncio.to_thread(_paint_scene_map, conv_id, str(body.get("kind") or "")))["battle"]
+        state = s.conversations.get_state(conv_id)
+        combat = state["combat"]
+    else:
+        import random as _r
+        kind = str(body.get("kind") or "")
+        g = combat["grid"]
+        tiles = g.get("tiles") or generate_map(kind if kind in MAP_TYPES else "field", min(24, g["w"]), min(24, g["h"]),
+                                               _r.randrange(1_000_000))
+        battle = await asyncio.to_thread(_paint_fight_map, {"tiles": tiles, "type": kind, "name": g.get("name") or ""})
+    tiles = battle.get("tiles") or []
+    w, h = (len(tiles[0]), len(tiles)) if tiles else (battle["w"], battle["h"])
+    combat["grid"] = {"w": w, "h": h, "tiles": tiles, "background": battle.get("background", ""),
+                      "name": str(battle.get("name") or "")[:60], "painted": bool(battle.get("painted")),
+                      **combat_geometry(battle)}
+    for c in combat["combatants"]:
+        c["x"], c["y"] = -1, -1
+    near = battle.get("near")
+    s.combat._place(combat["combatants"], w, h, tiles, tuple(near) if near else None)
+    s.conversations.save_state(conv_id, state)
+    return {"state": state}
 
 
 @app.patch("/api/conversations/{conv_id}/combat/{cid}")

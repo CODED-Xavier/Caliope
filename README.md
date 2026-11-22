@@ -171,6 +171,7 @@ speed, STR to CHA, skills, senses, challenge and XP, traits and attacks.
 ⚔ Combat → choose **d20** (D&D 5e) or a **d10 dice pool** (Vampire 5e) → add enemies, or **✨ Suggest from the scene** → pick a map → **Start the fight**.
 - The app rolls everything (initiative, attacks, damage, powers, enemy spells). The Aedo only narrates one ⚔️ card per round.
 - Maps: generated (forest, dungeon, tavern, river…) or your own from **🗺 My maps**. Walls block, obstacles give **cover**, and mud and bushes slow you.
+- **Painted maps (like Watabou):** a generated map is painted as a real battle map picture (trees, rocks, a road, stone floors) when the fight starts, with the grid already lined up. In an adventure scene that has no map, Calíope paints one that fits the scene (a road for an ambush, a cave for a hideout…) and keeps it in the card as that scene's map. **🎨 Paint a map** / **🎲 Paint another** in the Combat tab, and **🎨 Paint a map for this fight** turns a fight on a plain grid into a painted map mid-fight.
 - Undo and rewind also undo the dice.
 
 ### Resources and powers
@@ -512,3 +513,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.23 | Bestiary: a folder per book (imports go to bestiary/<book>/, 📂 Open folder, filter by book); adventures: the story walks into the next scene by itself, and a **⚔ A fight!** offer under the reply starts the scene's fight in one click |
 | 2.23.1 | Starts on the main menu (Settings: *Continue from the last played card*); the top bar fits narrow windows instead of spilling over the side panel |
 | 2.23.2 | The adventure's scene changes show under the reply (📍 Scene: Goblin Ambush) |
+| 2.24 | Painted battle maps: Calíope paints a map (Watabou style, grid lined up) for scenes and fights that have none, keeps it in the card, and can repaint a plain-grid fight mid-fight |

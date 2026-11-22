@@ -17,7 +17,7 @@ class GeneratorTests(unittest.TestCase):
                 self.assertEqual((len(tiles), len(tiles[0])), (9, 14), kind)
                 cells = open_cells(tiles)
                 region = largest_region([list(r) for r in tiles])
-                walkable = sum(1 for r in tiles for ch in r if ch in '.,"D')
+                walkable = sum(1 for r in tiles for ch in r if ch in '.,"D:')
                 self.assertEqual(len(region), walkable, f"{kind} seed {seed} has unreachable pockets")
                 self.assertGreaterEqual(len(cells), 12, kind)
 

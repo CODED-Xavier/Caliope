@@ -94,6 +94,7 @@ Easier: pick a mode under the text box (**🗣 Speak · ✋ Act · 💭 Think ·
 - **Relationships follow fixed rules now:** what you do (defend, help, mock, betray…) always counts the same, repeating it counts less, and each level changes how the character treats you. Open someone in the People tab to see why their value changed.
 - Calíope opens on a **🏠 Main menu** with all your cards (▶ Play, ✎ Edit, ＋ New card). Start it from the desktop shortcut: no black window, just a loading screen.
 - Adventure maps: **🔍 Find the grid** lines the squares up with the map; fights happen on the map with fog of war.
+- No map for a fight? Calíope **paints one** that fits the scene (road, cave, dungeon, tavern…) with the grid lined up. **🎲 Paint another** in the Combat tab if you don't like it.
 - **📚 Research a work** (in the Muse): type an anime/game/book name, tick the wiki pages, and get a draft card with its world, characters and lore.
 - **🔁** in the music controls loops the current song.
 - **Adventures:** in the card editor, *Adventure: scenes, maps and fights* imports a published adventure (PDF or pasted text). In play the **📕 Adventure** tab shows your scene, the map, XP and **⚔ Fight here**.

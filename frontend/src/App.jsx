@@ -308,7 +308,7 @@ export default function App() {
       setPanelOpen(true); setTab("combat");
       combatAction({ action: "start", system: "d20", enemies: r.enemies, scene: fight.scene,
         grid: b ? { w: b.w, h: b.h } : { w: 12, h: 8 },
-        map: b ? { tiles: [], background: b.background, name: b.name, geom: b.geom, fog: b.fog } : undefined,
+        map: b ? { tiles: b.tiles || [], background: b.background, name: b.name, geom: b.geom, fog: b.fog, painted: !!b.painted } : undefined,
         near: b?.near || undefined });
     } catch (e) { setError(e.message); }
   };

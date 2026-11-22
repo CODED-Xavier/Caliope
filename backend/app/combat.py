@@ -180,6 +180,7 @@ class CombatEngine:
                   "combatants": people, "grid": {"w": w, "h": h, "tiles": tiles,
                                                  "background": str((battle_map or {}).get("background") or "")[:600],
                                                  "name": truncate(str((battle_map or {}).get("name") or ""), 60),
+                                                 "painted": bool((battle_map or {}).get("painted")),
                                                  **_picture_geometry(battle_map)},
                   "log": log[-30:]}
         state["combat"] = combat

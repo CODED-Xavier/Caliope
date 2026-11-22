@@ -1504,7 +1504,21 @@
 "Continue from the last played card": "Continuar do último card jogado",
 "When it is on, Calíope opens straight into the game you played last. When it is off (the default), it opens on the main menu with all your cards.": "Ligado, a Calíope abre direto no último jogo que você jogou. Desligado (o padrão), abre no menu principal com todos os seus cards.",
 "Turn it on if you usually play one long game.": "Ligue se você costuma jogar uma partida longa.",
-"Nothing.": "Nada."
+"Nothing.": "Nada.",
+"Road / path": "Estrada / trilha",
+"Road through the woods": "Estrada pela floresta",
+"What the painted map shows": "O que o mapa pintado mostra",
+"Fits the scene": "Combina com a cena",
+"Calíope paints a battle map for this scene, with the grid already lined up, and keeps it in the card": "A Calíope pinta um mapa de batalha para esta cena, com o grid já alinhado, e guarda no card",
+"Painting…": "Pintando…",
+"🎲 Paint another": "🎲 Pintar outro",
+"🎨 Paint a map": "🎨 Pintar um mapa",
+"🎨 This map is painted as a picture when the fight starts.": "🎨 Este mapa vira uma pintura quando a luta começa.",
+"🎨 Paint a map for this fight": "🎨 Pintar um mapa para esta luta",
+"Scroll left": "Rolar para a esquerda",
+"Scroll right": "Rolar para a direita",
+"Recap": "Resumo",
+"Undo": "Desfazer"
 },
 "patterns": [
 [

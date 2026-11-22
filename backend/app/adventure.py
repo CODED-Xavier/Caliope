@@ -116,6 +116,73 @@ def _grid(raw) -> dict:
     return {k: round(v, 2) for k, v in g.items()}
 
 
+def _painted(m: dict) -> dict:
+    """A map Calíope painted itself keeps its terrain tiles (walls block, trees give cover) and its type."""
+    if not isinstance(m.get("tiles"), list) or not m["tiles"]:
+        return {}
+    from .maps import MapError, clean_tiles
+    try:
+        return {"tiles": clean_tiles(m["tiles"]), "kind": str(m.get("kind") or "")[:20]}
+    except MapError:
+        return {}
+
+
+# words in a scene that say what kind of place it is (the first kind with most hits wins)
+PLACE_WORDS = {
+    "cave": ("cave", "cavern", "grotto", "tunnel", "hideout", "lair", "den", "mine", "caverna", "gruta", "toca", "covil", "mina"),
+    "dungeon": ("dungeon", "crypt", "tomb", "vault", "cellar", "ruin", "castle", "keep", "manor", "temple", "corridor",
+                "chamber", "masmorra", "cripta", "tumba", "ruína", "castelo", "templo", "corredor", "câmara", "porão"),
+    "tavern": ("tavern", "inn", "pub", "hall", "house", "shop", "room", "taverna", "estalagem", "casa", "loja", "salão", "quarto"),
+    "street": ("street", "town", "village", "city", "alley", "market", "square", "rua", "vila", "aldeia", "cidade", "beco",
+               "mercado", "praça"),
+    "river": ("river", "stream", "creek", "bridge", "ford", "lake", "rio", "riacho", "ponte", "lago"),
+    "road": ("road", "trail", "path", "ambush", "wagon", "cart", "highway", "estrada", "trilha", "caminho", "emboscada", "carroça"),
+    "forest": ("forest", "wood", "woods", "grove", "jungle", "thicket", "floresta", "bosque", "mata", "selva"),
+}
+
+
+def pick_kind(scene: dict | None) -> str:
+    """Which generated map fits a scene, from its name first and then its text."""
+    if not scene:
+        return "field"
+    best, score = "field", 0
+    name = (scene.get("name", "") + " " + " ".join(scene.get("aliases") or [])).lower()
+    body = (scene.get("read_aloud", "") + " " + scene.get("notes", "")).lower()[:4000]
+    for kind, words in PLACE_WORDS.items():
+        pat = r"\b(" + "|".join(re.escape(w) for w in words) + r")s?\b"
+        n = 5 * len(re.findall(pat, name)) + len(re.findall(pat, body))
+        if n > score:
+            best, score = kind, n
+    return best
+
+
+def start_cell(tiles: list[str]) -> tuple[int, int]:
+    """Where a generated map's scene marker goes: the open square nearest the middle (on the road, if there is one)."""
+    from .maps import open_cells
+    h, w = len(tiles), len(tiles[0])
+    cells = open_cells(tiles) or [(w // 2, h // 2)]
+    road = [c for c in cells if tiles[c[1]][c[0]] == ":"]
+    return min(road or cells, key=lambda c: (c[0] - w / 2) ** 2 + (c[1] - h / 2) ** 2)
+
+
+def add_painted_map(adv: dict, scene_id: str, kind: str, tiles: list[str], url: str, geom: dict) -> dict:
+    """Put a painted map in the adventure as the scene's map (replacing the one painted for it before)."""
+    adv = normalize_adventure(adv)
+    s = get_scene(adv, scene_id)
+    if not s:
+        return adv
+    mid = "painted-" + s["id"]
+    x, y = start_cell(tiles)
+    m = {"id": mid, "name": truncate("Painted: " + s["name"], 80), "picture": url, "player_picture": "", "cols": len(tiles[0]),
+         "rows": len(tiles), "markers": {s["id"]: [round((x + 0.5) / len(tiles[0]), 4), round((y + 0.5) / len(tiles), 4)]},
+         "grid": geom, "reveal": 0, "tiles": tiles, "kind": kind}
+    adv["maps"] = [x for x in adv["maps"] if x["id"] != mid] + [m]
+    for sc in adv["scenes"]:
+        if sc["id"] == s["id"]:
+            sc["map"] = mid
+    return normalize_adventure(adv)
+
+
 def normalize_adventure(raw) -> dict:
     raw = raw if isinstance(raw, dict) else {}
     parts, part_ids = [], set()
@@ -170,7 +237,7 @@ def normalize_adventure(raw) -> dict:
         maps.append({"id": mid, "name": truncate(str(m["name"]).strip(), 80), "picture": _url(m.get("picture")),
                      "player_picture": _url(m.get("player_picture")), "cols": _int(m.get("cols"), 30, 6, MAP_MAX),
                      "rows": _int(m.get("rows"), 20, 4, MAP_MAX), "markers": markers, "grid": _grid(m.get("grid")),
-                     "reveal": _int(m.get("reveal"), 6, 0, 40)})
+                     "reveal": _int(m.get("reveal"), 6, 0, 40), **_painted(m)})
     for s in scenes:
         if s["map"] and s["map"] not in map_ids:
             s["map"] = ""
@@ -771,5 +838,8 @@ def battle_map(adv: dict, state: dict) -> dict | None:
     visited = set((state.get("adventure") or {}).get("visited") or []) | {s["id"]}
     fog = [{"x": round(to_cell(*m["markers"][sid])[0], 2), "y": round(to_cell(*m["markers"][sid])[1], 2), "r": m["reveal"]}
            for sid in visited if sid in m["markers"]] if m.get("reveal") else []
-    return {"background": m["player_picture"] or m["picture"], "name": truncate(s["name"], 60), "w": cols, "h": rows,
-            "near": near, "geom": g or None, "fog": fog}
+    out = {"background": m["player_picture"] or m["picture"], "name": truncate(s["name"], 60), "w": cols, "h": rows,
+           "near": near, "geom": g or None, "fog": fog}
+    if m.get("tiles") and len(m["tiles"]) == rows and len(m["tiles"][0]) == cols:
+        out.update(tiles=m["tiles"], painted=True)
+    return out

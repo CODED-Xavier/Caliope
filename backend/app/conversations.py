@@ -197,6 +197,13 @@ class ConversationRepository:
         self.db.execute("UPDATE conversations SET scenario_snapshot = ? WHERE id = ?", (json.dumps(scenario, ensure_ascii=False), conv_id))
         return self.get(conv_id)
 
+    def set_adventure(self, conv_id: int, adv: dict) -> dict:
+        """This game's copy of the adventure (a painted scene map is added to it)."""
+        conv = self.get(conv_id)
+        scenario = {**conv["scenario"], "adventure": adv}
+        self.db.execute("UPDATE conversations SET scenario_snapshot = ? WHERE id = ?", (json.dumps(scenario, ensure_ascii=False), conv_id))
+        return self.get(conv_id)
+
     def set_player_lore(self, conv_id: int, entries) -> dict:
         self.get(conv_id)
         self.db.execute("UPDATE conversations SET player_lore = ? WHERE id = ?",

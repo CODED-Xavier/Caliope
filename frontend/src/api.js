@@ -74,6 +74,8 @@ export const api = {
   },
   combatDefaults: (id, system) => request("GET", `/api/conversations/${id}/combat/defaults?system=${system}`),
   combatSuggest: (id, system) => request("POST", `/api/conversations/${id}/combat/suggest`, { system }),
+  paintSceneMap: (id, kind = "", scene = "") => request("POST", `/api/conversations/${id}/adventure/paint-map`, { kind, scene }),
+  combatPaintMap: (id, kind = "") => request("POST", `/api/conversations/${id}/combat/paint-map`, { kind }),
   combatEdit: (id, cid, patch) => request("PATCH", `/api/conversations/${id}/combat/${cid}`, patch),
   paintScene: (convId, messageId, reroll = false) => request("POST", `/api/conversations/${convId}/messages/${messageId}/scene-picture`, { reroll }),
   engine: () => request("GET", "/api/engine"),

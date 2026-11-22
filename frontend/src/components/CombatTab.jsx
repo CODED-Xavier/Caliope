@@ -5,7 +5,7 @@ import HelpTip from "./HelpTip.jsx";
 import BattleMap, { SIDE_COLOR, TILE_STYLE } from "./BattleMap.jsx";
 import MapEditor from "./MapEditor.jsx";
 
-const MAP_TYPES = { field: "Open field", forest: "Forest", dungeon: "Dungeon", cave: "Cave", tavern: "Tavern", river: "River crossing", street: "Town street" };
+const MAP_TYPES = { field: "Open field", forest: "Forest", road: "Road through the woods", dungeon: "Dungeon", cave: "Cave", tavern: "Tavern", river: "River crossing", street: "Town street" };
 const MAP_FEATURES = ["rocks", "trees", "bushes", "barrels", "water", "mud"];
 const BLOCKING = "#~TRB";
 
@@ -21,7 +21,7 @@ const FIELDS = {
 };
 
 /* ---------------------------------------------------------------- start form */
-function StartForm({ convId, kind, busy, onStart, sceneFight }) {
+function StartForm({ convId, kind, busy, onStart, sceneFight, hasScene }) {
   const [system, setSystem] = useState("d20");
   const [enemies, setEnemies] = useState([{ ...BLANK.d20, name: "", count: 1 }]);  // a name from the Bestiary fills the numbers
   const [me, setMe] = useState({});
@@ -41,7 +41,7 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
   const loadSaved = () => api.maps().then((r) => setSaved(r.maps)).catch(() => {});
   useEffect(() => { loadSaved(); }, []);
   const reroll = async (type = mapType, feats = features) => {
-    try { const r = await api.generateMap({ type, w: grid.w, h: grid.h, features: feats }); setPreview({ tiles: r.tiles, name: MAP_TYPES[type] }); } catch (e) { setError(e.message); }
+    try { const r = await api.generateMap({ type, w: grid.w, h: grid.h, features: feats }); setPreview({ tiles: r.tiles, name: MAP_TYPES[type], type }); } catch (e) { setError(e.message); }
   };
   useEffect(() => { if (mapMode === "gen") reroll(); }, [mapMode, mapType, features.join(","), grid.w, grid.h]); // eslint-disable-line
   useEffect(() => {
@@ -51,7 +51,10 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
   }, [mapMode, savedId, saved]);
   useEffect(() => { if (mapMode === "empty") setPreview(null); }, [mapMode]);
   useEffect(() => {
-    if (mapMode === "scene" && battle) { setGrid({ w: battle.w, h: battle.h }); setPreview({ tiles: [], background: battle.background, name: battle.name, geom: battle.geom, fog: battle.fog }); }
+    if (mapMode === "scene" && battle) {
+      setGrid({ w: battle.w, h: battle.h });
+      setPreview({ tiles: battle.tiles || [], background: battle.background, name: battle.name, geom: battle.geom, fog: battle.fog, painted: !!battle.painted });
+    }
   }, [mapMode, battle]);
   useEffect(() => { if (sceneFight) suggest(); }, [sceneFight]); // eslint-disable-line
   const switchSystem = (s) => { setSystem(s); setEnemies(enemies.map((e) => ({ ...BLANK[s], name: e.name, count: e.count }))); };
@@ -73,6 +76,12 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
       if (r.battle) { setBattle(r.battle); setMapMode("scene"); }
       else if (r.map) { setMapMode("gen"); setMapType(r.map.type); setFeatures(r.map.features || []); }
     } catch (e) { setError(e.message); } finally { setSuggesting(false); }
+  };
+  const [painting, setPainting] = useState(false);
+  const [paintKind, setPaintKind] = useState("");
+  const paintScene = async () => { // 🎨 a new painted map for this scene (kept in the card as the scene's map)
+    setPainting(true); setError("");
+    try { const r = await api.paintSceneMap(convId, paintKind); setBattle(r.battle); setMapMode("scene"); } catch (e) { setError(e.message); } finally { setPainting(false); }
   };
   const start = () => {
     const list = enemies.filter((e) => String(e.name).trim());
@@ -163,6 +172,18 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
           <button className="chip" onClick={() => reroll()} title="Another map of this type">🎲 reroll</button>
         </div>
       )}
+      {(mapMode === "scene" || hasScene) && (
+        <div className="row gap center">
+          <select className="field grow" value={paintKind} onChange={(e) => setPaintKind(e.target.value)} title="What the painted map shows">
+            <option value="">Fits the scene</option>
+            {Object.entries(MAP_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <button className="btn small" onClick={paintScene} disabled={painting || busy}
+            title="Calíope paints a battle map for this scene, with the grid already lined up, and keeps it in the card">
+            {painting ? "Painting…" : battle?.painted ? "🎲 Paint another" : "🎨 Paint a map"}</button>
+        </div>
+      )}
+      {mapMode !== "scene" && mapMode !== "empty" && <div className="muted tiny">🎨 This map is painted as a picture when the fight starts.</div>}
       {mapMode !== "saved" && mapMode !== "scene" && (
         <div className="row gap center">
           <span className="small grow">Size</span>
@@ -173,7 +194,7 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
         </div>
       )}
       {preview && <BattleMap w={preview.tiles[0]?.length || grid.w} h={preview.tiles.length || grid.h} tiles={preview.tiles} background={preview.background}
-        geom={preview.geom} fog={preview.fog}
+        geom={preview.geom} fog={preview.fog} painted={preview.painted}
         cell={mapMode === "scene" ? Math.max(8, Math.floor(360 / grid.w)) : 20} className="preview" />}
       {editor && <MapEditor onClose={() => { setEditor(false); loadSaved(); }}
         onPicked={(m) => { setEditor(false); loadSaved(); setPreview({ tiles: m.tiles, background: m.background, name: m.name }); setMapMode(m.id ? "saved" : "gen-custom"); if (m.id) setSavedId(String(m.id)); }} />}
@@ -185,8 +206,14 @@ function StartForm({ convId, kind, busy, onStart, sceneFight }) {
 }
 
 /* ---------------------------------------------------------------- grid */
-function Grid({ combat, selected, onSelect, onMove }) {
-  const { w, h, tiles = [], background = "", name = "", geom = null, fog = null } = combat.grid;
+function Grid({ combat, selected, onSelect, onMove, convId, onState, busy }) {
+  const { w, h, tiles = [], background = "", name = "", geom = null, fog = null, painted = false } = combat.grid;
+  const [painting, setPainting] = useState(false);
+  const [paintError, setPaintError] = useState("");
+  const paint = async () => { // a plain grid gets a painted map; everyone is placed again
+    setPainting(true); setPaintError("");
+    try { const r = await api.combatPaintMap(convId); onState?.(r.state); } catch (e) { setPaintError(e.message); } finally { setPainting(false); }
+  };
   const people = combat.combatants;
   const sel = people.find((c) => c.id === selected);
   const [hover, setHover] = useState(null);
@@ -196,7 +223,13 @@ function Grid({ combat, selected, onSelect, onMove }) {
   const hoverTile = hover ? TILE_STYLE[tiles[hover.y]?.[hover.x] || "."] : null;
   return (
     <div className="grid-wrap">
-      <BattleMap w={w} h={h} tiles={tiles} background={background} tokens={people} selected={selected} geom={geom} cell={geom ? 28 : 30}
+      {!background && convId && (
+        <div className="row gap center">
+          <button className="btn small" onClick={paint} disabled={painting || busy}>{painting ? "Painting…" : "🎨 Paint a map for this fight"}</button>
+          {paintError && <span className="error-text tiny">{paintError}</span>}
+        </div>
+      )}
+      <BattleMap w={w} h={h} tiles={tiles} background={background} tokens={people} selected={selected} geom={geom} cell={geom ? 28 : 30} painted={painted}
         // fog of war: the places already visited stay clear, and your side sees around itself
         fog={fog ? [...fog, ...people.filter((c) => c.side !== "enemy" && c.hp > 0).map((c) => ({ x: c.x + 0.5, y: c.y + 0.5, r: 4 }))] : null}
         onToken={onSelect} onLeave={() => setHover(null)} onCellEnter={(x, y) => setHover({ x, y })}
@@ -211,7 +244,7 @@ function Grid({ combat, selected, onSelect, onMove }) {
 }
 
 /* ---------------------------------------------------------------- active fight */
-function FightView({ combat, busy, onAction, onEdit, pools, abilities }) {
+function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, onState }) {
   const people = useMemo(() => combat.order.map((id) => combat.combatants.find((c) => c.id === id)), [combat]);
   const enemies = people.filter((c) => c.side === "enemy" && c.hp > 0);
   const [target, setTarget] = useState(enemies[0]?.id || "");
@@ -233,7 +266,7 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities }) {
         <div className="section-title grow">Round {combat.round} · {current?.side === "player" ? "your turn" : `${current?.name}'s turn`}</div>
         <span className="tag">{combat.system === "pool" ? "d10 pool" : "d20"}</span>
       </div>
-      <Grid combat={combat} selected={selected} onSelect={select} onMove={(id, x, y) => onEdit(id, { x, y })} />
+      <Grid combat={combat} selected={selected} onSelect={select} onMove={(id, x, y) => onEdit(id, { x, y })} convId={convId} onState={onState} busy={busy} />
       <div className="turn-order">
         {people.map((c) => (
           <div key={c.id} className={`fighter ${c.id === current?.id ? "current" : ""} ${c.hp <= 0 ? "down" : ""} ${c.id === target ? "targeted" : ""}`} onClick={() => select(c.id)}>
@@ -307,16 +340,17 @@ function sceneHasFoes(game) {
   return !!(adv?.scenes || []).find((s) => s.id === id && s.enemies?.length);
 }
 
-export default function CombatTab({ game, busy, onCombat, onCombatEdit }) {
+export default function CombatTab({ game, busy, onCombat, onCombatEdit, onState }) {
   const combat = game.state.combat;
-  if (combat?.active) return <FightView combat={combat} busy={busy} onAction={onCombat} onEdit={onCombatEdit} pools={game.state.resources} abilities={game.state.abilities} />;
+  if (combat?.active) return <FightView combat={combat} busy={busy} onAction={onCombat} onEdit={onCombatEdit} pools={game.state.resources} abilities={game.state.abilities}
+    convId={game.conversation.id} onState={onState} />;
   return (
     <>
       {combat && !combat.active && combat.log?.length > 0 && (
         <div className="tab-body"><div className="muted tiny">Last fight: {combat.log.slice(-3).join(" ")}</div></div>
       )}
       <StartForm convId={game.conversation.id} kind={game.features?.kind} busy={busy} onStart={onCombat}
-        sceneFight={sceneHasFoes(game)} />
+        sceneFight={sceneHasFoes(game)} hasScene={!!game.state.adventure?.scene && !!game.conversation.scenario?.adventure?.scenes?.length} />
     </>
   );
 }

@@ -12,6 +12,7 @@ export const TILE_STYLE = {
   "R": { fill: "#9a958d", glyph: "🪨", label: "Rock (blocks, cover)" },
   "B": { fill: "#a77d4f", glyph: "📦", label: "Barrel / crate / table (blocks, cover)" },
   "D": { fill: "#c39a62", glyph: "🚪", label: "Door" },
+  ":": { fill: "#b49a6e", label: "Road / path" },
 };
 export const SIDE_COLOR = { player: "var(--good)", ally: "#4a8fd8", enemy: "var(--bad)" };
 const initials = (name) => name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -20,7 +21,7 @@ const initials = (name) => name.split(/\s+/).map((w) => w[0]).join("").slice(0, 
  * A battle map: terrain squares (+ an optional picture underneath) and tokens.
  * onCell(x, y) is called on click; onCellEnter(x, y) while the mouse moves (used for painting and distances).
  */
-export default function BattleMap({ w, h, tiles = [], background = "", tokens = [], selected, onCell, onCellEnter, onToken, onLeave, cell = 30, className = "", geom = null, fog = null }) {
+export default function BattleMap({ w, h, tiles = [], background = "", tokens = [], selected, onCell, onCellEnter, onToken, onLeave, cell = 30, className = "", geom = null, fog = null, painted = false }) {
   const bg = background ? portraitSrc(background) : "";
   const maskId = React.useId().replace(/:/g, "");
   return (
@@ -38,8 +39,8 @@ export default function BattleMap({ w, h, tiles = [], background = "", tokens = 
         return (
           <g key={i} onMouseDown={(e) => { e.preventDefault(); onCell?.(x, y, e); }} onMouseEnter={(e) => onCellEnter?.(x, y, e)}>
             <rect x={x * cell} y={y * cell} width={cell} height={cell} className="grid-cell"
-              style={{ fill: bg && ch === "." ? "transparent" : st.fill, fillOpacity: bg && ch !== "." ? 0.75 : 1 }} />
-            {st.glyph && <text x={x * cell + cell / 2} y={y * cell + cell / 2 + 5} textAnchor="middle" fontSize={cell * 0.5} pointerEvents="none">{st.glyph}</text>}
+              style={{ fill: (bg && ch === ".") || painted ? "transparent" : st.fill, fillOpacity: bg && ch !== "." ? 0.75 : 1 }} />
+            {st.glyph && !painted && <text x={x * cell + cell / 2} y={y * cell + cell / 2 + 5} textAnchor="middle" fontSize={cell * 0.5} pointerEvents="none">{st.glyph}</text>}
           </g>
         );
       })}
