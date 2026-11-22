@@ -1758,7 +1758,35 @@
 "A bit of roleplay for the round card, under this roll. It changes nothing in the rules.": "Um pouco de interpretação para o cartão da rodada, abaixo desta rolagem. Não muda nada nas regras.",
 "📦 Export card": "📦 Exportar card",
 "Export the card with all its pictures as a .caliope file, to share it (the other player uses ⤒ Import a card)": "Exporta o card com todas as imagens num arquivo .caliope, para compartilhar (o outro jogador usa ⤒ Importar um card)",
-"The card with all its pictures in one .caliope file, to share it (the other player uses Import a card)": "O card com todas as imagens num arquivo .caliope, para compartilhar (o outro jogador usa Importar um card)"
+"The card with all its pictures in one .caliope file, to share it (the other player uses Import a card)": "O card com todas as imagens num arquivo .caliope, para compartilhar (o outro jogador usa Importar um card)",
+"Where you are": "Onde você está",
+"Home": "Início",
+"Systems": "Sistemas",
+"Dungeons & Dragons 5e": "Dungeons & Dragons 5e",
+"the SRD built in, plus your own files": "o SRD embutido, mais seus próprios arquivos",
+"Compendium": "Compêndio",
+"Classes, races, spells, items, feats…": "Classes, raças, magias, itens, talentos…",
+"Rules the Aedo reads": "Regras que o Aedo lê",
+"Compendium folders": "Pastas do compêndio",
+"Other systems": "Outros sistemas",
+"Tormenta20, Vampire, Call of Cthulhu… their rulebooks and sheets live in Rulebooks for now.": "Tormenta20, Vampiro, Chamado de Cthulhu… por enquanto seus livros de regras e fichas ficam em Livros de regras.",
+"Open Rulebooks": "Abrir Livros de regras",
+"Calíope settings": "Configurações do Calíope",
+"Extra know-how the Aedo can use": "Conhecimentos extras que o Aedo pode usar",
+"Download and manage the AI models": "Baixe e gerencie os modelos de IA",
+"Model server, language, voice, fights…": "Servidor do modelo, idioma, voz, lutas…",
+"The jukebox's tracks": "As faixas da jukebox",
+"Guided tour": "Tour guiado",
+"A walk through Calíope": "Um passeio pelo Calíope",
+"Your cards: play, edit, create, import": "Seus cards: jogar, editar, criar, importar",
+"Systems: D&D 5e compendium, bestiary, rulebooks": "Sistemas: compêndio de D&D 5e, bestiário, livros de regras",
+"Skills, models, settings, music": "Skills, modelos, configurações, música",
+"Write stories and cards together": "Escrevam histórias e cards juntos",
+"Home: games, library, settings, the Muse": "Início: jogos, biblioteca, configurações, a Musa",
+"No game yet": "Nenhum jogo ainda",
+"Your saved games, to pick up where you left": "Seus jogos salvos, para continuar de onde parou",
+"Library: D&D 5e compendium, bestiary, rulebooks": "Biblioteca: compêndio de D&D 5e, bestiário, livros de regras",
+"Your saved games": "Seus jogos salvos"
 },
 "patterns": [
 [
@@ -2336,6 +2364,22 @@
 [
 " Show hidden ({0})",
 " Mostrar ocultas ({0})"
+],
+[
+"2014 and 2024 rules · {0}",
+"Regras de 2014 e 2024 · {0}"
+],
+[
+"Continue: {0}",
+"Continuar: {0}"
+],
+[
+"{0} entries",
+"{0} entradas"
+],
+[
+"{0} cards",
+"{0} cards"
 ]
 ]
 }

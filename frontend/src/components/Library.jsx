@@ -8,8 +8,8 @@ const SECTIONS = [
 ];
 
 /** The D&D 5e library: the SRD built in plus your own 5e.tools files (data/compendium/dnd5e). */
-export default function Library({ onClose }) {
-  const [type, setType] = useState("spell");
+export default function Library({ onClose, initialType = "spell" }) {
+  const [type, setType] = useState(initialType);
   const [edition, setEdition] = useState("2014");
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);

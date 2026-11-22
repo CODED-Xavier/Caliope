@@ -14,7 +14,7 @@ import Lightbox from "./components/Lightbox.jsx";
 import EngineStrip from "./components/EngineStrip.jsx";
 import Library from "./components/Library.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
-import MainMenu from "./components/MainMenu.jsx";
+import Home from "./components/Home.jsx";
 import MuseModal from "./components/MuseModal.jsx";
 import { RecapView } from "./components/Cantos.jsx";
 import Tour from "./components/Tour.jsx";
@@ -94,7 +94,11 @@ export default function App() {
   const [theme, setTheme] = useState(initialTheme);
   const [convs, setConvs] = useState([]);
   const [activeId, setActiveId] = useState(null);
-  const [openBuilder, setOpenBuilder] = useState(false); // a new game made with "Build with the 5e builder"
+  const [openBuilder, setOpenBuilder] = useState(false);
+  const [homeView, setHomeViewState] = useState(() => { try { return localStorage.getItem("caliope.home") || "hub"; } catch { return "hub"; } });
+  const setHomeView = (v) => { setHomeViewState(v); try { localStorage.setItem("caliope.home", v); } catch { /* ignore */ } };
+  const [libraryType, setLibraryType] = useState("spell");
+  const goHome = (v = "hub") => { if (busy) return; setActiveId(null); setGame(null); localStorage.removeItem("activeConv"); setHomeView(v); }; // a new game made with "Build with the 5e builder"
   const [game, setGame] = useState(null); // {conversation, messages, state, npcs, memory_count}
   const [stream, setStream] = useState(null); // {text, phase, context}
   const [lastContext, setLastContext] = useState(null);
@@ -499,7 +503,8 @@ export default function App() {
       data-story-colors={view.storyColors === false ? "off" : "on"}>
       <Sidebar
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => { setMenuInit(null); setModal("new"); }}
-        onHome={() => { if (!busy) { setActiveId(null); setGame(null); localStorage.removeItem("activeConv"); } }}
+        onHome={() => goHome("hub")} onGames={() => goHome("games")} onLibraryHome={() => goHome("library")}
+        lastGame={convs[0]} onContinue={() => convs[0] && !busy && openConversation(convs[0].id)}
         onRename={renameConv} onRestart={restartConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onBestiary={() => setModal("bestiary")} onLibrary={() => setModal("library")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         collapsed={view.sideCollapsed} onCollapse={setSideCollapsed}
@@ -548,11 +553,15 @@ export default function App() {
             </div>
             {!online && <FirstModel onOpen={(init) => { setModelsInit({ tab: init.tab, query: init.query || "" }); setModal("models"); }} />}
             {error && <p className="error-text small">{error}</p>}
-            <MainMenu refreshKey={menuKey}
+            <Home view={homeView} onView={setHomeView} menuKey={menuKey}
               onPlay={(id) => { setMenuInit({ action: "play", id }); setModal("new"); }}
               onEdit={(id) => { setMenuInit({ action: "edit", id }); setModal("new"); }}
               onCreate={() => { setMenuInit({ action: "create" }); setModal("new"); }}
-              onImport={() => { setMenuInit({ action: "import" }); setModal("new"); }} />
+              onImport={() => { setMenuInit({ action: "import" }); setModal("new"); }}
+              onLibrary={(t) => { setLibraryType(t || "spell"); setModal("library"); }} onBestiary={() => setModal("bestiary")} onRulebooks={() => setModal("rulebooks")}
+              onSkills={() => setModal("skills")} onModels={() => openModels()} onSettings={() => setModal("settings")} onMuse={() => setModal("muse")}
+              onMusic={() => setModal("jukebox")} onTour={() => setTour(true)}
+              lastGame={convs[0]} onContinue={() => convs[0] && !busy && openConversation(convs[0].id)} />
           </div>
         )}
       </main>
@@ -577,7 +586,7 @@ export default function App() {
       {modal === "skills" && <SkillsModal onClose={() => setModal(null)} />}
       {modal === "rulebooks" && <RulebooksModal onClose={() => setModal(null)} />}
       {modal === "bestiary" && <BestiaryModal onClose={() => setModal(null)} />}
-      {modal === "library" && <Library onClose={() => setModal(null)} />}
+      {modal === "library" && <Library initialType={libraryType} onClose={() => setModal(null)} />}
       {modal === "jukebox" && <JukeboxModal onClose={() => setModal(null)} onChanged={setTracks} />}
     </div>
   );

@@ -4,6 +4,8 @@ import { MODE_LABELS, timeAgo } from "../utils.js";
 // Simple stroke icons (no emoji): one look in both themes.
 const ICONS = {
   menu: "M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
+  play: "M7 4l13 8-13 8z",
+  cards: "M4 6h11v14H4zM8 3h12v14",
   games: "M5 4h11l3 3v13H5zM9 9h6M9 13h6M9 17h4",
   new: "M12 5v14M5 12h14",
   bestiary: "M4 18c3-1 4-4 4-7 0-3 2-6 5-6s5 3 5 6c0 3 1 6 2 7M10 11h.01M15 11h.01",
@@ -38,8 +40,8 @@ function RailButton({ icon, label, onClick, on = false, tour, title }) {
  * The slim icon rail on the left (always there) and, beside it, the drawer with your games
  * (opened with Games; it closes itself when you pick one on a narrow window).
  */
-export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onRename, onRestart, onDelete, onSkills, onRulebooks, onBestiary,
-  onLibrary, onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
+export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onGames, onLibraryHome, lastGame, onContinue, onRename, onRestart, onDelete,
+  onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
   const online = health?.llm?.ok;
   const [filter, setFilter] = useState("");
   const shown = filter.trim() ? convs.filter((c) => (c.title || "").toLowerCase().includes(filter.trim().toLowerCase())) : convs;
@@ -48,14 +50,13 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onRe
     <>
       <nav className="rail" aria-label="Main">
         <img className="rail-logo" src="/favicon.png" alt="Calíope" title="Calíope" />
-        <RailButton icon="menu" label="Menu" onClick={onHome} on={!activeId} title="All your cards" />
-        <RailButton icon="games" label="Games" onClick={() => onCollapse(!collapsed)} on={!collapsed} title="Your games" />
+        <RailButton icon="menu" label="Home" onClick={onHome} on={!activeId} title="Home: games, library, settings, the Muse" />
+        <RailButton icon="play" label="Continue" onClick={onContinue} on={false} title={lastGame ? `Continue: ${lastGame.title || "your last game"}` : "No game yet"} />
+        <RailButton icon="cards" label="Games" onClick={onGames} title="Your cards: play, edit, create, import" />
+        <RailButton icon="games" label="Saves" onClick={() => onCollapse(!collapsed)} on={!collapsed} title="Your saved games, to pick up where you left" />
         <RailButton icon="new" label="New" onClick={onNew} tour="new" title="New game" />
         <div className="rail-gap" />
-        <RailButton icon="library" label="Library" onClick={onLibrary} title="D&D 5e library: classes, spells, feats, items" />
-        <RailButton icon="bestiary" label="Bestiary" onClick={onBestiary} title="Monster sheets for fights" />
-        <RailButton icon="rules" label="Rules" onClick={onRulebooks} title="Rulebooks" />
-        <RailButton icon="skills" label="Skills" onClick={onSkills} />
+        <RailButton icon="library" label="Library" onClick={onLibraryHome} title="Library: D&D 5e compendium, bestiary, rulebooks" />
         <RailButton icon="muse" label="Muse" onClick={onMuse} tour="muse" title="Write stories and cards with the Muse" />
         <div className="rail-grow" />
         <RailButton icon="models" label="Models" onClick={onModels} tour="models" title="Download and manage AI models" />
@@ -66,9 +67,9 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onRe
         </button>
       </nav>
       {!collapsed && (
-        <aside className="drawer" aria-label="Your games">
+        <aside className="drawer" aria-label="Your saved games">
           <div className="drawer-head">
-            <span className="drawer-title">Your games</span>
+            <span className="drawer-title">Your saved games</span>
             <button type="button" className="icon-btn" onClick={() => onCollapse(true)} title="Close">✕</button>
           </div>
           <button type="button" className="btn primary wide big-touch" onClick={onNew}>＋ New game</button>
