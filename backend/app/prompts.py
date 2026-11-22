@@ -288,6 +288,9 @@ class PromptBuilder:
         mem_budget = int(settings.get("memory_char_budget", 900))
 
         history = [dict(h) for h in history]
+        for h in history:  # the round card's picture markers are for the screen only
+            if "[[face:" in h.get("content", ""):
+                h["content"] = re.sub(r"\n?\[\[face:[^\]\n]*\]\]", "", h["content"])
         opening = next((h for h in history if h.get("meta", {}).get("opening")), None)
         if opening:
             history = [h for h in history if h is not opening]

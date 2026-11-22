@@ -51,12 +51,15 @@ class ConversationRepository:
     # ------------------------------------------------------------ conversations
     def create(self, scenario: dict | None = None, title: str = "", player_name: str | None = None,
                player: dict | None = None, setup: str = "", player_lore: list | None = None, start: str = "",
-               party_mode: str = "", card_status: dict | None = None) -> dict:
+               party_mode: str = "", card_status: dict | None = None, companions: list | None = None) -> dict:
         """`player` comes from the start screen and is laid over the card's starting sheet.
         `card_status`: the card's own sheet (Tier, Attributes, Stats...) filled on the start screen.
         `setup` is "app" (made on the start screen), "card" (the card asks in the story) or ""."""
         """Start a new playthrough. `scenario` is a full scenario row (with `data`) or None for freeform."""
         data = scenario["data"] if scenario else normalize_scenario({"name": "Freeform adventure", "mode": "gm_world"})
+        if companions:  # set up on the start screen (names, looks, pictures): this game's companions
+            from .party import apply_companion_edits
+            data = {**data, "npcs": apply_companion_edits(data.get("npcs") or [], companions)}
         snapshot = {**data, "name": scenario["name"] if scenario else data["name"]}
         route = routes.resolve(data, start)  # None: the card's default start
         if route:

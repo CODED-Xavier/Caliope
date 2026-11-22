@@ -61,6 +61,31 @@ def companions(scenario: dict) -> list[dict]:
     return [n for n in (scenario or {}).get("npcs") or [] if n.get("companion")][:MAX_COMPANIONS]
 
 
+def apply_companion_edits(npcs: list[dict], edits: list | None) -> list[dict]:
+    """The start screen's "Set up your companions": name, background, looks, personality and pictures with moods,
+    laid over the card's companions (matched by their card name, `of`). Other characters stay as they are."""
+    from .appearance import normalize_appearance
+    from .portraits import normalize_portraits
+    out = [dict(n) for n in npcs or []]
+    for e in (edits if isinstance(edits, list) else [])[:MAX_COMPANIONS]:
+        if not isinstance(e, dict):
+            continue
+        n = next((x for x in out if x.get("companion") and x.get("name") == str(e.get("of") or "")), None)
+        if not n:
+            continue
+        name = " ".join(str(e.get("name") or "").split())[:60]
+        if name:
+            n["name"] = name
+        for key, cap in (("description", 2000), ("personality", 600), ("speech_style", 300)):
+            if key in e:
+                n[key] = str(e.get(key) or "").strip()[:cap]
+        if "appearance" in e:
+            n["appearance"] = normalize_appearance(e.get("appearance"))
+        if "portraits" in e:
+            n["portraits"] = normalize_portraits(e.get("portraits"))
+    return out
+
+
 def start_party(state: dict, scenario: dict, mode: str) -> None:
     """A new game: with companions, everyone starts at full HP; solo leaves them out."""
     comps = companions(scenario)

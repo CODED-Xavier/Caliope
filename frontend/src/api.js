@@ -120,6 +120,7 @@ export const api = {
     return res.json();
   },
   sheetTemplates: () => request("GET", "/api/sheet-templates"),
+  saveCompanions: (scenarioId, companions) => request("POST", `/api/scenarios/${scenarioId}/companions`, { companions }),
   startSheet: (scenarioId) => request("GET", `/api/scenarios/${scenarioId}/start-sheet`),
   saveCardStatus: (convId, values) => request("POST", `/api/conversations/${convId}/card-status`, { values }),
   setSheetTemplate: (id, text) => request("POST", `/api/conversations/${id}/sheet-template`, { text }),

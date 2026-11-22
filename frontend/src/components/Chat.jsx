@@ -1,4 +1,5 @@
 import React, { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { companionFace } from "./CompanionSetup.jsx";
 import { Markdown } from "../markdown.jsx";
 import { firstMood, hideStatus, moodUrl, portraitSrc, stripTags } from "../portraits.js";
 import Story from "./Story.jsx";
@@ -7,6 +8,18 @@ import { api } from "../api.js";
 import { cantoStarts } from "./Cantos.jsx";
 
 /** A picture of the scene, painted by Pollinations.ai the first time it is shown (can take up to a minute). */
+/** The round card, with a companion's Standard picture on their first turn in the fight ("[[face: Name]]"). */
+function CombatText({ text, npcs }) {
+  const parts = String(text || "").split(/\n?\[\[face:\s*([^\]\n]+?)\s*\]\]\n?/);
+  return parts.map((part, i) => {
+    if (i % 2 === 0) return part.trim() ? <Markdown key={i} text={part} /> : null;
+    const low = part.toLowerCase();
+    const npc = (npcs || []).find((n) => n.name.toLowerCase() === low) || (npcs || []).find((n) => n.name.toLowerCase().split(" ")[0] === low.split(" ")[0]);
+    const face = companionFace(npc);
+    return face ? <img key={i} className="combat-face" src={portraitSrc(face)} alt={part} title={part} loading="lazy" /> : null;
+  });
+}
+
 function ScenePicture({ pic, onReroll, canAct, kept, onKeep }) {
   const [state, setState] = useState("loading");
   const [tries, setTries] = useState(0);
@@ -152,7 +165,9 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
         <div className="user-col">
           {editing ? editor : (
             <>
-              <div className={`bubble ${isDice ? "dice" : ""} ${isCombat ? "combat-card" : ""}`}><Markdown text={showThoughts(m.content)} story={!isDice && !isCombat} /></div>
+              <div className={`bubble ${isDice ? "dice" : ""} ${isCombat ? "combat-card" : ""}`}>
+                {isCombat ? <CombatText text={m.content} npcs={npcs} /> : <Markdown text={showThoughts(m.content)} story={!isDice} />}
+              </div>
               {m.meta?.edited && <div className="muted tiny edited">edited</div>}
               {actions}
             </>

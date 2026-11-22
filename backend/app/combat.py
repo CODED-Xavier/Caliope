@@ -889,13 +889,19 @@ class CombatEngine:
 
     @staticmethod
     def _by_turns(combat: dict, lines: list[str]) -> list[str]:
-        """The round told turn by turn: a "**Name's turn**" heading whenever the one acting changes."""
+        """The round told turn by turn: a "**Name's turn**" heading whenever the one acting changes. A companion's
+        first turn in the fight also gets "[[face: Name]]": the round card shows their picture there."""
         names = sorted((c["name"] for c in combat["combatants"]), key=len, reverse=True)
+        allies = {c["name"] for c in combat["combatants"] if c.get("side") == "ally"}
+        faced = combat.setdefault("faced", [])
         out, current = [], None
         for line in lines:
             who = next((n for n in names if line.startswith(f"**{n} ") or line.startswith(f"**{n}**")), None)
             if who and who != current:
                 out.append(f"**{who}'s turn**")
+                if who in allies and who not in faced:
+                    out.append(f"[[face: {who}]]")
+                    faced.append(who)
                 current = who
             out.append(line)
         return out

@@ -1789,7 +1789,14 @@
 "Your saved games": "Seus jogos salvos",
 "Grade": "Grau",
 "The card's own values. The story raises them as you play: EXP fills each stat's bar, and a full bar raises its grade. They live in the Sheet tab.": "Os valores do próprio card. A história os aumenta enquanto você joga: a EXP enche a barra de cada atributo, e uma barra cheia sobe o grau. Eles ficam na aba Ficha.",
-"What the card asks for": "O que o card pede"
+"What the card asks for": "O que o card pede",
+"Clothes": "Roupas",
+"Keep them on the card for next games": "Guardar no card para os próximos jogos",
+"Set up your companions": "Prepare seus companheiros",
+"✎ Set up your companions": "✎ Prepare seus companheiros",
+"Who travels with you. Give each one a face for every mood: their Standard picture shows on their first turn in a fight, and the story shows the mood that fits (two pictures per reply at most).": "Quem viaja com você. Dê a cada um um rosto para cada humor: a imagem Padrão aparece no primeiro turno deles numa luta, e a história mostra o humor que combina (no máximo duas imagens por resposta).",
+"A companion needs a name.": "Um companheiro precisa de um nome.",
+"Where they come from, why they travel with you": "De onde vem, por que viaja com você"
 },
 "patterns": [
 [

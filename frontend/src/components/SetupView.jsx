@@ -7,6 +7,8 @@ import HelpTip from "./HelpTip.jsx";
 import { CharacterPreview, StartPicker } from "./CardExtras.jsx";
 import PersonaBar from "./Personas.jsx";
 import CardSheetForm, { startValues } from "./CardSheetForm.jsx";
+import CompanionSetup, { companionFace, withEdits } from "./CompanionSetup.jsx";
+import { portraitSrc } from "../portraits.js";
 import { abilityMod, fmtMod } from "../utils.js";
 
 // Hit die per class (D&D 5e). Anything else uses d8.
@@ -55,6 +57,9 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   const [showCast, setShowCast] = useState(false);
   const [sheet, setSheet] = useState(null); // the card's own sheet (Lumencia: Tier, Attributes, Stats with EXP)
   const [sheetValues, setSheetValues] = useState({});
+  const [compEdits, setCompEdits] = useState({}); // "Set up your companions": changes by the companion's card name
+  const [keepComp, setKeepComp] = useState(true);
+  const [showComp, setShowComp] = useState(false);
 
   useEffect(() => {
     api.scenario(scenarioId).then((s) => {
@@ -103,14 +108,29 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
     } catch (e) { setError(e.message); } finally { setDrafting(false); }
   };
 
+  const withTeam = hasTeam && partyMode === "companions";
+  const teamOpts = () => {
+    const list = Object.entries(compEdits).map(([of, e]) => ({ of, ...e }));
+    return withTeam && list.length ? { companions: list } : {};
+  };
+  const saveTeam = async (edits, keep) => {
+    setCompEdits(edits); setKeepComp(keep); setShowComp(false); setError("");
+    if (!keep) return;
+    try { // kept on the card: next games (and the card editor) have them too
+      const saved = await api.saveCompanions(scenarioId, Object.entries(edits).map(([of, e]) => ({ of, ...e })));
+      setCard({ ...saved.data, name: saved.name });
+      setCompEdits({});
+    } catch (e) { setError(e.message); }
+  };
+
   const start = async () => {
     setBusy(true); setError("");
     try {
       if (way === "card") {
-        await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo" });
+        await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", ...teamOpts() });
       } else if (way === "builder") {
         if (!p.name.trim()) { setError("Give your character a name."); setBusy(false); return; }
-        await onStart(scenarioId, { setup: "app", player: { ...p, name: p.name.trim() }, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", open_builder: true });
+        await onStart(scenarioId, { setup: "app", player: { ...p, name: p.name.trim() }, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", open_builder: true, ...teamOpts() });
       } else {
         if (!p.name.trim()) { setError("Give your character a name."); setBusy(false); return; }
         const player = { ...p, name: p.name.trim() };
@@ -118,7 +138,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
         else delete player.stats;
         // only what you filled: an empty box or a stat without a grade ("- [0/100]") keeps the card's own value
         const own = sheet ? Object.fromEntries(Object.entries(sheetValues).filter(([, v]) => { const t = String(v || "").trim(); return t && !/^-?\s*\[\d+\/\d+\]$/.test(t); })) : null;
-        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", ...(own ? { card_status: own } : {}) });
+        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", ...(own ? { card_status: own } : {}), ...teamOpts() });
       }
     } catch (e) { setError(e.message); setBusy(false); }
   };
@@ -139,8 +159,8 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
       {hasTeam && (
         <div className="way-pick">
           <label className={`way ${partyMode === "companions" ? "active" : ""}`}>
-            <input type="radio" checked={partyMode === "companions"} onChange={() => setPartyMode("companions")} />
-            <span><strong>👥 Play with companions</strong><br /><span className="muted tiny">{`${team.map((n) => n.name).join(", ")} travel and fight beside you.`}</span></span>
+            <input type="radio" checked={partyMode === "companions"} onChange={() => { setPartyMode("companions"); setShowComp(true); }} />
+            <span><strong>👥 Play with companions</strong><br /><span className="muted tiny">{`${team.map((n) => withEdits(n, compEdits).name).join(", ")} travel and fight beside you.`}</span></span>
           </label>
           <label className={`way ${partyMode === "solo" ? "active" : ""}`}>
             <input type="radio" checked={partyMode === "solo"} onChange={() => setPartyMode("solo")} />
@@ -148,6 +168,22 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
           </label>
         </div>
       )}
+      {withTeam && (
+        <div className="team-row">
+          {team.map((n) => {
+            const c = withEdits(n, compEdits);
+            const face = companionFace(c);
+            return (
+              <span className="team-face" key={n.name} title={c.name}>
+                {face ? <img src={portraitSrc(face)} alt="" /> : <span>{(c.name || "?").slice(0, 1)}</span>}
+                <span className="tiny">{c.name.split(" ")[0]}</span>
+              </span>
+            );
+          })}
+          <button type="button" className="btn small" onClick={() => setShowComp(true)}>✎ Set up your companions</button>
+        </div>
+      )}
+      {showComp && <CompanionSetup team={team} edits={compEdits} keep={keepComp} onDone={saveTeam} onClose={() => setShowComp(false)} />}
       <div className="way-pick">
         <label className={`way ${way === "app" ? "active" : ""}`}>
           <input type="radio" checked={way === "app"} onChange={() => setWay("app")} />

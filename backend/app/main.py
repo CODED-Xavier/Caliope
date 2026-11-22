@@ -276,6 +276,18 @@ async def scenario_start_sheet(scenario_id: int):
     return statusbook.start_sheet(scenario["data"])
 
 
+@app.post("/api/scenarios/{scenario_id}/companions")
+async def save_companions(scenario_id: int, body: dict[str, Any] = Body(...)):
+    """"Keep them on the card": the start screen's companion setup (names, looks, pictures) saved into the card."""
+    from .party import apply_companion_edits
+    scenario = svc().scenarios.get(scenario_id)
+    if not scenario:
+        raise NotFound(f"Scenario {scenario_id} not found")
+    data = {**scenario["data"], "name": scenario["name"]}
+    data["npcs"] = apply_companion_edits(data.get("npcs") or [], body.get("companions"))
+    return svc().scenarios.update(scenario_id, data)
+
+
 @app.put("/api/scenarios/{scenario_id}")
 async def update_scenario(scenario_id: int, data: dict[str, Any] = Body(...)):
     before = svc().scenarios.get(scenario_id)
@@ -1775,6 +1787,7 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
                                       party_mode=str(body.get("party") or ""),
                                       player=player, setup=str(body.get("setup") or ""),
                                       card_status=body.get("card_status") if isinstance(body.get("card_status"), dict) else None,
+                                      companions=body.get("companions") if isinstance(body.get("companions"), list) else None,
                                       player_lore=body.get("player_lore") if isinstance(body.get("player_lore"), list) else None)
     return full_conversation(conv["id"])
 
