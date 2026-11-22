@@ -148,7 +148,8 @@ def regenerate(state: dict, when: str, times: int = 1) -> list[str]:
             continue
         p["current"] = p["max"] if amount < 0 else min(p["max"], p["current"] + amount * times)
         out.append(f"{name} {p['current']}/{p['max']}")
-    return out
+    from .party import rest as party_rest
+    return out + party_rest(state, when)
 
 
 def rest_kind(minutes: int) -> str | None:

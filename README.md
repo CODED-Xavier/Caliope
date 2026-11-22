@@ -181,6 +181,13 @@ speed, STR to CHA, skills, senses, challenge and XP, traits and attacks.
 - **Painted maps (like Watabou):** a generated map is painted as a real battle map picture (trees, rocks, a road, stone floors) when the fight starts, with the grid already lined up. In an adventure scene that has no map, Calíope paints one that fits the scene (a road for an ambush, a cave for a hideout…) and keeps it in the card as that scene's map. **🎨 Paint a map** / **🎲 Paint another** in the Combat tab, and **🎨 Paint a map for this fight** turns a fight on a plain grid into a painted map mid-fight.
 - Undo and rewind also undo the dice.
 
+### Companions and solo play
+Card editor → **👥 Companions**: up to 3 characters who travel with you, outside the card's own story. Each has a fight sheet (class, role, HP, AC, attack, damage, range, speed; healers also a heal and heals per fight), a personality, a way of talking and pictures. **✨ Write companions** has the AI draft 3 that fit the card.
+- When you start a game: **👥 Play with companions** or **🧍 Play solo**. With companions, the Aedo voices them (they talk and act on their own, never for you) and they have a relationship with you like anyone else.
+- **In fights** they join by themselves and Calíope plays them: a healer heals you first if you're dying, then whoever is below half HP; the others walk up and attack (archers shoot). Their HP lasts between fights; a long rest heals them fully, a short rest half.
+- **Solo**: an adventure's scene enemies are scaled to one hero (the books are written for 4): 4 goblins become 1. Fights you build in the Combat tab keep your numbers.
+- **Death saving throws** (5e): at 0 HP you're dying; each of your turns the app rolls a save (10+ succeeds, natural 20 = back up with 1 HP, natural 1 = two failures; 3 successes = stable, 3 failures = dead). The fight is lost only when nobody on your side is standing: then your remaining saves decide if you're left alive (waking later with 1 HP).
+
 ### Resources and powers
 Card editor > **Resources and powers**: pools (Mana, Aura, Stamina…) with maximum, colour and refill (per round, rest, night, day), and powers that spend them.
 - The Sheet and Combat tabs have **Use** buttons; the app pays the cost and rolls.
@@ -529,3 +536,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.25.1 | The start screen's AC counts armour and shield (chain mail + shield = 18, not 10 + DEX); fights wait for the ⚔ button again by default; a sword knocked away in a fight stays in the bag |
 | 2.25.2 | Enemies find their way on wide plain grids; tests skip when a test-only package is missing |
 | 2.25.3 | Click a story picture to see it big; card pictures reach running games; the face follows the text when the Aedo forgets the mood |
+| 2.26.0 | Companions (up to 3 per card, the Aedo voices them, Calíope plays them in fights, healers heal), Play solo with fights scaled to one hero, 5e death saving throws |

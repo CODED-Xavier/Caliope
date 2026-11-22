@@ -671,3 +671,11 @@ body.resizing { user-select: none; cursor: col-resize; }
 .lightbox img { max-width: 94vw; max-height: 86vh; min-height: min(70vh, 640px); width: auto; object-fit: contain; border-radius: 10px; box-shadow: 0 10px 40px #000a; }
 .lightbox-caption { color: #ddd; font-size: 13px; max-width: 80ch; text-align: center; }
 .lightbox-close { position: absolute; top: 14px; right: 18px; color: #fff; font-size: 20px; }
+
+/* companions */
+.companions > summary { cursor: pointer; }
+.companion-stats { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 12px; }
+.companion-stats label { display: flex; align-items: center; gap: 4px; }
+.companion-stats .field.num { width: 52px; }
+.bad-text { color: var(--bad); }
+.down-note { border-left: 3px solid var(--bad); padding: 4px 8px; }

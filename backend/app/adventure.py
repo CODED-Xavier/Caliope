@@ -812,8 +812,11 @@ def adventure_background(adv: dict) -> str:
 
 
 def combat_enemies(adv: dict, state: dict) -> list[dict]:
+    """The scene's enemies, scaled to the party (a solo hero meets 1 goblin where the book has 4)."""
+    from .party import party_size, scale_enemies, scaling_on
     s = get_scene(adv, (state.get("adventure") or {}).get("scene", ""))
-    return [dict(e) for e in (s or {}).get("enemies") or []]
+    foes = [dict(e) for e in (s or {}).get("enemies") or []]
+    return scale_enemies(foes, party_size(state)) if scaling_on(state) else foes
 
 
 def battle_map(adv: dict, state: dict) -> dict | None:

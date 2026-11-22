@@ -97,6 +97,7 @@ Easier: pick a mode under the text box (**🗣 Speak · ✋ Act · 💭 Think ·
 - No map for a fight? Calíope **paints one** that fits the scene (road, cave, dungeon, tavern…) with the grid lined up. **🎲 Paint another** in the Combat tab if you don't like it.
 - **↺ Restart** (top bar, or ↺ next to the game in the list) starts the game over from the opening with the same character at full HP, handy for testing a scene again.
 - **Click any picture in the story** to see it big. Pictures you add to a character in the card editor now also show up in games you already started.
+- **Companions**: cards can have up to 3 companions (card editor → 👥 Companions). Start a game with **Play with companions** to have them fight beside you, or **Play solo** for fights scaled to one hero. At 0 HP you make death saving throws instead of losing at once.
 - **In a fight**, just write your attack (*"I swing at the goblin's neck"*) or type **/attack goblin 2**: the app rolls it and the fight updates. On your turn, click a lit square on the grid to move. Check buttons show the DC before you roll.
 - **📚 Research a work** (in the Muse): type an anime/game/book name, tick the wiki pages, and get a draft card with its world, characters and lore.
 - **🔁** in the music controls loops the current song.

@@ -44,6 +44,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   const [card, setCard] = useState(null);
   const [p, setP] = useState(null);
   const [way, setWay] = useState("app");
+  const [partyMode, setPartyMode] = useState("companions"); // a card with companions: play with them, or solo
   const [busy, setBusy] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState("");
@@ -69,6 +70,8 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   if (!card || !p) return <div className="muted small">{error || "Loading…"}</div>;
 
   const adventure = card.kind === "adventure";
+  const team = (card.npcs || []).filter((n) => n.companion);
+  const hasTeam = team.length > 0;
   const set = (k, v) => setP((x) => ({ ...x, [k]: v }));
   const setStat = (k, v) => setP((x) => ({ ...x, stats: { ...x.stats, [k]: Math.max(1, Math.min(30, parseInt(v, 10) || 0)) } }));
   const statKeys = Object.keys(p.stats);
@@ -96,13 +99,13 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
     setBusy(true); setError("");
     try {
       if (way === "card") {
-        await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined, player_lore: lore, start: startId });
+        await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo" });
       } else {
         if (!p.name.trim()) { setError("Give your character a name."); setBusy(false); return; }
         const player = { ...p, name: p.name.trim() };
         if (adventure) { player.hp = { current: hp, max: hp }; player.ac = ac; }
         else delete player.stats;
-        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId });
+        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo" });
       }
     } catch (e) { setError(e.message); setBusy(false); }
   };
@@ -120,6 +123,18 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
         setP((x) => ({ ...x, ...Object.fromEntries(Object.entries(persona.player || {}).filter(([k, v]) => v !== "" && v != null && !(k === "stats" && !Object.keys(v || {}).length))) }));
         if ((persona.lore || []).length) setLore(persona.lore);
       }} />
+      {hasTeam && (
+        <div className="way-pick">
+          <label className={`way ${partyMode === "companions" ? "active" : ""}`}>
+            <input type="radio" checked={partyMode === "companions"} onChange={() => setPartyMode("companions")} />
+            <span><strong>👥 Play with companions</strong><br /><span className="muted tiny">{`${team.map((n) => n.name).join(", ")} travel and fight beside you.`}</span></span>
+          </label>
+          <label className={`way ${partyMode === "solo" ? "active" : ""}`}>
+            <input type="radio" checked={partyMode === "solo"} onChange={() => setPartyMode("solo")} />
+            <span><strong>🧍 Play solo</strong><br /><span className="muted tiny">Just you. An adventure's fights are scaled down to one hero.</span></span>
+          </label>
+        </div>
+      )}
       <div className="way-pick">
         <label className={`way ${way === "app" ? "active" : ""}`}>
           <input type="radio" checked={way === "app"} onChange={() => setWay("app")} />

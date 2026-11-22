@@ -152,6 +152,9 @@ def describe_state(state: dict, compact: bool = False) -> str:
     if not compact:
         inv = ", ".join(f"{i['name']}" + (f" x{i['qty']}" if i["qty"] > 1 else "") for i in state["inventory"]) or "nothing"
         lines.append(f"Gold: {state['gold']}. Inventory: {inv}.")
+    from .party import state_line
+    if state_line(state):
+        lines.append(state_line(state))
     active = [q for q in state["quests"] if q["status"] == "active"]
     if active:
         lines.append("Active quests: " + "; ".join(f"{q['title']}" + (f" ({truncate(q['notes'], 80)})" if q["notes"] else "") for q in active))
@@ -247,7 +250,7 @@ WINDOW_STEP = 6  # messages (3 rounds): see build()
 
 SECTION_ORDER = [
     "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "known_at_start", "fixed_facts", "secrets", "ending", "route", "adventure", "places",
-    "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_reminders", "card_overrides", "portraits", "npcs", "npc_hint",
+    "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_reminders", "card_overrides", "portraits", "npcs", "companions", "npc_hint",
     "player", "pinned", "opening", "cantos", "summary",
 ]
 
@@ -284,6 +287,10 @@ class PromptBuilder:
         prompt_npcs = [n for n in npcs if n.get("in_prompt", True)]
         sections = self._stable_sections(scenario, prompt_npcs, summary, pinned, language, settings, mode, opening, skills)
         sections.update(self._card_sections(scenario, npcs, lore[0], macro, app_status is not None))
+        from .party import prompt_section as companions_section
+        team = companions_section(state, npcs, scenario)  # app/party.py: who travels with the player
+        if team:
+            sections["companions"] = team
         reminders = split_template((scenario.get("information") or {}).get("post_history") or "")[0]
         if reminders.strip():  # the same every turn: kept in the stable part, so it is read once, not every turn
             sections["card_reminders"] = "## Card reminders\n" + strip_links(macro(reminders)).strip()

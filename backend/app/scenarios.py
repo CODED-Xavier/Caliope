@@ -138,6 +138,10 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
                 "active": bool(n.get("active", True)),
             }
         )
+        if n.get("companion") and sum(1 for x in npcs if x.get("companion")) < 3:  # app/party.py: up to 3 companions
+            from .party import normalize_sheet
+            npcs[-1]["companion"] = True
+            npcs[-1]["sheet"] = normalize_sheet(n.get("sheet"))
 
     # Skills are card add-ons: up to 3, always part of the prompt. (Older cards stored them as "pinned".)
     skills = raw.get("skills") if isinstance(raw.get("skills"), dict) else {}

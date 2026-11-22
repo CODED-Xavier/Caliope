@@ -50,7 +50,8 @@ class ConversationRepository:
 
     # ------------------------------------------------------------ conversations
     def create(self, scenario: dict | None = None, title: str = "", player_name: str | None = None,
-               player: dict | None = None, setup: str = "", player_lore: list | None = None, start: str = "") -> dict:
+               player: dict | None = None, setup: str = "", player_lore: list | None = None, start: str = "",
+               party_mode: str = "") -> dict:
         """`player` comes from the start screen and is laid over the card's starting sheet.
         `setup` is "app" (made on the start screen), "card" (the card asks in the story) or ""."""
         """Start a new playthrough. `scenario` is a full scenario row (with `data`) or None for freeform."""
@@ -94,9 +95,16 @@ class ConversationRepository:
                     state["scene_mood"] = first["music"]
                 if str(data.get("opening_message") or "").strip():
                     state["adventure"]["fresh"] = ""  # the opening already set the scene
+            from .party import companions, start_party
+            if not party_mode:
+                party_mode = "companions" if companions(data) else "solo"
+            start_party(state, data, party_mode)  # app/party.py: solo, or with the card's companions
+            solo = state["party_mode"] == "solo"
             focus = {f.lower() for f in (route or {}).get("focus") or []}
             self.db.execute("INSERT INTO game_state(conversation_id, data) VALUES(?,?)", (conv_id, json.dumps(state, ensure_ascii=False)))
             for i, npc in enumerate(data.get("npcs", [])):
+                if solo and npc.get("companion"):
+                    continue
                 self.add_npc(
                     conv_id,
                     npc["name"],
@@ -190,7 +198,8 @@ class ConversationRepository:
         if isinstance(hp, dict) and hp.get("max"):
             player["hp"] = {**hp, "current": hp["max"]}
         new = self.create(scenario, title=scenario["name"], player=player, setup=str(state.get("setup") or ""),
-                          player_lore=conv.get("player_lore") or [], start=str((conv["scenario"].get("route") or {}).get("id") or ""))
+                          player_lore=conv.get("player_lore") or [], start=str((conv["scenario"].get("route") or {}).get("id") or ""),
+                          party_mode=str(state.get("party_mode") or ""))
         if keep:
             title = re.sub(r"\s*\(old run\)$", "", conv["title"] or scenario["name"])[:100]
             self.rename(conv_id, f"{title} (old run)")

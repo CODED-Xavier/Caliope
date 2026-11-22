@@ -128,6 +128,10 @@ def _story_part(merged: dict) -> dict:
     script = merged.get("script")
     if isinstance(script, dict):
         out["script"] = {"next": max(0, as_int(script.get("next", 0)))}
+    if merged.get("party_mode") in ("solo", "companions"):  # app/party.py
+        from .party import normalize_party
+        out["party_mode"] = merged["party_mode"]
+        out["party"] = normalize_party(merged.get("party"))
     log = merged.get("rep_log")
     if isinstance(log, list):
         out["rep_log"] = [e for e in log if isinstance(e, dict)][-60:]

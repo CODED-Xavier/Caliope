@@ -324,7 +324,7 @@ function RelBar({ value }) {
 const LOOKS = [["race", "Race / species"], ["hair", "Hair"], ["eyes", "Eyes"], ["build", "Build"], ["skin", "Skin"], ["outfit", "Style / outfit"], ["extra", "Other details"]];
 const looksSummary = (app) => ["race", "hair", "eyes"].map((k) => (app || {})[k]).filter(Boolean).join(" · ");
 
-function NpcCard({ npc, onUpdate, onDelete, log = [] }) {
+function NpcCard({ npc, onUpdate, onDelete, log = [], member = null }) {
   const [open, setOpen] = useState(false);
   const pics = npc.portraits || { default: "", moods: [] };
   const thumb = pics.moods?.[0]?.url || pics.default;
@@ -333,7 +333,8 @@ function NpcCard({ npc, onUpdate, onDelete, log = [] }) {
       <div className="row gap center" onClick={() => setOpen(!open)} style={{ cursor: "pointer" }}>
         {thumb && <img className="npc-thumb" src={portraitSrc(thumb)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
         <div className="grow">
-          <div className="npc-name">{npc.name}{npc.is_main && <span className="tag">main</span>}</div>
+          <div className="npc-name">{npc.name}{npc.is_main && <span className="tag">main</span>}
+            {member && <span className="tag" title="Travels and fights with you">{`👥 ${member.hp}/${member.max_hp} HP`}</span>}</div>
           <div className="small" style={{ color: relationshipColor(npc.relationship) }} title={relationshipEffect(npc.relationship)}>
             {relationshipLabel(npc.relationship)} ({npc.relationship > 0 ? "+" : ""}{npc.relationship})
           </div>
@@ -392,7 +393,7 @@ function NpcCard({ npc, onUpdate, onDelete, log = [] }) {
   );
 }
 
-function PeopleTab({ npcs, onUpdate, onDelete, onAdd, repLog = [] }) {
+function PeopleTab({ npcs, onUpdate, onDelete, onAdd, repLog = [], party = {} }) {
   const logOf = (n) => repLog.filter((e) => (e.npc || "").toLowerCase() === n.name.toLowerCase());
   const [name, setName] = useState("");
   const met = npcs.filter((n) => n.met !== false);
@@ -401,7 +402,7 @@ function PeopleTab({ npcs, onUpdate, onDelete, onAdd, repLog = [] }) {
     <div className="tab-body">
       <div className="section-title">Characters ({met.length})</div>
       {met.length === 0 && <div className="muted small">No characters met yet. They appear here as the story introduces them.</div>}
-      {met.map((n) => <NpcCard key={n.id} npc={n} onUpdate={onUpdate} onDelete={onDelete} log={logOf(n)} />)}
+      {met.map((n) => <NpcCard key={n.id} npc={n} onUpdate={onUpdate} onDelete={onDelete} log={logOf(n)} member={party[n.name]} />)}
       {unmet.length > 0 && (
         <details className="unmet">
           <summary className="section-title">Not met yet ({unmet.length})</summary>
@@ -795,7 +796,8 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         {active === "sheet" && <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} onPower={onPower} onRest={onRest} busy={!canRoll}
           convId={conversation.id} onState={onStateLoaded} />}
         {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}
-        {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} repLog={state.rep_log || []} />}
+        {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} repLog={state.rep_log || []}
+          party={state.party_mode === "companions" ? state.party || {} : {}} />}
         {active === "map" && <MapTab state={state} convId={conversation.id} refreshKey={game.messages?.length} />}
         {active === "combat" && <CombatTab game={game} busy={!canRoll} onCombat={onCombat} onCombatEdit={onCombatEdit} onState={onStateLoaded} />}
         {active === "dice" && <DiceTab onRollToChat={onRollToChat} canRoll={canRoll} />}

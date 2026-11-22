@@ -100,6 +100,11 @@ def _combatant(raw: dict, side: str, system: str, index: int) -> dict:
         "range": max(1, min(30, as_int(raw.get("range", 1), 1))),   # squares: 1 = melee, more = ranged
         "speed": max(1, min(12, as_int(raw.get("speed", 6), 6))),   # squares per turn (6 = 30 ft)
     }
+    if side == "ally" and raw.get("companion"):  # app/party.py: Calíope plays them (healers heal, the others attack)
+        c["companion"] = True
+        c["role"] = str(raw.get("role") or "fighter")
+        if raw.get("heal"):
+            c["heal"], c["heals_left"] = _dice_ok(raw["heal"], "1d8+3"), max(0, as_int(raw.get("heals", 0), 0))
     spell = raw.get("spell") if isinstance(raw.get("spell"), dict) else None
     if spell and str(spell.get("name", "")).strip():
         mp_max = max(1, min(999, as_int(raw.get("mp", raw.get("mp_max", 10)), 10)))
@@ -119,6 +124,10 @@ def _combatant(raw: dict, side: str, system: str, index: int) -> dict:
         c["damage"] = _dice_ok(raw.get("damage"), "1d6+1")
         c["init_bonus"] = max(-5, min(15, as_int(raw.get("init_bonus", 1), 1)))
     return c
+
+
+def me_down(combat: dict) -> dict:
+    return next(c for c in combat["combatants"] if c["side"] == "player")
 
 
 class CombatEngine:
@@ -194,6 +203,9 @@ class CombatEngine:
             combat["log"] = (combat["log"] + first)[-30:]
             line += "\n\n" + "\n\n".join(first)
             done = self._finished(combat)
+            if done == "you have fallen" and me_down(combat).get("dying"):
+                line += "\n\n" + self._fall_out(combat, me_down(combat))
+                self._sync_player(state)
             if done:
                 state, end_line = self.end(state, done)
                 line += "\n\n🏁 " + end_line.replace("⚔️ ", "")
@@ -251,6 +263,10 @@ class CombatEngine:
     def _sync_player(self, state: dict) -> None:
         me = next(c for c in state["combat"]["combatants"] if c["side"] == "player")
         state["player"]["hp"]["current"] = int(clamp(me["hp"], 0, state["player"]["hp"]["max"]))
+        group = state.get("party") or {}
+        for c in state["combat"]["combatants"]:  # companions' HP lasts after the fight
+            if c.get("companion") and c["name"] in group:
+                group[c["name"]]["hp"] = int(clamp(c["hp"], 0, group[c["name"]]["max_hp"]))
 
     def _advance(self, combat: dict) -> None:
         """Next living combatant; a new round starts after the last one."""
@@ -263,7 +279,7 @@ class CombatEngine:
             cur = self.current(combat)
             if "dodging" in cur["conditions"]:  # a Dodge lasts until the dodger's own next turn
                 cur["conditions"].remove("dodging")
-            if cur["hp"] > 0:
+            if cur["hp"] > 0 or cur.get("dying"):  # a dying player still has a turn: their death save
                 if cur["side"] == "player":
                     combat["moved"] = 0  # a fresh turn: the player's full speed again
                 return
@@ -282,10 +298,10 @@ class CombatEngine:
             if margin <= 0:
                 return f"{head}\n{roll} → **MISS**"
             dmg = margin + as_int(att["damage"], 0)
-            target["hp"] = max(0, target["hp"] - dmg)
+            after = self._hurt(combat, target, dmg, crit=a["critical"])
             crit = " (CRITICAL)" if a["critical"] else ""
             return (f"{head}\n{roll} → **HIT**{crit}\n💥 {dmg} damage → {target['name']} {target['hp']}/{target['max_hp']} HP"
-                    + self._down(target))
+                    + after)
 
         mode = advantage
         if "dodging" in target["conditions"] or "invisible" in target["conditions"]:
@@ -308,21 +324,93 @@ class CombatEngine:
             dmg_expr = re.sub(r"(\d*)d(\d+)", lambda m: f"{2 * int(m.group(1) or 1)}d{m.group(2)}", dmg_expr)
         d = self.dice.roll(dmg_expr)
         dmg = max(1, d.total)
-        target["hp"] = max(0, target["hp"] - dmg)
+        after = self._hurt(combat, target, dmg, crit=r.natural == 20)
         crit = "CRITICAL HIT" if r.natural == 20 else "HIT"
         return (f"{head}\n{roll} → **{crit}**\n💥 {dmg} damage ({dmg_expr}) → {target['name']} {target['hp']}/{target['max_hp']} HP"
-                + self._down(target))
+                + after)
 
-    @staticmethod
-    def _down(c: dict) -> str:
-        if c["hp"] > 0:
+    def _hurt(self, combat: dict, target: dict, dmg: int, crit: bool = False) -> str:
+        """Damage lands. A player at 0 HP is dying (5e death saves); a hit while dying is a failed save (a critical, two)."""
+        if target["side"] == "player" and target["hp"] <= 0 and not target.get("dead"):
+            death = target.setdefault("death", {"ok": 0, "fail": 0})
+            death["fail"] += 2 if crit else 1
+            target["stable"] = False
+            target["dying"] = True
+            if death["fail"] >= 3:
+                target["dying"], target["dead"] = False, True
+                return f" · 💀 **{target['name']} dies.**"
+            return f" · 💀 a hit while dying: death save failure ({death['fail']}/3)"
+        target["hp"] = max(0, target["hp"] - dmg)
+        if target["hp"] > 0:
             return ""
-        return f" · **{c['name']} falls unconscious!**" if c["side"] == "player" else f" · **{c['name']} is defeated!**"
+        if target["side"] == "player":
+            target.update(dying=True, stable=False, death={"ok": 0, "fail": 0})
+            return f" · **{target['name']} falls, dying!** (death saves each turn)"
+        return f" · **{target['name']} falls unconscious!**" if target["side"] == "ally" else f" · **{target['name']} is defeated!**"
+
+    def _death_save(self, combat: dict, me: dict) -> str:
+        """One death saving throw: 10+ succeeds; a natural 20 brings them back at 1 HP; a natural 1 is two failures."""
+        r = self.dice.roll("1d20")
+        death = me.setdefault("death", {"ok": 0, "fail": 0})
+        if r.natural == 20:
+            me.update(hp=1, dying=False, stable=False, death={"ok": 0, "fail": 0})
+            return f"💀 **{me['name']}'s death save**: d20(20) → **natural 20!** {me['name']} gets back up with 1 HP."
+        if r.natural == 1:
+            death["fail"] += 2
+            word = "natural 1: two failures"
+        elif r.total >= 10:
+            death["ok"] += 1
+            word = "success"
+        else:
+            death["fail"] += 1
+            word = "failure"
+        tail = f" (✔ {death['ok']}/3 · ✖ {min(3, death['fail'])}/3)"
+        if death["fail"] >= 3:
+            me.update(dying=False, dead=True)
+            return f"💀 **{me['name']}'s death save**: d20({r.natural}) → {word}{tail}. **{me['name']} dies.**"
+        if death["ok"] >= 3:
+            me.update(dying=False, stable=True)
+            return f"💀 **{me['name']}'s death save**: d20({r.natural}) → {word}{tail}. **{me['name']} is stable** (unconscious)."
+        return f"💀 **{me['name']}'s death save**: d20({r.natural}) → {word}{tail}"
+
+    def _fall_out(self, combat: dict, me: dict) -> str:
+        """Nobody on the player's side is standing: the remaining saves decide whether they are left alive."""
+        lines = []
+        for _ in range(12):
+            if not me.get("dying"):
+                break
+            lines.append(self._death_save(combat, me))
+        if me.get("stable") or me["hp"] > 0:
+            me["hp"] = max(1, me["hp"])
+            lines.append(f"🩹 {me['name']} survives: left for dead or captured, waking later with {me['hp']} HP.")
+        return "\n".join(lines)
+
+    def _companion_heal(self, combat: dict, c: dict) -> str:
+        """A healer's turn: heal the dying player first, then whoever is lowest below half HP (while heals remain)."""
+        if not c.get("heal") or c.get("heals_left", 0) <= 0:
+            return ""
+        side = [x for x in combat["combatants"] if x["side"] in ("player", "ally") and not x.get("dead")]
+        dying = [x for x in side if x["side"] == "player" and x["hp"] <= 0]
+        hurt = [x for x in side if 0 < x["hp"] < x["max_hp"] / 2]
+        target = (dying or sorted(hurt, key=lambda x: x["hp"] / x["max_hp"]) or [None])[0]
+        if target is None:
+            return ""
+        amount = max(1, self.dice.roll(c["heal"]).total)
+        was_down = target["hp"] <= 0
+        target["hp"] = min(target["max_hp"], max(0, target["hp"]) + amount)
+        if target["side"] == "player":
+            target.update(dying=False, stable=False, death={"ok": 0, "fail": 0})
+        c["heals_left"] -= 1
+        back = f" · **{target['name']} is back on their feet!**" if was_down else ""
+        return (f"**{c['name']} heals {target['name']}** ({c['heals_left']} heals left)\n"
+                f"💚 +{amount} HP ({c['heal']}) → {target['name']} {target['hp']}/{target['max_hp']} HP{back}")
 
     def _finished(self, combat: dict) -> str:
         if all(c["hp"] <= 0 for c in combat["combatants"] if c["side"] == "enemy"):
             return "all enemies are down"
-        if all(c["hp"] <= 0 for c in combat["combatants"] if c["side"] == "player"):
+        if any(c.get("dead") for c in combat["combatants"] if c["side"] == "player"):
+            return "you have fallen"
+        if all(c["hp"] <= 0 for c in combat["combatants"] if c["side"] in ("player", "ally")):
             return "you have fallen"
         return ""
 
@@ -337,8 +425,12 @@ class CombatEngine:
         lines: list[str] = []
         # Anyone before the player in the order acts first (start of the fight, or after a free text turn).
         lines += self._others_until_player(combat)
+        if self._finished(combat):
+            self._sync_player(state)
+            return self._wrap(state, lines, round_no)
         if me["hp"] <= 0:
-            raise CombatError("You are unconscious.")
+            raise CombatError("You are down: your death saves are rolled on your turns while your companions fight on. "
+                              "Use “Others act” to play the round.")
         if action == "attack":
             target = self._get(combat, target_id)
             if target["hp"] <= 0:
@@ -474,9 +566,20 @@ class CombatEngine:
             if c["side"] == "player":
                 if c["hp"] > 0:
                     break
+                if c.get("dying"):  # down: the turn is a death saving throw, rolled by the app (one per round)
+                    lines.append(self._death_save(combat, c))
+                    if c["hp"] > 0:
+                        break  # a natural 20: back up, and it is their turn
+                    self._advance(combat)
+                    break
                 self._advance(combat)
                 continue
             if c["hp"] <= 0:
+                self._advance(combat)
+                continue
+            healed = self._companion_heal(combat, c) if c.get("companion") else ""
+            if healed:
+                lines.append(healed)
                 self._advance(combat)
                 continue
             foes = [x for x in combat["combatants"] if x["hp"] > 0 and ((x["side"] == "enemy") != (c["side"] == "enemy"))]
@@ -523,6 +626,15 @@ class CombatEngine:
                 lines.append("\U0001F504 " + ", ".join(back))
         done = self._finished(combat)
         text = f"⚔️ **Round {round_no}**\n\n" + "\n\n".join(lines)
+        me = me_down(combat)
+        if done == "you have fallen":
+            if me.get("dying"):
+                text += "\n\n" + self._fall_out(combat, me)
+            self._sync_player(state)
+        elif done and me["hp"] <= 0 and not me.get("dead"):  # won while down: the companions see to the player
+            me.update(hp=1, dying=False, stable=True)
+            text += f"\n\n🩹 The companions stabilize {me['name']}, who comes to with 1 HP."
+            self._sync_player(state)
         if done:
             state, end_line = self.end(state, done)
             text += "\n\n🏁 " + end_line.replace("⚔️ ", "")

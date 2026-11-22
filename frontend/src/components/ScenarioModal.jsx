@@ -4,6 +4,7 @@ import { CharacterPreview, FillCharacters, PicturesFolder, PlacesEditor, StartsE
 import Modal from "./Modal.jsx";
 import SheetPicker from "./SheetPicker.jsx";
 import AdventureEditor from "./AdventureEditor.jsx";
+import CompanionsEditor from "./CompanionsEditor.jsx";
 import HelpTip from "./HelpTip.jsx";
 import KindPicker from "./KindPicker.jsx";
 import SetupView from "./SetupView.jsx";
@@ -385,7 +386,9 @@ function Editor({ initial, id, onCancel, onSaved }) {
             npcs: [...p.npcs, ...(card.data.npcs || []).filter((n) => !have.has(n.name.toLowerCase()))] };
         })} />}
 
-      <div className="section-title">{d.mode === "character" ? "The character" : "Characters (NPCs)"} <span className="muted tiny">({d.npcs.length})</span></div>
+      {d.mode !== "character" && <CompanionsEditor cardId={id} npcs={d.npcs} onChange={(v) => set("npcs", v)} />}
+
+      <div className="section-title">{d.mode === "character" ? "The character" : "Characters (NPCs)"} <span className="muted tiny">({d.npcs.filter((n) => !n.companion).length})</span></div>
       <PicturesFolder cardId={id} npcs={d.npcs} onApplied={(card) => {
         const pics = Object.fromEntries((card.data.npcs || []).map((n) => [n.name, n.portraits]));
         setD((p) => {
@@ -399,7 +402,7 @@ function Editor({ initial, id, onCancel, onSaved }) {
         setD((p) => ({ ...p, npcs: p.npcs.map((n) => (by[n.name] ? { ...n, appearance: by[n.name].appearance, personality: by[n.name].personality, speech_style: by[n.name].speech_style } : n)) }));
       }} />
       {d.npcs.length > 8 && <div className="row gap center"><input className="field grow" placeholder="Find a character…" value={npcFilter} onChange={(e) => setNpcFilter(e.target.value)} /></div>}
-      {d.npcs.map((n, i) => (npcFilter && !n.name.toLowerCase().includes(npcFilter.toLowerCase())) ? null : (
+      {d.npcs.map((n, i) => (n.companion || (npcFilter && !n.name.toLowerCase().includes(npcFilter.toLowerCase()))) ? null : (
         <div className="card" key={i}>
           <div className="row gap center">
             <input className="field grow" placeholder="Name" value={n.name} onChange={(e) => setNpc(i, "name", e.target.value)} />

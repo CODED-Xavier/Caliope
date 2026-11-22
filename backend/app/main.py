@@ -43,7 +43,7 @@ from .playerlore import parse_suggestions, suggest_prompt
 from .checks import roll_line
 from . import shop
 from . import resources
-from . import adventure, bestiary, mappaint, sheets, statusbook, wikiresearch
+from . import adventure, bestiary, mappaint, party, sheets, statusbook, wikiresearch
 from . import worldtime
 from .engine import BusyError
 from .llm import LLMError
@@ -277,6 +277,18 @@ async def update_scenario(scenario_id: int, data: dict[str, Any] = Body(...)):
     return scenario
 
 
+@app.post("/api/scenarios/{scenario_id}/companions/draft")
+async def draft_companions(scenario_id: int):
+    """✨ Write companions: 3 new characters who fit the card, with fight sheets (you edit them before saving)."""
+    card = svc().scenarios.get(scenario_id)
+    if not card:
+        raise NotFound(f"Scenario {scenario_id} not found")
+    got = await party.draft(svc().llm, {**card["data"], "name": card["name"]})
+    if not got:
+        raise ValueError("The model did not write usable companions. Try again.")
+    return {"companions": got}
+
+
 @app.delete("/api/scenarios/{scenario_id}")
 async def delete_scenario(scenario_id: int):
     if not svc().scenarios.delete(scenario_id):
@@ -326,8 +338,10 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
             fight_map = await asyncio.to_thread(_paint_fight_map, fight_map)  # the little tile map becomes a painted picture
 
         def prepare(st):
+            card = s.conversations.get(conv_id)["scenario"]
+            allies = (body.get("allies") or []) + party.allies(st, card)  # companions always join
             new, line = s.combat.start(st, body.get("system", "d20"), BESTIARY.enrich(body.get("enemies") or []),
-                                       body.get("allies") or [], body.get("player") or {}, body.get("grid") or {},
+                                       allies, body.get("player") or {}, body.get("grid") or {},
                                        fight_map,
                                        body.get("near") if isinstance(body.get("near"), list) else None)
             if body.get("scene"):  # this scene's fight happened: the chat stops offering it
@@ -1485,6 +1499,7 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
     player = body.get("player") if isinstance(body.get("player"), dict) else None
     conv = svc().conversations.create(scenario, title=str(body.get("title", "")), player_name=body.get("player_name"),
                                       start=str(body.get("start") or ""),
+                                      party_mode=str(body.get("party") or ""),
                                       player=player, setup=str(body.get("setup") or ""),
                                       player_lore=body.get("player_lore") if isinstance(body.get("player_lore"), list) else None)
     return full_conversation(conv["id"])

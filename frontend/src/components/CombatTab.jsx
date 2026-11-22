@@ -306,7 +306,10 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, o
           <div key={c.id} className={`fighter ${c.id === current?.id ? "current" : ""} ${c.hp <= 0 ? "down" : ""} ${c.id === target ? "targeted" : ""}`} onClick={() => select(c.id)}>
             <div className="row gap center">
               <span className="dot-side" style={{ background: SIDE_COLOR[c.side] }} />
-              <span className="grow small"><strong>{c.name}</strong>{c.side === "enemy" && c.id === target && <span className="tiny muted"> · target</span>}</span>
+              <span className="grow small"><strong>{c.name}</strong>{c.side === "enemy" && c.id === target && <span className="tiny muted"> · target</span>}
+                {c.companion && <span className="tiny muted">{` · 👥 ${c.role}${c.heal ? `, ${c.heals_left} heals` : ""}`}</span>}
+                {c.side === "player" && c.dying && <span className="tiny bad-text">{` · 💀 dying ✔${c.death?.ok || 0} ✖${c.death?.fail || 0}`}</span>}
+                {c.side === "player" && c.stable && c.hp <= 0 && <span className="tiny muted"> · stable</span>}</span>
               <button className="icon-btn" title="−1 HP" onClick={(e) => { e.stopPropagation(); onEdit(c.id, { hp: c.hp - 1 }); }}>−</button>
               <span className="small hp-num">{c.hp}/{c.max_hp}</span>
               <button className="icon-btn" title="+1 HP" onClick={(e) => { e.stopPropagation(); onEdit(c.id, { hp: c.hp + 1 }); }}>＋</button>
@@ -325,6 +328,9 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, o
         ))}
       </div>
 
+      {people.find((c) => c.side === "player")?.hp <= 0 && (
+        <div className="muted small down-note">{"💀 You are down. Your death saves are rolled on your turns while your companions fight on: press “Others act” to play the round."}</div>
+      )}
       <div className="action-bar">
         <div className="row gap center">
           <select className="field grow" value={target} onChange={(e) => setTarget(e.target.value)}>

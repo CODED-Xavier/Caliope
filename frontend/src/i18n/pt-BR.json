@@ -1533,7 +1533,39 @@
 "You already made a check this round (one reaction per round). It comes back next round.": "Você já fez um teste nesta rodada (uma reação por rodada). Ela volta na próxima rodada.",
 "You cannot stand there.": "Você não pode ficar ali.",
 "You are unconscious.": "Você está inconsciente.",
-"Close (Esc)": "Fechar (Esc)"
+"Close (Esc)": "Fechar (Esc)",
+" · stable": " · estável",
+"💀 You are down. Your death saves are rolled on your turns while your companions fight on: press “Others act” to play the round.": "💀 Você caiu. Seus testes contra a morte são rolados nos seus turnos enquanto seus companheiros lutam: aperte “Outros agem” para jogar a rodada.",
+"⚔ Fighter": "⚔ Guerreiro",
+"🏹 Archer": "🏹 Arqueiro",
+"💚 Healer": "💚 Curandeiro",
+"🗡 Rogue": "🗡 Ladino",
+"Replace the companions with 3 new ones written by the AI?": "Substituir os companheiros por 3 novos escritos pela IA?",
+"👥 Companions": "👥 Companheiros",
+"They travel with the player in games started with “Play with companions”: the Aedo voices them, and Calíope plays them in fights. In “Play solo” they stay home, and an adventure's fights are scaled to one hero.": "Eles viajam com o jogador nos jogos começados com “Jogar com companheiros”: o Aedo dá voz a eles, e a Calíope os joga nas lutas. Em “Jogar sozinho” eles ficam em casa, e as lutas de uma aventura são ajustadas para um herói.",
+"Class (Cleric…)": "Classe (Clérigo…)",
+"HP": "PV",
+"Squares (1 = melee)": "Quadrados (1 = corpo a corpo)",
+"Squares per turn (6 = 30 ft)": "Quadrados por turno (6 = 9 m)",
+"Heal": "Cura",
+"Heals per fight": "Curas por luta",
+"Who they are (history, looks)": "Quem são (história, aparência)",
+"＋ Add companion": "＋ Adicionar companheiro",
+"The AI writes 3 companions who fit this card (you can edit everything)": "A IA escreve 3 companheiros que combinam com este card (você pode editar tudo)",
+"Save the card first": "Salve o card primeiro",
+"✨ Write companions": "✨ Escrever companheiros",
+"the card's AC": "a CA do card",
+"👥 Play with companions": "👥 Jogar com companheiros",
+"🧍 Play solo": "🧍 Jogar sozinho",
+"Just you. An adventure's fights are scaled down to one hero.": "Só você. As lutas de uma aventura são ajustadas para um herói.",
+"Travels and fights with you": "Viaja e luta com você",
+"Companions": "Companheiros",
+"Up to 3 characters who travel with the player, outside the card's own story. In a game started with Play with companions, the Aedo voices them (they talk and act on their own, never for you) and Calíope plays them in fights: healers heal whoever is hurt, the others fight. Their HP lasts between fights; rests heal them. They have a relationship with you like any character.": "Até 3 personagens que viajam com o jogador, fora da história do próprio card. Num jogo começado com Jogar com companheiros, o Aedo dá voz a eles (falam e agem por conta própria, nunca por você) e a Calíope os joga nas lutas: curandeiros curam quem está ferido, os outros lutam. Os PV deles continuam entre lutas; descansos curam. Eles têm relacionamento com você como qualquer personagem.",
+"Adventures written for a group (like Lost Mine of Phandelver), or any card where you want a party.": "Aventuras escritas para um grupo (como A Mina Perdida de Phandelver), ou qualquer card em que você queira um grupo.",
+"A few more lines in each reply.": "Algumas linhas a mais em cada resposta.",
+"In an adventure, when the enemies of the scene attack (or you attack them), the fight starts on its own right after the reply: turn order, the battle map, and the app rolls every attack. When it is off (the default), a ⚔ A fight! button appears under the reply and you start it.": "Numa aventura, quando os inimigos da cena atacam (ou você os ataca), a luta começa sozinha logo depois da resposta: ordem de turnos, mapa de batalha, e o app rola todos os ataques. Desligado (o padrão), aparece um botão ⚔ Uma luta! embaixo da resposta e você a começa.",
+"Turn it on if you want fights to start without the button.": "Ligue se quiser que as lutas comecem sem o botão.",
+"· stable": "· estável"
 },
 "patterns": [
 [
@@ -1975,6 +2007,22 @@
 [
 "Starting HP {0} (d{1} {2} CON) · AC {3} ({4}). You can change them on the sheet later.",
 "PV iniciais {0} (d{1} {2} CON) · CA {3} ({4}). Você pode mudar isso na ficha depois."
+],
+[
+"{0} travel and fight beside you.",
+"{0} viajam e lutam ao seu lado."
+],
+[
+"👥 {0}/{1} HP",
+"👥 {0}/{1} PV"
+],
+[
+" · 💀 dying ✔{0} ✖{1}",
+" · 💀 morrendo ✔{0} ✖{1}"
+],
+[
+"🖼 Pictures and moods ({0})",
+"🖼 Imagens e humores ({0})"
 ]
 ]
 }
