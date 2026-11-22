@@ -59,7 +59,7 @@ function CheckButtons({ checks, onCheck }) {
       {checks.map((c, i) => (
         <span key={i} className="check-btn">
           <button className="btn small primary" onClick={() => onCheck(i, "")} title="Roll with the bonus from your sheet; the result goes to the Aedo">
-            🎲 {c.skill || c.ability} {CHECK_KIND[c.kind]}{c.dc ? ` · DC ${c.dc}` : ""}
+            🎲 {c.skill || c.ability} {CHECK_KIND[c.kind]}{c.dc ? ` (DC ${c.dc})` : ""}
           </button>
           <button className="btn small" title="Roll with advantage (two d20, keep the higher)" onClick={() => onCheck(i, "advantage")}>▲</button>
           <button className="btn small" title="Roll with disadvantage (two d20, keep the lower)" onClick={() => onCheck(i, "disadvantage")}>▼</button>
@@ -446,7 +446,7 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
             rows={1}
             spellCheck lang={chatLang(game)}
             value={text}
-            placeholder={MODES.find((x) => x.id === sendMode)?.hint}
+            placeholder={game.state?.combat?.active ? "⚔ In the fight: write your attack (\"I swing at Goblin 2's neck\") or /attack goblin 2. The app rolls it." : MODES.find((x) => x.id === sendMode)?.hint}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); }
@@ -472,7 +472,7 @@ export default function Chat({ game, stream, busy, error, lastContext, onSend, o
             ))}
           </span>
           <span className="mode-who">{MODES.find((x) => x.id === sendMode)?.who}</span>
-          <HelpTip id="writing" /> · <span className="mark">/roll 1d20</span> · Shift+Enter: new line
+          <HelpTip id="writing" /> · {game.state?.combat?.active ? <><span className="mark">/attack</span> · <span className="mark">/dodge</span></> : <span className="mark">/roll 1d20</span>} · Shift+Enter: new line
         </div>
       </div>
     </div>

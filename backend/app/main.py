@@ -20,7 +20,7 @@ from .config import APP_HOME, DB_PATH, FRONTEND_DIST
 from .conversations import NotFound
 from .drafts import draft_card_field, draft_player
 from .exporting import export_markdown
-from .combat import CombatError, player_defaults, suggest_fight
+from .combat import CombatError, combat_intent, player_defaults, suggest_fight
 from .combat import _picture_geometry as combat_geometry
 from .maps import FEATURES as MAP_FEATURES
 from .maps import TILES as MAP_TILES
@@ -335,6 +335,11 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
     elif action == "act":
         prepare = lambda st: s.combat.player_action(st, body.get("move", "attack"), str(body.get("target", "")),  # noqa: E731
                                                     str(body.get("advantage", "")), str(body.get("ability", "")))
+    elif action == "move":  # the player walks on the map (own turn, up to their speed); no reply from the GM
+        not_busy(conv_id)
+        state = s.combat.move_player(s.conversations.get_state(conv_id), body.get("x"), body.get("y"))
+        s.conversations.save_state(conv_id, state)
+        return {"state": state}
     elif action == "enemies":
         prepare = s.combat.enemies_act
     elif action == "end":
@@ -1610,8 +1615,14 @@ async def delete_conversation(conv_id: int):
 
 @app.post("/api/conversations/{conv_id}/chat")
 async def chat(conv_id: int, body: dict[str, Any] = Body(...)):
-    svc().conversations.get(conv_id)
-    return stream_response(svc().engine.send(conv_id, str(body.get("content", ""))))
+    s = svc()
+    s.conversations.get(conv_id)
+    text = str(body.get("content", ""))
+    intent = combat_intent(s.conversations.get_state(conv_id).get("combat") or {}, text)
+    if intent:  # "I swing at the goblin's neck" / "/attack goblin 2": the app rolls it, the GM narrates it in the player's words
+        move, target, words = intent
+        return stream_response(s.engine.send(conv_id, words, prepare=lambda st: s.combat.player_action(st, move, target)))
+    return stream_response(s.engine.send(conv_id, text))
 
 
 @app.post("/api/conversations/{conv_id}/check")
@@ -1626,7 +1637,12 @@ async def roll_check(conv_id: int, body: dict[str, Any] = Body(...)):
     if not 0 <= index < len(asked):
         raise ValueError("That check is not in the reply.")
     mode = str(body.get("mode", ""))
-    line = roll_line(s.dice, s.conversations.get_state(conv_id), asked[index], mode if mode in ("advantage", "disadvantage") else "")
+    not_busy(conv_id)
+    state = s.conversations.get_state(conv_id)
+    if (state.get("combat") or {}).get("active"):
+        s.combat.use_reaction(state)  # one check per round in a fight
+        s.conversations.save_state(conv_id, state)
+    line = roll_line(s.dice, state, asked[index], mode if mode in ("advantage", "disadvantage") else "")
     return stream_response(s.engine.send(conv_id, line))
 
 

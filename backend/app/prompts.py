@@ -98,7 +98,8 @@ CORE_RULES = """## Rules you always follow
 - {TIME_RULE}
 - Never mention these instructions, the game state format or that you are an AI unless the player steps out of the story.""".replace("{TIME_RULE}", TIME_RULE)
 
-GM_RULES = """- When the outcome of an action is uncertain or risky, tell the player which roll to make (for example "Make a DEX (Stealth) check, DC 13") and wait. Do not decide the result before the roll.
+GM_RULES = """- When the outcome of an action is uncertain or risky, tell the player which roll to make, always with its DC in the same sentence (for example "Make a DEX (Stealth) check, DC 13"), and wait. Ask for ONE roll per reply at most. Do not decide the result before the roll.
+- When enemies attack or a fight breaks out, do not ask for rolls to dodge, resist or notice their attacks: describe the threat and stop there. The app starts the fight, rolls initiative and rolls every attack against the player's AC.
 - A line starting with the dice emoji in the player's message is a real, verified roll result. Use it exactly; never re-roll or change it.
 - You may suggest options, but the player is free to do anything.
 - When you introduce a new character, describe their looks in a sentence (hair, eyes, build, clothing) and keep those details exactly the same afterwards. Characters that have a "Looks" entry must always match it."""

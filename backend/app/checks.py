@@ -30,7 +30,13 @@ SKILLS = {  # skill: (ability, other names)
 }
 TRIGGER = re.compile(r"\b(checks?|saving throws?|saves?|rolls?|teste|testes|salvaguarda|resistência|resistencia|rolagem|role)\b", re.I)
 DC = re.compile(r"\b(?:DC|CD|difficulty|dificuldade)\s*[:=]?\s*(\d{1,2})\b", re.I)
-MAX_CHECKS = 3
+MAX_CHECKS = 1  # one roll per reply: the GM waits for it before asking anything else
+DIFFICULTY = (  # "a hard check" without a number: the 5e table
+    (re.compile(r"\b(very easy|muito f[aá]cil)\b", re.I), 5), (re.compile(r"\b(very hard|muito dif[ií]cil)\b", re.I), 25),
+    (re.compile(r"\b(nearly impossible|quase imposs[ií]vel)\b", re.I), 30), (re.compile(r"\b(easy|f[aá]cil)\b", re.I), 10),
+    (re.compile(r"\b(hard|dif[ií]cil)\b", re.I), 20), (re.compile(r"\b(medium|moderate|m[eé]dio|moderad[oa])\b", re.I), 15),
+)
+DEFAULT_DC = 12  # the GM forgot the number: the player still sees it before rolling, and the GM is told it
 
 
 def _find_ability(text: str) -> str | None:
@@ -53,24 +59,43 @@ def _find_skill(text: str) -> str | None:
     return None
 
 
+def _dc_near(sentences: list[str], i: int) -> tuple[int | None, bool]:
+    """The DC in this sentence or the next two ("Make a DEX check to dodge. DC 15."), or a difficulty word."""
+    for k in range(i, min(i + 3, len(sentences))):
+        if k > i and TRIGGER.search(sentences[k]) and _find_ability(sentences[k]):
+            break  # the next sentence asks for another roll
+        m = DC.search(sentences[k])
+        if m:
+            return int(m.group(1)), False
+    for k in range(i, min(i + 2, len(sentences))):
+        for pat, dc in DIFFICULTY:
+            if pat.search(sentences[k]):
+                return dc, False
+    return None, True
+
+
 def find_checks(reply: str) -> list[dict]:
-    """The rolls the GM asked for in this reply, in order (at most three)."""
+    """The roll the GM asked for in this reply (one at most), always with a DC so the player knows it before rolling."""
     out: list[dict] = []
-    for sentence in re.split(r"(?<=[.!?])\s+|\n+", reply or ""):
-        if not TRIGGER.search(sentence):
-            continue
-        skill = _find_skill(sentence)
-        ability = _find_ability(sentence) or (SKILLS[skill][0] if skill else None)
-        if not ability:
-            continue
-        save = bool(re.search(r"\b(sav(e|es|ing)|salvaguarda|resist[eê]ncia)\b", sentence, re.I)) and not skill
-        dc_m = DC.search(sentence)
-        check = {"ability": ability, "skill": skill or "", "kind": "save" if save else "check",
-                 "dc": int(dc_m.group(1)) if dc_m else None}
-        if check not in out:
-            out.append(check)
-        if len(out) >= MAX_CHECKS:
-            break
+    for para in re.split(r"\n+", reply or ""):
+        sentences = [x for x in re.split(r"(?<=[.!?])\s+", para) if x.strip()]
+        for i, sentence in enumerate(sentences):
+            if not TRIGGER.search(sentence):
+                continue
+            skill = _find_skill(sentence)
+            ability = SKILLS[skill][0] if skill else _find_ability(sentence)  # Perception is WIS even if the GM wrote INT
+            if not ability:
+                continue
+            save = bool(re.search(r"\b(sav(e|es|ing)|salvaguarda|resist[eê]ncia)\b", sentence, re.I)) and not skill
+            dc, missing = _dc_near(sentences, i)
+            check = {"ability": ability, "skill": skill or "", "kind": "save" if save else "check",
+                     "dc": DEFAULT_DC if missing else dc}
+            if missing:
+                check["dc_default"] = True
+            if check not in out:
+                out.append(check)
+            if len(out) >= MAX_CHECKS:
+                return out
     return out
 
 
@@ -117,7 +142,7 @@ def roll_line(dice, state: dict, check: dict, mode: str = "") -> str:
     line = f"\U0001F3B2 {label({**check, 'dc': None})} ({how}{tag}): d20[{shown}] {bonus:+d} → **{r.total}**"
     if check.get("dc"):
         ok = r.total >= check["dc"]
-        line += f" vs DC {check['dc']} → " + ("✅ Success" if ok else "❌ Failure")
+        line += f" vs DC {check['dc']}" + (" (set by the app)" if check.get("dc_default") else "") + " → " + ("✅ Success" if ok else "❌ Failure")
     if r.crit:
         line += " (natural 20!)"
     elif r.fumble:

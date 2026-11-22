@@ -127,6 +127,33 @@ def path_step(tiles: list[str], start: tuple[int, int], goal: tuple[int, int], o
     return best
 
 
+def walk_cost(tiles: list[str], start: tuple[int, int], goal: tuple[int, int], occupied: set, max_steps: int,
+              size: tuple[int, int] | None = None) -> int | None:
+    """Squares it costs to walk from start to goal around obstacles and other creatures (difficult terrain costs 2),
+    or None when the goal cannot be reached within max_steps."""
+    if start == goal:
+        return 0
+    w, h = (len(tiles[0]), len(tiles)) if tiles else (size or (MAX_SIDE, MAX_SIDE))
+    if not (0 <= goal[0] < w and 0 <= goal[1] < h) or blocked(tiles, *goal) or goal in occupied:
+        return None
+    seen = {start: 0}
+    queue = deque([start])
+    best = None
+    while queue:
+        x, y = queue.popleft()
+        cost = seen[(x, y)]
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1), (x + 1, y + 1), (x - 1, y - 1), (x + 1, y - 1), (x - 1, y + 1)):
+            if not (0 <= nx < w and 0 <= ny < h) or blocked(tiles, nx, ny) or (nx, ny) in occupied:
+                continue
+            nc = cost + (2 if TILES.get(tile_at(tiles, nx, ny), TILES["."])["difficult"] else 1)
+            if nc <= max_steps and nc < seen.get((nx, ny), 99):
+                seen[(nx, ny)] = nc
+                queue.append((nx, ny))
+                if (nx, ny) == goal:
+                    best = nc if best is None else min(best, nc)
+    return best
+
+
 def largest_region(grid: list[list[str]]) -> set:
     h, w = len(grid), len(grid[0])
     seen, best = set(), set()

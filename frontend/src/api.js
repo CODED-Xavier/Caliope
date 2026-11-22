@@ -207,6 +207,7 @@ export const api = {
   createConversation: (body) => request("POST", "/api/conversations", body),
   renameConversation: (id, title) => request("PATCH", `/api/conversations/${id}`, { title }),
   deleteConversation: (id) => request("DELETE", `/api/conversations/${id}`),
+  combatMove: (id, x, y) => request("POST", `/api/conversations/${id}/combat`, { action: "move", x, y }),
   restartConversation: (id, keep) => request("POST", `/api/conversations/${id}/restart`, { keep }),
   undo: (id) => request("POST", `/api/conversations/${id}/undo`),
   editMessage: (messageId, content) => request("PATCH", `/api/messages/${messageId}`, { content }),

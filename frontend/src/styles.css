@@ -315,6 +315,7 @@ body.resizing { user-select: none; cursor: col-resize; }
 .grid-cell { fill: transparent; stroke: var(--border); stroke-width: 1; cursor: pointer; }
 .grid-cell:hover { fill: color-mix(in srgb, var(--accent) 14%, transparent); }
 .token { cursor: pointer; }
+.reach-cell { fill: var(--good); fill-opacity: 0.18; stroke: var(--good); stroke-opacity: 0.45; stroke-width: 1; }
 .turn-order { display: flex; flex-direction: column; gap: 5px; }
 .fighter { border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; background: var(--panel); cursor: pointer; }
 .fighter.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }

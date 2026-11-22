@@ -730,6 +730,9 @@ class ChatEngine:
         snapshot = self.repo.capture_snapshot(conv_id)
         meta = {"snapshot": snapshot, **extra}
         asked = find_checks(reply)  # "Make a DEX (Stealth) check, DC 13" becomes a roll button
+        fight_now = (self.repo.get_state(conv_id).get("combat") or {})
+        if asked and fight_now.get("active") and fight_now.get("reaction_round") == fight_now.get("round"):
+            asked = []  # one check per round in a fight: the reaction is spent
         if asked:
             meta["checks"] = asked
         offers = find_offers(reply, scenario.get("currency") or "gold")  # "a lantern (5 gold)" becomes a buy button
@@ -751,6 +754,7 @@ class ChatEngine:
             offer = adventure.fight_offer(adv, st, user_msg["content"], reply)
             if offer:
                 meta["fight"] = offer  # "⚔ A fight! 4 × Goblin [Start the fight]" under the reply
+                meta.pop("checks", None)  # the fight starts instead: attacks are rolled by the app, not dodged with checks
         assistant_msg = self.repo.add_message(conv_id, "assistant", reply, meta)
         st = self.repo.get_state(conv_id)
         moved = routes.advance(st, scenario.get("route"))  # the planned scene was written: the next one comes after it

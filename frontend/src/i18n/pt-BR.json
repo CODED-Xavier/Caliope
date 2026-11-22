@@ -1522,7 +1522,17 @@
 "↺ Restart, keep the old run": "↺ Recomeçar, manter a partida antiga",
 "Restart and delete the old run": "Recomeçar e apagar a partida antiga",
 "Restart from the beginning": "Recomeçar do início",
-"Start this game over from the opening (same character, HP full)": "Recomeçar este jogo da abertura (mesmo personagem, PV cheio)"
+"Start this game over from the opening (same character, HP full)": "Recomeçar este jogo da abertura (mesmo personagem, PV cheio)",
+"⚔ In the fight: write your attack (\"I swing at Goblin 2's neck\") or /attack goblin 2. The app rolls it.": "⚔ Na luta: escreva seu ataque (\"Golpeio o pescoço do Goblin 2\") ou /attack goblin 2. O app rola os dados.",
+"No movement left this turn.": "Sem movimento restante neste turno.",
+"Start fights by themselves": "Começar as lutas sozinhas",
+"In an adventure, when the enemies of the scene attack (or you attack them), the fight starts on its own right after the reply: turn order, the battle map, and the app rolls every attack. When it is off, a ⚔ A fight! button appears under the reply instead.": "Numa aventura, quando os inimigos da cena atacam (ou você os ataca), a luta começa sozinha logo depois da resposta: ordem de turnos, mapa de batalha, e o app rola todos os ataques. Desligado, aparece um botão ⚔ Uma luta! embaixo da resposta.",
+"Turn it off if you prefer to choose when a fight starts.": "Desligue se preferir escolher quando a luta começa.",
+"square": "quadrado",
+"squares": "quadrados",
+"You already made a check this round (one reaction per round). It comes back next round.": "Você já fez um teste nesta rodada (uma reação por rodada). Ela volta na próxima rodada.",
+"You cannot stand there.": "Você não pode ficar ali.",
+"You are unconscious.": "Você está inconsciente."
 },
 "patterns": [
 [
@@ -1936,6 +1946,30 @@
 [
 "Restart \"{0}\" from the beginning? You keep your character (HP full); the story, items, gold, fights and scenes start over.",
 "Recomeçar \"{0}\" do início? Você mantém seu personagem (PV cheio); a história, os itens, o ouro, as lutas e as cenas recomeçam."
+],
+[
+"🏃 Your turn: click a lit square to move ({0} of {1} squares left). Click an enemy to target it.",
+"🏃 Seu turno: clique num quadrado iluminado para se mover ({0} de {1} quadrados restantes). Clique num inimigo para mirá-lo."
+],
+[
+"⏳ {0}'s turn. You move on your turn.",
+"⏳ Turno de {0}. Você se move no seu turno."
+],
+[
+" · {0} squares",
+" · {0} quadrados"
+],
+[
+" · {0} square",
+" · {0} quadrado"
+],
+[
+"It is {0}'s turn. You can move on your turn.",
+"É o turno de {0}. Você pode se mover no seu turno."
+],
+[
+"Too far: you can move {0} more squares ({1} ft) this turn.",
+"Longe demais: você ainda pode se mover {0} quadrados ({1} pés) neste turno."
 ]
 ]
 }

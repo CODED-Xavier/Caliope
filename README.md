@@ -171,6 +171,11 @@ speed, STR to CHA, skills, senses, challenge and XP, traits and attacks.
 ### Combat
 ⚔ Combat → choose **d20** (D&D 5e) or a **d10 dice pool** (Vampire 5e) → add enemies, or **✨ Suggest from the scene** → pick a map → **Start the fight**.
 - The app rolls everything (initiative, attacks, damage, powers, enemy spells). The Aedo only narrates one ⚔️ card per round.
+- **Turns by the rules:** enemies faster than you act as soon as the fight starts (rolled by the app, never by the Aedo). Then it is your turn.
+- **Write your attack:** during a fight, *"I try to cut the goblin's head clean off"* is rolled by the app against that goblin, and the Aedo narrates the real result in your words. **/attack goblin 2** and **/dodge** work too. Speech in quotes and questions are never taken as attacks. Too far away? You walk to it with your movement, or **Dash** toward it if it is out of reach this turn.
+- **Interactive grid:** on your turn, the squares you can reach light up. Click one to move (6 squares = 30 ft; mud and bushes cost double). You can't move on the enemies' turns.
+- **Checks:** every roll button shows its DC before you roll (*CON check (DC 13)*), and the result says ✅ Success or ❌ Failure. If the Aedo forgot the DC, the app sets 12 and tells it. One roll per reply; in a fight, one check per round (your reaction). A named skill uses its own ability (Perception is WIS).
+- **Fights start by themselves** in adventures when the scene's enemies attack (Settings → *Start fights by themselves*; off = a ⚔ A fight! button).
 - Maps: generated (forest, dungeon, tavern, river…) or your own from **🗺 My maps**. Walls block, obstacles give **cover**, and mud and bushes slow you.
 - **Painted maps (like Watabou):** a generated map is painted as a real battle map picture (trees, rocks, a road, stone floors) when the fight starts, with the grid already lined up. In an adventure scene that has no map, Calíope paints one that fits the scene (a road for an ambush, a cave for a hideout…) and keeps it in the card as that scene's map. **🎨 Paint a map** / **🎲 Paint another** in the Combat tab, and **🎨 Paint a map for this fight** turns a fight on a plain grid into a painted map mid-fight.
 - Undo and rewind also undo the dice.
@@ -516,3 +521,4 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.23.2 | The adventure's scene changes show under the reply (📍 Scene: Goblin Ambush) |
 | 2.24 | Painted battle maps: Calíope paints a map (Watabou style, grid lined up) for scenes and fights that have none, keeps it in the card, and can repaint a plain-grid fight mid-fight |
 | 2.24.1 | ↺ Restart: start a game over from the card's opening with the same character (full HP), keeping or deleting the old run |
+| 2.25 | Fights by the rules: faster enemies act at once, typed attacks (and /attack, /dodge) are rolled by the app and update the fight, you move on your own turn by clicking the lit squares, checks show their DC before the roll, one roll per reply and one check per round, adventure fights start by themselves |

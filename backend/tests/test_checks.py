@@ -22,7 +22,7 @@ class FindTests(unittest.TestCase):
         self.assertEqual(find_checks("She smiles and pours the tea. Nothing to roll here."), [])
         self.assertEqual(find_checks("The con artist checks his int pocket."), [])  # ordinary words are not abilities
         many = find_checks("Make a STR check. Make a DEX check. Make a WIS check. Make a CHA check.")
-        self.assertEqual(len(many), 3)
+        self.assertEqual(len(many), 1)  # one roll per reply
 
     def test_bonus_and_roll(self):
         self.assertEqual(bonus_for(SHEET, {"ability": "DEX", "skill": "Stealth", "kind": "check"})[0], 3 + 3)

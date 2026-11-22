@@ -66,6 +66,7 @@ DEFAULT_SETTINGS: dict = {
     "show_timing": True,
     "chars_per_token": 3.4,
     "continue_last": False,       # start in the last game played instead of the main menu
+    "auto_fight": True,  # a fight breaking out in an adventure scene starts by itself (else: a button under the reply)
     "app_window": True,           # Play.bat / Caliope.exe open the game in its own window instead of a browser tab       # measured automatically from the model server's real token counts
     # --- Cards and skills ---
     "default_card_kind": "roleplay",  # type used for new cards: roleplay | adventure

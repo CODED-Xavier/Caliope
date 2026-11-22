@@ -21,7 +21,7 @@ const initials = (name) => name.split(/\s+/).map((w) => w[0]).join("").slice(0, 
  * A battle map: terrain squares (+ an optional picture underneath) and tokens.
  * onCell(x, y) is called on click; onCellEnter(x, y) while the mouse moves (used for painting and distances).
  */
-export default function BattleMap({ w, h, tiles = [], background = "", tokens = [], selected, onCell, onCellEnter, onToken, onLeave, cell = 30, className = "", geom = null, fog = null, painted = false }) {
+export default function BattleMap({ w, h, tiles = [], background = "", tokens = [], selected, onCell, onCellEnter, onToken, onLeave, cell = 30, className = "", geom = null, fog = null, painted = false, reach = null }) {
   const bg = background ? portraitSrc(background) : "";
   const maskId = React.useId().replace(/:/g, "");
   return (
@@ -56,6 +56,10 @@ export default function BattleMap({ w, h, tiles = [], background = "", tokens = 
           <rect x="0" y="0" width={w * cell} height={h * cell} fill="#0b0912" opacity="0.88" mask={`url(#fog-${maskId})`} pointerEvents="none" />
         </>
       )}
+      {reach && [...reach].map((k) => { // the squares the player can still walk to this turn
+        const [x, y] = k.split(",").map(Number);
+        return <rect key={`r${k}`} x={x * cell + 1} y={y * cell + 1} width={cell - 2} height={cell - 2} className="reach-cell" pointerEvents="none" />;
+      })}
       {tokens.map((c) => (
         <g key={c.id} transform={`translate(${c.x * cell + cell / 2},${c.y * cell + cell / 2})`} className="token"
           onMouseDown={(e) => { e.stopPropagation(); onToken?.(c.id); }}>

@@ -17,7 +17,7 @@ import re
 import uuid
 
 from .dice import DiceError, DiceRoller
-from .maps import blocked, clean_tiles, distance, has_cover, open_cells, path_step
+from .maps import blocked, clean_tiles, distance, has_cover, open_cells, path_step, walk_cost
 from .util import as_int, clamp, truncate
 
 SYSTEMS = ("d20", "pool")
@@ -187,6 +187,18 @@ class CombatEngine:
         order = ", ".join(c["name"] for c in people)
         foes = ", ".join(f"{c['name']} ({c['hp']} HP)" for c in people if c["side"] == "enemy")
         line = f"⚔️ Combat starts! Turn order: {order}. Enemies: {foes}."
+        first = self._others_until_player(combat)  # whoever is faster than the player acts now, rolled by the app
+        combat["moved"] = 0
+        if first:
+            self._sync_player(state)
+            combat["log"] = (combat["log"] + first)[-30:]
+            line += "\n\n" + "\n\n".join(first)
+            done = self._finished(combat)
+            if done:
+                state, end_line = self.end(state, done)
+                line += "\n\n🏁 " + end_line.replace("⚔️ ", "")
+        if combat.get("active"):
+            line += f"\n\n➡️ {self.current(combat)['name']}'s turn."
         return state, line
 
     @staticmethod
@@ -252,6 +264,8 @@ class CombatEngine:
             if "dodging" in cur["conditions"]:  # a Dodge lasts until the dodger's own next turn
                 cur["conditions"].remove("dodging")
             if cur["hp"] > 0:
+                if cur["side"] == "player":
+                    combat["moved"] = 0  # a fresh turn: the player's full speed again
                 return
 
     def _attack(self, combat: dict, att: dict, target: dict, advantage: str = "", head: str = "") -> str:
@@ -329,7 +343,15 @@ class CombatEngine:
             target = self._get(combat, target_id)
             if target["hp"] <= 0:
                 raise CombatError(f"{target['name']} is already down.")
-            lines.append(self._attack(combat, me, target, advantage if advantage in ("advantage", "disadvantage") else ""))
+            moved, in_reach = self._close_in(combat, me, target)
+            if not in_reach:
+                lines.append(f"**{me['name']} runs at {target['name']}**\n{moved}")
+            else:
+                block = self._attack(combat, me, target, advantage if advantage in ("advantage", "disadvantage") else "")
+                if moved:
+                    head, _, rest = block.partition("\n")
+                    block = f"{head}\n{moved}\n{rest}"
+                lines.append(block)
         elif action == "dodge":
             if "dodging" not in me["conditions"]:
                 me["conditions"].append("dodging")
@@ -375,6 +397,62 @@ class CombatEngine:
             me["hp"] = min(me["max_hp"], me["hp"] + max(0, r.total))
             return f"**{me['name']} uses {ability['name']}**{spent}\n\U0001F49A heals {r.total} ({ability['dice']}) \u2192 {me['hp']}/{me['max_hp']} HP"
         return f"**{me['name']} uses {ability['name']}**{spent}\n\u2728 {ability['description'] or 'See the player message.'}"
+
+    def _close_in(self, combat: dict, me: dict, target: dict) -> tuple[str, bool]:
+        """Out of reach: the player walks toward the target with the movement left this turn. Still too far: they Dash
+        (double move, no attack this turn). Returns (the move line, whether the target is now in reach)."""
+        reach = me.get("range", 1)
+        if distance(me["x"], me["y"], target["x"], target["y"]) <= reach:
+            return "", True
+        left = max(0, me.get("speed", 6) - combat.get("moved", 0))
+        occupied = {(o["x"], o["y"]) for o in combat["combatants"] if o["hp"] > 0 and o["id"] != me["id"]}
+        g = combat["grid"]
+        tiles = g.get("tiles") or []
+        nx, ny = path_step(tiles, (me["x"], me["y"]), (target["x"], target["y"]), occupied, left) if left else (me["x"], me["y"])
+        dash = distance(nx, ny, target["x"], target["y"]) > reach
+        if dash:  # the Dash action: the whole turn spent running toward it
+            nx, ny = path_step(tiles, (me["x"], me["y"]), (target["x"], target["y"]), occupied, left + me.get("speed", 6))
+        budget = left + (me.get("speed", 6) if dash else 0)
+        steps = walk_cost(tiles, (me["x"], me["y"]), (nx, ny), occupied, budget, (g["w"], g["h"])) or distance(me["x"], me["y"], nx, ny)
+        me["x"], me["y"] = nx, ny
+        combat["moved"] = combat.get("moved", 0) + steps
+        if dash:
+            return (f"🏃 {me['name']} dashes {steps} squares ({steps * 5} ft) toward {target['name']}, "
+                    f"still out of reach: no attack this turn."), False
+        return f"🏃 {me['name']} moves {steps} squares ({steps * 5} ft) toward {target['name']}.", True
+
+    def move_player(self, state: dict, x: int, y: int) -> dict:
+        """The player walks on the map, on their own turn only, up to their speed (difficult ground costs double)."""
+        combat = state.get("combat") or {}
+        if not combat.get("active"):
+            raise CombatError("There is no fight going on.")
+        me = next(c for c in combat["combatants"] if c["side"] == "player")
+        if self.current(combat)["id"] != me["id"]:
+            raise CombatError(f"It is {self.current(combat)['name']}'s turn. You can move on your turn.")
+        if me["hp"] <= 0:
+            raise CombatError("You are unconscious.")
+        g = combat["grid"]
+        gx, gy = as_int(x, me["x"]), as_int(y, me["y"])
+        left = max(0, me.get("speed", 6) - combat.get("moved", 0))
+        occupied = {(o["x"], o["y"]) for o in combat["combatants"] if o["hp"] > 0 and o["id"] != me["id"]}
+        cost = walk_cost(g.get("tiles") or [], (me["x"], me["y"]), (gx, gy), occupied, left, (g["w"], g["h"]))
+        if cost is None:
+            if not (0 <= gx < g["w"] and 0 <= gy < g["h"]) or blocked(g.get("tiles") or [], gx, gy) or (gx, gy) in occupied:
+                raise CombatError("You cannot stand there.")
+            raise CombatError(f"Too far: you can move {left} more squares ({left * 5} ft) this turn.")
+        me["x"], me["y"] = gx, gy
+        combat["moved"] = combat.get("moved", 0) + cost
+        return state
+
+    @staticmethod
+    def use_reaction(state: dict) -> None:
+        """A check during a fight (a reaction, helping someone, looking around) is one per round."""
+        combat = state.get("combat") or {}
+        if not combat.get("active"):
+            return
+        if combat.get("reaction_round") == combat["round"]:
+            raise CombatError("You already made a check this round (one reaction per round). It comes back next round.")
+        combat["reaction_round"] = combat["round"]
 
     def enemies_act(self, state: dict) -> tuple[dict, str]:
         combat = state.get("combat") or {}
@@ -497,6 +575,12 @@ COMBAT_RULES = (
     "message lists verified results, one action per paragraph. Narrate the actions IN THE SAME ORDER, one short vivid "
     "paragraph per action. Never change who hit, the damage or the HP, never invent extra attacks or damage, never repeat "
     "the dice numbers, and never declare a combatant dead or defeated unless the ⚔️ block says so. "
+    "The player's own words before the ⚔️ block say HOW they attack: narrate the verified result in that style (a hit "
+    "that defeats the enemy can be the clean cut they described; a miss stays a miss). Never roll dice, never write "
+    "attack rolls or damage numbers and never decide a hit yourself: if the player's message has no ⚔️ block, nothing "
+    "was rolled, so do not resolve any attack; describe the moment and ask what they do. Enemy attacks are rolled by the "
+    "app against the player's AC, so never ask the player for a roll to dodge or resist them. Ask for at most one check "
+    "per round (a reaction, helping an ally, spotting something), always with its DC. "
     "End your reply by asking what the player does next."
 )
 
@@ -553,3 +637,54 @@ async def _suggest(llm, system: str, scene: str, rules: str = "", with_map: bool
     if not out:
         raise CombatError("The model did not suggest any enemies. Fill them in yourself.")
     return out, data if isinstance(data, dict) else {}
+
+
+# ------------------------------------------------------------------ attacks typed in the chat
+ATTACK_WORDS = re.compile(
+    r"\b(attack\w*|strik\w*|swing\w*|slash\w*|stab\w*|cut\w*|hit|hits|shoot\w*|lunge\w*|thrust\w*|smash\w*|bash\w*|"
+    r"punch\w*|kick\w*|behead\w*|decapitat\w*|cleav\w*|chop\w*|skewer\w*|impal\w*|fire\w* at|throw\w* (?:my |an? |the )?"
+    r"(?:axe|handaxe|dagger|javelin|spear)\w*|"
+    r"atac\w*|ataque\w*|golpe\w*|golpei\w*|cort\w*|esfaque\w*|acert\w*|atir\w*|dispar\w*|decapit\w*|soc\w*|chut\w*|"
+    r"perfur\w*|empal\w*|arremess\w*)\b", re.I)
+COMMAND = re.compile(r"^\s*/(attack|atacar|atk|dodge|esquivar)\b[ \t]*(.*)$", re.I | re.S)
+SPOKEN = re.compile(r"\"[^\"]*\"|“[^”]*”|(?<!\w)'[^'\n]+'(?!\w)")  # speech and thoughts are not actions
+
+
+def _base(name: str) -> str:
+    return re.sub(r"\s*#?\d+$", "", name).strip().lower()
+
+
+def find_target(combat: dict, text: str) -> str:
+    """The enemy the text names ("Goblin 3", "goblin #3", "the goblin", "the bugbear"), else the nearest one."""
+    me = next((c for c in combat["combatants"] if c["side"] == "player"), None)
+    alive = [c for c in combat["combatants"] if c["side"] == "enemy" and c["hp"] > 0]
+    if not alive:
+        return ""
+    low = (text or "").lower()
+    near = (lambda c: distance(me["x"], me["y"], c["x"], c["y"])) if me else (lambda c: 0)
+    for c in alive:  # a numbered name first
+        num = re.search(r"(\d+)$", c["name"])
+        pat = re.escape(_base(c["name"])) + (rf"s?\s*#?\s*{num.group(1)}\b" if num else r"\b")
+        if re.search(rf"\b{pat}", low):
+            return c["id"]
+    named = [c for c in alive if re.search(rf"\b{re.escape(_base(c['name']))}(s|es)?\b", low)]
+    return min(named or alive, key=near)["id"]
+
+
+def combat_intent(combat: dict, text: str) -> tuple[str, str, str] | None:
+    """A message typed during a fight that is an attack: (move, target id, the player's words).
+    /attack [enemy] [how] and /dodge [how] always count; otherwise an attack word in the text does."""
+    if not (combat or {}).get("active") or not (text or "").strip():
+        return None
+    if not any(c["side"] == "enemy" and c["hp"] > 0 for c in combat["combatants"]):
+        return None
+    m = COMMAND.match(text)
+    if m:
+        cmd, rest = m.group(1).lower(), m.group(2).strip()
+        if cmd in ("dodge", "esquivar"):
+            return "dodge", "", rest
+        return "attack", find_target(combat, rest), rest
+    t = text.strip()
+    if t.startswith(("/", "(", "[", "OOC", "ooc")) or t.endswith("?") or not ATTACK_WORDS.search(SPOKEN.sub(" ", t)):
+        return None
+    return "attack", find_target(combat, t), t

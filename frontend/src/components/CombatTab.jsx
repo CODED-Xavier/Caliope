@@ -206,7 +206,28 @@ function StartForm({ convId, kind, busy, onStart, sceneFight, hasScene }) {
 }
 
 /* ---------------------------------------------------------------- grid */
-function Grid({ combat, selected, onSelect, onMove, convId, onState, busy }) {
+const DIFFICULT = ',"';
+// squares the player can walk to with the movement left (around walls and creatures; mud and bushes cost 2)
+function reachable(combat, me, left) {
+  const { w, h, tiles = [] } = combat.grid;
+  const taken = new Set(combat.combatants.filter((c) => c.hp > 0 && c.id !== me.id).map((c) => `${c.x},${c.y}`));
+  const cost = new Map([[`${me.x},${me.y}`, 0]]);
+  const queue = [[me.x, me.y]];
+  while (queue.length) {
+    const [x, y] = queue.shift();
+    const c0 = cost.get(`${x},${y}`);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+      const nx = x + dx, ny = y + dy, k = `${nx},${ny}`;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h || taken.has(k) || BLOCKING.includes(tiles[ny]?.[nx] || ".")) continue;
+      const nc = c0 + (DIFFICULT.includes(tiles[ny]?.[nx] || ".") ? 2 : 1);
+      if (nc <= left && nc < (cost.get(k) ?? 99)) { cost.set(k, nc); queue.push([nx, ny]); }
+    }
+  }
+  cost.delete(`${me.x},${me.y}`);
+  return cost;
+}
+
+function Grid({ combat, selected, onSelect, convId, onState, busy, myTurn, current }) {
   const { w, h, tiles = [], background = "", name = "", geom = null, fog = null, painted = false } = combat.grid;
   const [painting, setPainting] = useState(false);
   const [paintError, setPaintError] = useState("");
@@ -215,12 +236,19 @@ function Grid({ combat, selected, onSelect, onMove, convId, onState, busy }) {
     try { const r = await api.combatPaintMap(convId); onState?.(r.state); } catch (e) { setPaintError(e.message); } finally { setPainting(false); }
   };
   const people = combat.combatants;
-  const sel = people.find((c) => c.id === selected);
+  const me = people.find((c) => c.side === "player");
   const [hover, setHover] = useState(null);
-  const dist = sel && hover ? Math.max(Math.abs(hover.x - sel.x), Math.abs(hover.y - sel.y)) : 0;
-  const occupied = (x, y) => people.some((c) => c.x === x && c.y === y && c.hp > 0);
-  const blockedAt = (x, y) => BLOCKING.includes(tiles[y]?.[x] || ".");
+  const [walkError, setWalkError] = useState("");
+  const left = me && myTurn && me.hp > 0 ? Math.max(0, (me.speed || 6) - (combat.moved || 0)) : 0;
+  const reach = useMemo(() => (left > 0 ? reachable(combat, me, left) : new Map()), [combat, left]); // eslint-disable-line
+  const hoverCost = hover ? reach.get(`${hover.x},${hover.y}`) : undefined;
   const hoverTile = hover ? TILE_STYLE[tiles[hover.y]?.[hover.x] || "."] : null;
+  const walk = async (x, y) => { // your token walks there (your turn only, within your speed)
+    setWalkError("");
+    if (!myTurn) { setWalkError(`It is ${current?.name}'s turn. You can move on your turn.`); return; }
+    if (!reach.has(`${x},${y}`)) { if (!(me.x === x && me.y === y)) setWalkError(left ? `Too far: you can move ${left} more squares (${left * 5} ft) this turn.` : "No movement left this turn."); return; }
+    try { const r = await api.combatMove(convId, x, y); onState?.(r.state); } catch (e) { setWalkError(e.message); }
+  };
   return (
     <div className="grid-wrap">
       {!background && convId && (
@@ -232,13 +260,18 @@ function Grid({ combat, selected, onSelect, onMove, convId, onState, busy }) {
       <BattleMap w={w} h={h} tiles={tiles} background={background} tokens={people} selected={selected} geom={geom} cell={geom ? 28 : 30} painted={painted}
         // fog of war: the places already visited stay clear, and your side sees around itself
         fog={fog ? [...fog, ...people.filter((c) => c.side !== "enemy" && c.hp > 0).map((c) => ({ x: c.x + 0.5, y: c.y + 0.5, r: 4 }))] : null}
+        reach={busy ? null : new Set(reach.keys())}
         onToken={onSelect} onLeave={() => setHover(null)} onCellEnter={(x, y) => setHover({ x, y })}
-        onCell={(x, y) => { if (sel && !occupied(x, y) && !blockedAt(x, y)) onMove(sel.id, x, y); }} />
+        onCell={(x, y) => { if (!busy) walk(x, y); }} />
       <div className="muted tiny">
         {name && <>{name} · </>}
-        {sel ? <>Selected: <strong>{sel.name}</strong>. Click an open square to move{hover && dist ? ` (${dist} squares, ${dist * 5} ft)` : ""}.</> : "Click a token to select it (enemies become your target)."}
+        {myTurn
+          ? `🏃 Your turn: click a lit square to move (${left} of ${me?.speed || 6} squares left). Click an enemy to target it.`
+          : `⏳ ${current?.name}'s turn. You move on your turn.`}
+        {myTurn && hoverCost ? ` · ${hoverCost} ${hoverCost === 1 ? "square" : "squares"}` : ""}
         {hoverTile && hoverTile.label !== "Floor / grass" && <> · {hoverTile.label}</>}
       </div>
+      {walkError && <div className="error-text tiny">{walkError}</div>}
     </div>
   );
 }
@@ -266,7 +299,8 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, o
         <div className="section-title grow">Round {combat.round} · {current?.side === "player" ? "your turn" : `${current?.name}'s turn`}</div>
         <span className="tag">{combat.system === "pool" ? "d10 pool" : "d20"}</span>
       </div>
-      <Grid combat={combat} selected={selected} onSelect={select} onMove={(id, x, y) => onEdit(id, { x, y })} convId={convId} onState={onState} busy={busy} />
+      <Grid combat={combat} selected={selected} onSelect={select} convId={convId} onState={onState} busy={busy}
+        myTurn={current?.side === "player"} current={current} />
       <div className="turn-order">
         {people.map((c) => (
           <div key={c.id} className={`fighter ${c.id === current?.id ? "current" : ""} ${c.hp <= 0 ? "down" : ""} ${c.id === target ? "targeted" : ""}`} onClick={() => select(c.id)}>

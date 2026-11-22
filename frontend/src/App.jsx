@@ -121,6 +121,8 @@ export default function App() {
   // The narration voice: one reply at a time; clicking 🔊 on the reply that is playing stops it.
   const audioRef = useRef(null);
   const lastReplyRef = useRef(null);
+  const fightRef = useRef(null);
+  const startFightRef = useRef(null);
   const [speaking, setSpeaking] = useState(null);
   const playVoice = (messageId) => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
@@ -232,6 +234,7 @@ export default function App() {
         break;
       case "assistant_message":
         lastReplyRef.current = ev.message.id;
+        fightRef.current = ev.message.meta?.fight || null; // a fight broke out: it starts by itself after the reply
         if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
         bufferRef.current = "";
         setGame((g) => (g ? { ...g, messages: [...g.messages, ev.message] } : g));
@@ -292,6 +295,9 @@ export default function App() {
       await reloadGame();
       refreshConvs();
       refreshHealth();
+      const fight = fightRef.current;
+      fightRef.current = null;
+      if (fight) api.settings().then((st) => { if (st.auto_fight !== false) setTimeout(() => startFightRef.current?.(fight), 30); }).catch(() => {});
     }
   }
 
@@ -312,6 +318,7 @@ export default function App() {
         near: b?.near || undefined });
     } catch (e) { setError(e.message); }
   };
+  startFightRef.current = startSceneFight;
   const noSceneFight = async (fight) => {
     try { const r = await api.adventureNoFight(activeRef.current, fight.scene); setGame((g) => (g ? { ...g, state: r.state } : g)); } catch (e) { setError(e.message); }
   };

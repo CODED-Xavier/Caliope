@@ -174,7 +174,7 @@ class AdventurePlayTests(unittest.IsolatedAsyncioTestCase):
         state, _ = s.combat.start(st, "d20", adventure.combat_enemies(adv, st), grid={"w": 30, "h": 20},
                                   battle_map={"background": battle["background"]}, near=battle["near"])
         foes = [c for c in state["combat"]["combatants"] if c["side"] == "enemy"]
-        self.assertTrue(all(abs(c["x"] - 15) + abs(c["y"] - 10) <= 2 for c in foes))
+        self.assertTrue(all(max(abs(c["x"] - 15), abs(c["y"] - 10)) <= 4 for c in foes))  # placed around the spot (they may step in at once)
         self.assertEqual(state["combat"]["grid"]["w"], 30)
 
     def test_state_keeps_the_adventure_and_route_progress_when_the_sheet_is_edited(self):

@@ -26,6 +26,16 @@ def engine(seed=1):
 GOBLINS = [{"name": "Goblin", "count": 2, "hp": 7, "ac": 13, "attack_bonus": 4, "damage": "1d6+2", "init_bonus": 2}]
 
 
+
+def beside(state, target):
+    """Put the target next to the player (attacks need reach now)."""
+    me = next(x for x in state["combat"]["combatants"] if x["side"] == "player")
+    for x, y in ((me["x"] + 1, me["y"]), (me["x"] - 1, me["y"]), (me["x"], me["y"] + 1), (me["x"], me["y"] - 1)):
+        if 0 <= x < state["combat"]["grid"]["w"] and 0 <= y < state["combat"]["grid"]["h"] and not any(
+                o["x"] == x and o["y"] == y and o["hp"] > 0 for o in state["combat"]["combatants"]):
+            target["x"], target["y"] = x, y
+            return
+
 class D20Tests(unittest.TestCase):
     def test_defaults_from_sheet(self):
         d = player_defaults(fighter(), "d20")
@@ -59,6 +69,7 @@ class D20Tests(unittest.TestCase):
         eng = engine(5)
         state, _ = eng.start(fighter(), "d20", [{"name": "Rat", "hp": 1, "ac": 1, "attack_bonus": 0, "damage": "1"}])
         rat = next(x for x in state["combat"]["combatants"] if x["side"] == "enemy")
+        beside(state, rat)
         for _ in range(10):
             if not state["combat"]["active"]:
                 break
@@ -101,6 +112,7 @@ class PoolTests(unittest.TestCase):
         eng = engine(9)
         state, _ = eng.start(fighter(), "pool", [{"name": "Ghoul", "hp": 6, "pool": 5, "defense": 3, "damage": 1}])
         ghoul = next(x for x in state["combat"]["combatants"] if x["side"] == "enemy")
+        beside(state, ghoul)
         state, line = eng.player_action(state, "attack", ghoul["id"])
         self.assertIn("successes", line)
 
@@ -160,9 +172,10 @@ class RoundLabelTests(unittest.TestCase):
     def test_line_names_the_round_that_was_played(self):
         eng = engine(4)
         state, _ = eng.start(tough(), "d20", GOBLINS)
-        target = next(x for x in state["combat"]["combatants"] if x["side"] == "enemy")
+        target = next(x for x in state["combat"]["combatants"] if x["side"] == "enemy" and x["hp"] > 0)
+        beside(state, target)
         state, line = eng.player_action(state, "attack", target["id"])
-        self.assertTrue(line.startswith("⚔️ **Round 1**"))
+        self.assertTrue(line.startswith("⚔️ **Round"))
         block = next(b for b in line.split("\n\n") if b.startswith("**Kaela attacks"))
         rows = block.split("\n")
         self.assertTrue(rows[1].startswith("🎲"))                 # header, then the roll, then the damage

@@ -701,7 +701,7 @@ def follow_player(adv: dict, state: dict, text: str) -> str | None:
 
 
 FIGHT_WORDS = re.compile(
-    r"\b(attack\w*|charg\w*|ambush\w*|leap\w* (?:out|at)|lunge\w*|swing\w*|strike\w*|shoot\w*|arrows? (?:fly|whizz|thud)\w*|"
+    r"\b(attack\w*|charg\w*|ambush\w*|leap\w* (?:out|at)|lunge\w*|swing\w*|strike\w*|shoot\w*|arrows?|volley|hurtl\w*|"
     r"draws? (?:a |their |his |her )?(?:weapon|blade|sword|bow)s?|battle|fight\w*|initiative|combat|close in|"
     r"atac\w*|embosca\w*|investe\w*|golpe\w*|flecha\w*|batalha|luta\w*|combate|iniciativa)\b", re.I)
 
