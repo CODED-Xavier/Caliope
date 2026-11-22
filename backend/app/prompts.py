@@ -62,13 +62,25 @@ def story_sections(scenario: dict, macro=lambda t: t) -> dict[str, str]:
     return out
 
 
-def closing_rules(player: str, language: str) -> str:
+APP_TURNS = ("\u2694\ufe0f Combat starts",)
+
+
+def app_wrote(content: str) -> bool:
+    """The newest "player" message was written by the app (a fight starting), not typed by the player."""
+    return str(content or "").lstrip().startswith(APP_TURNS)
+
+
+def closing_rules(player: str, language: str, app_turn: bool = False) -> str:
     """Sent with every message, last: never act for the player, and the story's language for every voice."""
-    return ("## Always\n"
-            f"- {player} belongs to the player. Never write {player}'s words, actions, thoughts, feelings or decisions, not "
-            "even small ones (a nod, a smile, an answer). The narrator and every character react only to what the player "
-            "wrote, then stop and wait.\n"
-            f"- {LANGUAGE_REMINDERS.get(language, LANGUAGE_REMINDERS['en'])}")
+    out = ("## Always\n"
+           f"- {player} belongs to the player. Never write {player}'s words, actions, thoughts, feelings or decisions, not "
+           "even small ones (a nod, a smile, an answer). The narrator and every character react only to what the player "
+           "wrote, then stop and wait.\n")
+    if app_turn:
+        out += (f"- The newest message was written by the app, not by the player: {player} has not acted yet. Describe the "
+                f"scene, the enemies and what they do, then stop and ask what {player} does. Don't invent {player}'s weapon, "
+                f"words or moves.\n")
+    return out + f"- {LANGUAGE_REMINDERS.get(language, LANGUAGE_REMINDERS['en'])}"
 
 
 GM_INTRO = (
@@ -412,7 +424,9 @@ class PromptBuilder:
                 messages.append({"role": msg["role"], "content": msg["content"]})
 
         # The two rules small models forget most, repeated right next to the player's message (where they look most).
-        volatile = (volatile + "\n\n" if volatile else "") + closing_rules(player_name or "the player's character", language)
+        last_user = next((m["content"] for m in reversed(kept) if m["role"] == "user"), "")
+        volatile = (volatile + "\n\n" if volatile else "") + closing_rules(player_name or "the player's character", language,
+                                                                          app_turn=app_wrote(last_user))
 
         # Attach the volatile notes to the newest player message (so older turns keep their exact text).
         if volatile:

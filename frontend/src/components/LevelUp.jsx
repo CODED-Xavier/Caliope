@@ -31,7 +31,7 @@ function FeatSearch({ edition, value, onPick }) {
  * Level up: the class table's new features are added by the app; you only choose what is really yours to choose
  * (hit points, a subclass, an Ability Score Improvement or a feat, a new option).
  */
-export default function LevelUp({ convId, onClose, onDone }) {
+export default function LevelUp({ convId, onClose, onDone, who = "" }) {
   const [plan, setPlan] = useState(null);
   const [edition, setEdition] = useState("2014");
   const [hpWay, setHpWay] = useState("average");
@@ -41,9 +41,9 @@ export default function LevelUp({ convId, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    api.levelUpPlan(convId).then(setPlan).catch((e) => setError(e.message));
-    api.character5e(convId).then((c) => setEdition(c?.character?.edition || "2014")).catch(() => {});
-  }, [convId]);
+    api.levelUpPlan(convId, who).then(setPlan).catch((e) => setError(e.message));
+    api.character5e(convId, who).then((c) => setEdition(c?.character?.edition || "2014")).catch(() => {});
+  }, [convId, who]);
   const faces = plan ? Number(String(plan.hit_die).replace("d", "")) : 8;
   const set = (id, v) => setAnswers((a) => ({ ...a, [id]: v }));
   const asi = answers.asi_or_feat?.asi || {};
@@ -61,7 +61,7 @@ export default function LevelUp({ convId, onClose, onDone }) {
   });
   const confirm = async () => {
     setBusy(true); setError("");
-    try { onDone(await api.levelUp(convId, { ...answers, hp: hpWay === "average" ? "average" : { roll } })); } catch (e) { setError(e.message); setBusy(false); }
+    try { onDone(await api.levelUp(convId, { ...answers, hp: hpWay === "average" ? "average" : { roll } }, who)); } catch (e) { setError(e.message); setBusy(false); }
   };
 
   return (

@@ -85,7 +85,8 @@ def player_defaults(state: dict, system: str) -> dict:
         if att:
             out.update(attack_bonus=att["bonus"], damage=att["damage"], weapon=att["name"])
         else:
-            out.update(attack_bonus=sheet.get("prof", 2) + max(ability_mod(stats.get("STR", 10)), 0), damage=f"1{ability_mod(stats.get('STR', 10)) + 1:+d}", weapon="Unarmed")
+            strength = ability_mod(stats.get("STR", 10))  # an unarmed strike: 1 + STR, with proficiency
+            out.update(attack_bonus=sheet.get("prof", 2) + strength, damage=f"1{strength:+d}" if strength else "1", weapon="Unarmed Strike")
         return out
     mod = max(ability_mod(stats.get("STR", 10)), ability_mod(stats.get("DEX", 10)))
     prof = 2 + max(0, as_int(p.get("level", 1), 1) - 1) // 4
@@ -107,6 +108,7 @@ def _combatant(raw: dict, side: str, system: str, index: int) -> dict:
         "y": as_int(raw.get("y"), -1),
         "init": 0,
         "notes": truncate(str(raw.get("notes") or ""), 120),
+        "weapon": truncate(str(raw.get("weapon") or ""), 40),
         "range": max(1, min(30, as_int(raw.get("range", 1), 1))),   # squares: 1 = melee, more = ranged
         "speed": max(1, min(12, as_int(raw.get("speed", 6), 6))),   # squares per turn (6 = 30 ft)
     }
@@ -202,6 +204,8 @@ class CombatEngine:
                                                  "painted": bool((battle_map or {}).get("painted")),
                                                  **_picture_geometry(battle_map)},
                   "log": log[-30:]}
+        combat["spent"] = {"action": False, "bonus": False, "attacked": False}
+        combat["turn_lines"] = []
         state["combat"] = combat
         order = ", ".join(c["name"] for c in people)
         foes = ", ".join(f"{c['name']} ({c['hp']} HP)" for c in people if c["side"] == "enemy")
@@ -292,6 +296,8 @@ class CombatEngine:
             if cur["hp"] > 0 or cur.get("dying"):  # a dying player still has a turn: their death save
                 if cur["side"] == "player":
                     combat["moved"] = 0  # a fresh turn: the player's full speed again
+                    combat["spent"] = {"action": False, "bonus": False, "attacked": False}
+                    combat["extra_actions"] = 0
                 return
 
     def _attack(self, combat: dict, att: dict, target: dict, advantage: str = "", head: str = "") -> str:
@@ -425,8 +431,181 @@ class CombatEngine:
         return ""
 
     # ------------------------------------------------------------------ actions
+    # ---------------------------------------------------------------- the player's turn: action, bonus, move, reaction
+    @staticmethod
+    def _martial_arts(state: dict) -> dict | None:
+        """The Unarmed Strike a Monk can make as a bonus action after taking the Attack action."""
+        sheet = state.get("character5e_sheet") or {}
+        if not sheet.get("martial_arts"):
+            return None
+        return next((a for a in sheet.get("attacks") or [] if a.get("name") == "Unarmed Strike"), None)
+
+    def turn_left(self, state: dict) -> str:
+        """What the player can still do this turn, said after each step."""
+        combat = state["combat"]
+        spent = combat.setdefault("spent", {"action": False, "bonus": False, "attacked": False})
+        me = next(c for c in combat["combatants"] if c["side"] == "player")
+        left = []
+        if not spent["action"] or combat.get("extra_actions"):
+            left.append("your action" if not spent["action"] else "one more action")
+        if not spent["bonus"]:
+            left.append("a bonus action (Martial Arts strike)" if self._martial_arts(state) and spent["attacked"] else "a bonus action")
+        move = max(0, me.get("speed", 6) - combat.get("moved", 0))
+        if move:
+            left.append(f"{move * 5} ft of movement")
+        return f"➡️ Still {me['name']}'s turn: " + (", ".join(left) or "nothing left") + ". End your turn when you're done."
+
+    def _check_my_turn(self, state: dict) -> tuple[dict, dict]:
+        combat = state.get("combat") or {}
+        if not combat.get("active"):
+            raise CombatError("There is no fight going on.")
+        me = next(c for c in combat["combatants"] if c["side"] == "player")
+        if self.current(combat)["id"] != me["id"]:
+            raise CombatError(f"It is {self.current(combat)['name']}'s turn.")
+        if me["hp"] <= 0:
+            raise CombatError("You are down: your death saves are rolled on your turns while your companions fight on. "
+                              "Use “Others act” to play the round.")
+        combat.setdefault("spent", {"action": False, "bonus": False, "attacked": False})
+        combat.setdefault("turn_lines", [])
+        return combat, me
+
+    def _do(self, state: dict, combat: dict, me: dict, action: str, target_id: str, advantage: str, ability_id: str) -> str:
+        """One part of the player's turn, checked against what is left (one action, one bonus action)."""
+        spent = combat["spent"]
+        if action == "bonus_attack":
+            punch = self._martial_arts(state)
+            if not punch:
+                raise CombatError("You have no attack to make as a bonus action (a Monk's Martial Arts gives one).")
+            if spent["bonus"]:
+                raise CombatError("You already used your bonus action this turn.")
+            if not spent["attacked"]:
+                raise CombatError("Martial Arts: take the Attack action first, then strike again as a bonus action.")
+            target = self._get(combat, target_id)
+            if target["hp"] <= 0:
+                raise CombatError(f"{target['name']} is already down.")
+            spent["bonus"] = True
+            att = {**me, "attack_bonus": as_int(punch.get("bonus"), 0), "damage": str(punch.get("damage") or "1")}
+            return self._attack(combat, att, target, advantage if advantage in ("advantage", "disadvantage") else "",
+                                head=f"**{me['name']} strikes {target['name']} (Unarmed Strike, bonus action)**")
+        self._spend_action(combat)
+        if action == "attack":
+            spent["attacked"] = True
+        return self._act(state, combat, me, action, target_id, advantage, ability_id)
+
+    @staticmethod
+    def _spend_action(combat: dict) -> None:
+        spent = combat["spent"]
+        if spent["action"]:
+            if combat.get("extra_actions"):  # Action Surge and the like
+                combat["extra_actions"] -= 1
+                return
+            raise CombatError("You already used your action this turn. You can still use a bonus action, move, or end your turn.")
+        spent["action"] = True
+
+    def _contest(self, state: dict, me: dict, target: dict, what: str) -> str:
+        """Grapple or Shove: your Strength (Athletics) against the target's Athletics or Acrobatics (ties: nothing happens)."""
+        skills = (state.get("character5e_sheet") or {}).get("skills") or {}
+        mine = as_int((skills.get("athletics") or {}).get("bonus"), ability_mod((state["player"].get("stats") or {}).get("STR", 10)))
+        theirs = as_int(target.get("athletics"), max(0, as_int(target.get("attack_bonus"), 2) - 2))
+        a, b = self.dice.roll(f"1d20{mine:+d}" if mine else "1d20"), self.dice.roll(f"1d20{theirs:+d}" if theirs else "1d20")
+        won = a.total > b.total
+        if won:
+            cond = "grappled" if what == "grapple" else "prone"
+            if cond not in target["conditions"]:
+                target["conditions"].append(cond)
+        result = ("GRAPPLED" if what == "grapple" else "KNOCKED PRONE") if won else "fails"
+        return (f"**{me['name']} tries to {what} {target['name']}**\n🤼 Athletics d20({a.natural}) {mine:+d} = {a.total} vs "
+                f"d20({b.natural}) {theirs:+d} = {b.total} → **{result}**")
+
+    def use_option(self, state: dict, option: dict, target_id: str = "", advantage: str = "") -> tuple[dict, str]:
+        """One option from the 5e list (Dash, Grapple, Second Wind, a spell…): its cost is spent and held until the turn
+        ends (the reaction until the round ends); what the app can roll, it rolls; the rest the Aedo narrates."""
+        kind, cost, name = option.get("kind", ""), option.get("cost", "action"), option.get("name", "")
+        if kind in ("attack", "dodge", "bonus_attack"):
+            return self.player_step(state, kind, target_id, advantage)
+        combat = state.get("combat") or {}
+        if not combat.get("active"):
+            raise CombatError("There is no fight going on.")
+        if cost == "reaction":  # a reaction can come on someone else's turn: once per round
+            me = next(c for c in combat["combatants"] if c["side"] == "player")
+            if me["hp"] <= 0:
+                raise CombatError("You are unconscious.")
+            if combat.get("reaction_round") == combat["round"]:
+                raise CombatError("You already used your reaction this round. It comes back at the start of your next turn.")
+            combat["reaction_round"] = combat["round"]
+            combat.setdefault("turn_lines", [])
+        else:
+            combat, me = self._check_my_turn(state)
+            if cost == "action":
+                self._spend_action(combat)
+            elif cost == "bonus":
+                if combat["spent"]["bonus"]:
+                    raise CombatError("You already used your bonus action this turn.")
+                combat["spent"]["bonus"] = True
+        label = {"action": "action", "bonus": "bonus action", "reaction": "reaction", "free": "no action"}.get(cost, cost)
+        if option.get("grants") == "action":
+            combat["extra_actions"] = combat.get("extra_actions", 0) + 1
+        if kind in ("grapple", "shove"):
+            target = self._get(combat, target_id)
+            if target["hp"] <= 0:
+                raise CombatError(f"{target['name']} is already down.")
+            combat["spent"]["attacked"] = True  # it replaces one attack of the Attack action
+            line = self._contest(state, me, target, kind)
+        elif kind == "opportunity":
+            target = self._get(combat, target_id)
+            line = self._attack(combat, me, target, "", head=f"**{me['name']} makes an opportunity attack on {target['name']} (reaction)**")
+        elif kind == "dash":
+            combat["moved"] = combat.get("moved", 0) - me.get("speed", 6)
+            line = f"**{me['name']} dashes** ({label})\n🏃 +{me.get('speed', 6) * 5} ft of movement this turn."
+        else:
+            line = f"**{me['name']} uses {name}** ({label})" + (f"\n{option['result']}" if option.get("result") else "")
+            if kind == "disengage":
+                line += "\n🛡 Moving away provokes no opportunity attacks this turn."
+        if option.get("hp") is not None:  # a feature that healed (Second Wind): the fight's HP follows the sheet
+            me["hp"] = int(clamp(as_int(option["hp"], me["hp"]), 0, me["max_hp"]))
+        combat["turn_lines"].append(line)
+        combat["log"] = (combat.get("log", []) + [line])[-30:]
+        self._sync_player(state)
+        mine = self.current(combat)["side"] == "player"
+        return state, line + ("\n\n" + self.turn_left(state) if mine else "")
+
+    def player_step(self, state: dict, action: str, target_id: str = "", advantage: str = "", ability_id: str = "") -> tuple[dict, str]:
+        """One part of the player's turn (from the Combat tab's buttons): rolled at once, the turn goes on."""
+        combat, me = self._check_my_turn(state)
+        block = self._do(state, combat, me, action, target_id, advantage, ability_id)
+        combat["turn_lines"].append(block)
+        combat["log"] = (combat.get("log", []) + [block])[-30:]
+        self._sync_player(state)
+        if self._finished(combat):  # the fight is won: End turn sends it all to the Aedo, who tells the ending
+            return state, block + "\n\n🏁 No enemy is left standing. End your turn to finish the fight."
+        return state, block + "\n\n" + self.turn_left(state)
+
+    def player_turn(self, state: dict, actions: list[str], target_id: str = "", advantage: str = "", bonus_target: str = "") -> tuple[dict, str]:
+        """A typed message is the player's whole turn: each part it names is rolled, then the turn ends."""
+        combat = state.get("combat") or {}
+        if combat.get("active"):
+            lines_before = self._others_until_player(combat)
+            if lines_before:
+                combat.setdefault("turn_lines", [])[:0] = lines_before
+        for i, action in enumerate(actions):
+            if self._finished(combat):
+                break
+            combat_, me = self._check_my_turn(state)
+            try:
+                tid = (bonus_target or target_id) if action == "bonus_attack" else target_id
+                if tid and self._get(combat_, tid)["hp"] <= 0:  # the first blow already dropped it: the nearest one standing
+                    tid = find_target(combat_, "")
+                block = self._do(state, combat_, me, action, tid, advantage, "")
+            except CombatError as exc:
+                if i == 0:
+                    raise
+                block = f"✋ {exc}"
+            combat_["turn_lines"].append(block)
+        return self.player_action(state, "end")
+
     def player_action(self, state: dict, action: str, target_id: str = "", advantage: str = "", ability_id: str = "") -> tuple[dict, str]:
-        """The player's action, then every other combatant until it is the player's turn again (one GM reply per round)."""
+        """The player's action (or "end": just end the turn), then every other combatant until it is the player's turn
+        again (one GM reply per round). Parts of the turn already played with player_step come first."""
         combat = state.get("combat") or {}
         if not combat.get("active"):
             raise CombatError("There is no fight going on.")
@@ -436,11 +615,23 @@ class CombatEngine:
         # Anyone before the player in the order acts first (start of the fight, or after a free text turn).
         lines += self._others_until_player(combat)
         if self._finished(combat):
+            lines = list(combat.pop("turn_lines", []) or []) + lines
+            combat["turn_lines"] = []
             self._sync_player(state)
             return self._wrap(state, lines, round_no)
-        if me["hp"] <= 0:
-            raise CombatError("You are down: your death saves are rolled on your turns while your companions fight on. "
-                              "Use “Others act” to play the round.")
+        if action != "end":
+            combat_, me = self._check_my_turn(state)
+            lines.append(self._do(state, combat_, me, action, target_id, advantage, ability_id))
+        lines = list(combat.get("turn_lines") or []) + lines
+        combat["turn_lines"] = []
+        if not self._finished(combat):
+            self._advance(combat)
+            lines += self._others_until_player(combat)
+        self._sync_player(state)
+        return self._wrap(state, lines, round_no)
+
+    def _act(self, state: dict, combat: dict, me: dict, action: str, target_id: str, advantage: str, ability_id: str) -> str:
+        lines: list[str] = []
         if action == "attack":
             target = self._get(combat, target_id)
             if target["hp"] <= 0:
@@ -449,7 +640,8 @@ class CombatEngine:
             if not in_reach:
                 lines.append(f"**{me['name']} runs at {target['name']}**\n{moved}")
             else:
-                block = self._attack(combat, me, target, advantage if advantage in ("advantage", "disadvantage") else "")
+                block = self._attack(combat, me, target, advantage if advantage in ("advantage", "disadvantage") else "",
+                                     head=f"**{me['name']} attacks {target['name']}" + (f" ({me['weapon']})" if me.get("weapon") else "") + "**")
                 if moved:
                     head, _, rest = block.partition("\n")
                     block = f"{head}\n{moved}\n{rest}"
@@ -464,11 +656,7 @@ class CombatEngine:
             lines.append(self._use_ability(state, combat, me, ability_id, target_id, advantage))
         else:
             raise CombatError("Unknown action.")
-        if not self._finished(combat):
-            self._advance(combat)
-            lines += self._others_until_player(combat)
-        self._sync_player(state)
-        return self._wrap(state, lines, round_no)
+        return "\n\n".join(lines)
 
     def _use_ability(self, state: dict, combat: dict, me: dict, ability_id: str, target_id: str, advantage: str) -> str:
         """The player spends a resource on an ability: an attack, a heal or another effect."""
@@ -776,13 +964,18 @@ def _base(name: str) -> str:
     return re.sub(r"\s*#?\d+$", "", name).strip().lower()
 
 
+NUMBERS = {w: i for i, ws in enumerate([[], ["one", "um", "uma"], ["two", "dois", "duas"], ["three", "três", "tres"], ["four", "quatro"],
+                                         ["five", "cinco"], ["six", "seis"], ["seven", "sete"], ["eight", "oito"]]) for w in ws}
+NUMBER_WORDS = re.compile(r"\b(" + "|".join(sorted(NUMBERS, key=len, reverse=True)) + r")\b", re.I)
+
+
 def find_target(combat: dict, text: str) -> str:
     """The enemy the text names ("Goblin 3", "goblin #3", "the goblin", "the bugbear"), else the nearest one."""
     me = next((c for c in combat["combatants"] if c["side"] == "player"), None)
     alive = [c for c in combat["combatants"] if c["side"] == "enemy" and c["hp"] > 0]
     if not alive:
         return ""
-    low = (text or "").lower()
+    low = NUMBER_WORDS.sub(lambda m: str(NUMBERS[m.group(0).lower()]), (text or "").lower())  # "goblin one" = Goblin 1
     near = (lambda c: distance(me["x"], me["y"], c["x"], c["y"])) if me else (lambda c: 0)
     for c in alive:  # a numbered name first
         num = re.search(r"(\d+)$", c["name"])
@@ -791,6 +984,28 @@ def find_target(combat: dict, text: str) -> str:
             return c["id"]
     named = [c for c in alive if re.search(rf"\b{re.escape(_base(c['name']))}(s|es)?\b", low)]
     return min(named or alive, key=near)["id"]
+
+
+BONUS_WORDS = re.compile(r"\b(bonus action|martial arts|flurry|a[çc][ãa]o b[ôo]nus|artes marciais|rajada)\b", re.I)
+END_WORDS = re.compile(r"^\s*/(end|fim|pass|passar)\b|\b(end (my|the) turn|i end|finish my turn|passo (o|a) (vez|turno)|encerro (o|meu) turno)\b", re.I)
+
+
+def split_turn(text: str) -> tuple[str, str]:
+    """(the action's words, the bonus action's words): "...the goblin one with my action, and with my bonus action the goblin 2"."""
+    t = text or ""
+    m = re.search(r"(,?\s*(and|then|e|depois)?\s*(with|using|use|com|usando)?\s*(my|a|minha)?\s*)?(bonus action|a[çc][ãa]o b[ôo]nus|martial arts|artes marciais|flurry)", t, re.I)
+    if not m:
+        return t, ""
+    return t[:m.start()].strip(" ,"), t[m.start():].strip(" ,")
+
+
+def bonus_intent(text: str) -> bool:
+    """The typed turn also uses a bonus action (a Monk's Martial Arts strike, Flurry of Blows)."""
+    return bool(BONUS_WORDS.search(SPOKEN.sub(" ", text or "")))
+
+
+def end_intent(text: str) -> bool:
+    return bool(END_WORDS.search(text or ""))
 
 
 def combat_intent(combat: dict, text: str) -> tuple[str, str, str] | None:

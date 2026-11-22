@@ -130,7 +130,75 @@ def sync_player(state: dict, lib) -> dict:
     p["stats"] = {k.upper(): v["score"] for k, v in sheet["abilities"].items()}
     p["skills"] = [f"{n.title()} {'+' if s['bonus'] >= 0 else ''}{s['bonus']}" for n, s in sheet["skills"].items() if s["proficient"]]
     state["character5e_sheet"] = {k: sheet[k] for k in ("ac", "attacks", "saves", "skills", "prof", "initiative", "speed", "hp_max", "level")}
+    state["character5e_sheet"]["martial_arts"] = sheet["class"] == "Monk"  # an Unarmed Strike as a bonus action after attacking
+    # the sheet owns the hero's numbers and gear: the Aedo reads these notes and the bag, not an old free-form sheet
+    if "notes_before_5e" not in p and p.get("notes"):
+        p["notes_before_5e"] = p["notes"]
+    p["notes"] = sheet_summary(sheet)
+    _sync_bag(state, char, lib)
     return sheet
+
+
+def sheet_summary(sheet: dict) -> str:
+    sig = lambda n: f"+{n}" if n >= 0 else str(n)  # noqa: E731
+    head = f"{sheet['class']} {sheet['level']}" + (f" ({sheet['subclass']})" if sheet["subclass"] else "")
+    parts = [f"{head}. AC {sheet['ac']} ({sheet['ac_how']}). Proficiency {sig(sheet['prof'])}.",
+             "Saving throws: " + (", ".join(a.upper() for a in sheet["save_prof"]) or "none") + "."]
+    if sheet["attacks"]:
+        parts.append("Attacks: " + "; ".join(f"{a['name']} {sig(a['bonus'])}, {a['damage']} {a['dtype']}".strip() for a in sheet["attacks"]) + ".")
+    feats = [f["name"] + (f" ({f['uses_max'] - f['used']}/{f['uses_max']} per {f['per']} rest)" if f.get("uses_max") else "") for f in sheet["features"]]
+    if feats:
+        parts.append("Features: " + ", ".join(feats) + ".")
+    if sheet.get("slots"):
+        parts.append("Spell slots: " + ", ".join(f"level {k}: {v}" for k, v in sheet["slots"].items()) + ".")
+    return " ".join(parts)
+
+
+def _sync_bag(state: dict, char: dict, lib) -> None:
+    """Weapons and armour in the bag follow the sheet; everything else in the bag (packs, potions, loot) stays."""
+    from .library import item_category
+    bag = [dict(i) for i in state.get("inventory") or [] if isinstance(i, dict)]
+    on_sheet = {i["name"].lower() for i in char.get("items") or []}
+
+    def gear(name: str) -> bool:
+        n = name.lower()
+        return any(k == "baseitem" and key == n and item_category(e) in ("weapon", "armor") for (k, key, _), e in lib.items.items())
+
+    bag = [i for i in bag if not (gear(str(i.get("name", ""))) and str(i.get("name", "")).lower() not in on_sheet)]
+    have = {str(i.get("name", "")).lower() for i in bag}
+    for it in char.get("items") or []:
+        if it["name"].lower() not in have:
+            bag.append({"name": it["name"], "qty": int(it.get("qty", 1)), "notes": ""})
+            have.add(it["name"].lower())
+    state["inventory"] = bag
+
+
+def pull_hp(state: dict, who: str = "") -> None:
+    """HP changed by the game (a fight, the Aedo, a rest) goes into the 5e character before the sheet is touched."""
+    char = char_of(state, who)
+    if not char:
+        return
+    if not who:
+        cur = ((state.get("player") or {}).get("hp") or {}).get("current")
+    else:
+        cur = ((state.get("party") or {}).get(who) or {}).get("hp")
+    if cur is not None:
+        char["hp"] = {**(char.get("hp") or {}), "current": max(0, int(cur))}
+
+
+def char_of(state: dict, who: str = "") -> dict | None:
+    """The hero's 5e character (who = "") or a companion's (who = their name)."""
+    return state.get("character5e") if not who else (state.get("party5e") or {}).get(who)
+
+
+def put_char(state: dict, who: str, char: dict, lib) -> dict:
+    """Store a 5e character and work its numbers into the game (the player, or the companion's fight sheet)."""
+    if not who:
+        state["character5e"] = char
+        return sync_player(state, lib)
+    from . import party5e
+    state.setdefault("party5e", {})[who] = char
+    return party5e.sync_companion(state, who, lib)
 
 
 def _find(lib, kinds: tuple, name: str, edition: str) -> dict | None:

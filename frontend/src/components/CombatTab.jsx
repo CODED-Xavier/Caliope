@@ -276,16 +276,72 @@ function Grid({ combat, selected, onSelect, convId, onState, busy, myTurn, curre
   );
 }
 
+/* ---------------------------------------------------------------- 5e options, by cost */
+const COST_LABELS = [["action", "Action"], ["bonus", "Bonus action"], ["reaction", "Reaction"], ["free", "Free"]];
+const NEEDS_TARGET = new Set(["attack", "bonus_attack", "grapple", "shove", "opportunity"]);
+
+/** Everything you can do this turn, sorted by what it costs (read from the rules and your features' own text). */
+function OptionsList({ convId, combat, target, adv, busy, onStep }) {
+  const [data, setData] = useState(null);
+  const [open, setOpen] = useState(true);
+  const [tip, setTip] = useState("");
+  useEffect(() => { api.combatOptions(convId).then(setData).catch(() => setData(null)); }, [convId, combat.round, combat.turn, JSON.stringify(combat.spent || {}), combat.extra_actions, combat.reaction_round]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!data?.groups) return null;
+  const spent = combat.spent || {};
+  const used = { action: spent.action && !combat.extra_actions, bonus: spent.bonus, reaction: combat.reaction_round === combat.round, free: false };
+  const use = (o) => (["attack", "dodge", "bonus_attack"].includes(o.kind)
+    ? onStep({ move: o.kind, target, advantage: adv })
+    : onStep({ move: "use", option: o.id, target, advantage: adv }));
+  return (
+    <div className="options5e">
+      <button type="button" className="section-title link-btn" onClick={() => setOpen((v) => !v)}>{open ? "▾ Your options" : "▸ Your options"}</button>
+      {open && COST_LABELS.map(([cost, label]) => (
+        <div key={cost} className={`opt-group ${used[cost] ? "spent" : ""}`}>
+          <div className="opt-head"><span>{label}</span>{used[cost] && <span className="tiny muted">{cost === "reaction" ? " · used this round" : " · used"}</span>}</div>
+          <div className="opt-list">
+            {data.groups[cost].map((o) => {
+              const noTarget = NEEDS_TARGET.has(o.kind) && !target;
+              const empty = o.uses_left === 0;
+              return (
+                <button key={o.id} type="button" className={`opt ${o.kind === "spell" ? "spell" : o.kind === "feature" ? "feature" : ""}`}
+                  disabled={busy || used[cost] || noTarget || empty || (o.kind === "bonus_attack" && !spent.attacked)}
+                  title={o.text} onMouseEnter={() => setTip(o.text)} onFocus={() => setTip(o.text)} onClick={() => use(o)}>
+                  {o.name}{o.uses_left !== undefined ? ` (${o.uses_left})` : ""}{o.kind === "spell" ? (o.level ? ` · ${o.level}` : " · cantrip") : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      {open && tip && <div className="tiny muted opt-tip">{tip}</div>}
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------- active fight */
-function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, onState }) {
+function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, onState, martialArts, is5e }) {
   const people = useMemo(() => combat.order.map((id) => combat.combatants.find((c) => c.id === id)), [combat]);
   const enemies = people.filter((c) => c.side === "enemy" && c.hp > 0);
   const [target, setTarget] = useState(enemies[0]?.id || "");
   const [selected, setSelected] = useState(null);
   const [adv, setAdv] = useState("");
   const [other, setOther] = useState("");
+  const [stepLine, setStepLine] = useState("");
+  const [stepError, setStepError] = useState("");
+  const [stepping, setStepping] = useState(false);
+  const spent = combat.spent || { action: false, bonus: false, attacked: false };
+  // one part of your turn (attack, bonus strike, dodge): rolled at once, your turn goes on until you end it
+  const step = async (body) => {
+    setStepping(true); setStepError("");
+    try { const r = await api.combatStep(convId, body); setStepLine(r.line); onState(r.state); } catch (e) { setStepError(e.message); } finally { setStepping(false); }
+  };
   useEffect(() => { if (!enemies.some((e) => e.id === target)) setTarget(enemies[0]?.id || ""); }, [combat]); // eslint-disable-line
   const current = people[combat.turn % people.length];
+  const myTurn = current?.side === "player" && current.hp > 0;
+  useEffect(() => { if (!myTurn) setStepLine(""); }, [myTurn]);
+  const me = people.find((c) => c.side === "player");
+  const moveLeft = me ? Math.max(0, (me.speed || 6) - (combat.moved || 0)) : 0;
+  const pending = (combat.turn_lines || []).length > 0;
   const select = (id) => {
     setSelected(id);
     const c = people.find((p) => p.id === id);
@@ -342,10 +398,29 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, o
             </select>
           )}
         </div>
+        {myTurn && (
+          <div className="turn-budget" aria-label="What is left this turn">
+            <span className={`pill small ${spent.action ? "" : "on"}`} title="Attack, Dodge, a spell, something else">{spent.action ? "✔ Action used" : "● Action"}</span>
+            <span className={`pill small ${spent.bonus ? "" : "on"}`} title="A Martial Arts strike, Second Wind, a bonus-action spell…">{spent.bonus ? "✔ Bonus used" : "● Bonus action"}</span>
+            <span className={`pill small ${moveLeft ? "on" : ""}`} title="Click a lit square on the map to move">{`🏃 ${moveLeft * 5} ft`}</span>
+            <span className={`pill small ${combat.reaction_round === combat.round ? "" : "on"}`} title="One check or reaction per round">{combat.reaction_round === combat.round ? "✔ Reaction used" : "● Reaction"}</span>
+          </div>
+        )}
         <div className="row gap">
-          <button className="btn primary grow" disabled={busy || !target} onClick={() => onAction({ action: "act", move: "attack", target, advantage: adv })}>⚔ Attack</button>
-          <button className="btn" disabled={busy} onClick={() => onAction({ action: "act", move: "dodge" })} title="Attacks against you have disadvantage until your next turn">🛡 Dodge</button>
+          <button className="btn primary grow" disabled={busy || stepping || !target || !myTurn || spent.action} onClick={() => step({ move: "attack", target, advantage: adv })}>⚔ Attack</button>
+          <button className="btn" disabled={busy || stepping || !myTurn || spent.action} onClick={() => step({ move: "dodge" })} title="Attacks against you have disadvantage until your next turn">🛡 Dodge</button>
+          {martialArts && (
+            <button className="btn" disabled={busy || stepping || !target || !myTurn || spent.bonus || !spent.attacked} onClick={() => step({ move: "bonus_attack", target, advantage: adv })}
+              title={spent.attacked ? "Martial Arts: an Unarmed Strike as your bonus action" : "Attack first, then strike again as a bonus action"}>👊 Bonus strike</button>
+          )}
         </div>
+        {myTurn && is5e && <OptionsList convId={convId} combat={combat} target={target} adv={adv} busy={busy || stepping} onStep={step} />}
+        {stepLine && <div className="step-line small">{stepLine.split("\n").map((l, i) => <div key={i}>{l.replace(/\*\*/g, "")}</div>)}</div>}
+        {stepError && <div className="error-text tiny">{stepError}</div>}
+        {myTurn && (
+          <button className="btn primary wide big-touch" disabled={busy || stepping} onClick={() => { setStepLine(""); onAction({ action: "act", move: "end" }); }}
+            title="Your turn is over: the Aedo tells what you did, then everyone else acts">{pending ? "⏭ End turn (the Aedo tells it)" : "⏭ End turn"}</button>
+        )}
         {abilities?.length > 0 && (
           <div className="ability-row">
             {abilities.map((a) => {
@@ -368,7 +443,7 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, o
           <button className="btn small grow" disabled={busy} onClick={() => onAction({ action: "enemies" })} title="Let everyone else act now">Others act</button>
           <button className="btn small danger" disabled={busy} onClick={async () => { if (await ask.confirm("End the fight now?")) onAction({ action: "end", reason: "the fight was stopped" }); }}>End fight</button>
         </div>
-        <div className="muted tiny">The app rolls everything and the Aedo narrates it. One reply per round: your action, then everyone else.</div>
+        <div className="muted tiny">Your turn: an action, a bonus action, your movement and a reaction. The app rolls each part at once; press End turn and the Aedo tells it, then everyone else acts. Typing your turn in the chat does it all in one go.</div>
       </div>
     </div>
   );
@@ -383,7 +458,7 @@ function sceneHasFoes(game) {
 export default function CombatTab({ game, busy, onCombat, onCombatEdit, onState }) {
   const combat = game.state.combat;
   if (combat?.active) return <FightView combat={combat} busy={busy} onAction={onCombat} onEdit={onCombatEdit} pools={game.state.resources} abilities={game.state.abilities}
-    convId={game.conversation.id} onState={onState} />;
+    convId={game.conversation.id} onState={onState} martialArts={!!game.state.character5e_sheet?.martial_arts} is5e={!!game.state.character5e} />;
   return (
     <>
       {combat && !combat.active && combat.log?.length > 0 && (

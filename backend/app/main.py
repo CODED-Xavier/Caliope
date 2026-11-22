@@ -20,7 +20,7 @@ from .config import APP_HOME, DB_PATH, FRONTEND_DIST
 from .conversations import NotFound
 from .drafts import draft_card_field, draft_player
 from .exporting import export_markdown
-from .combat import CombatError, combat_intent, player_defaults, suggest_fight
+from .combat import CombatError, bonus_intent, combat_intent, end_intent, find_target, player_defaults, split_turn, suggest_fight
 from .combat import _picture_geometry as combat_geometry
 from .maps import FEATURES as MAP_FEATURES
 from .maps import TILES as MAP_TILES
@@ -291,9 +291,16 @@ def library5e():
 
 
 @app.get("/api/library/5e")
-async def library_search(type: str = Query("spell"), q: str = Query(""), edition: str = Query("2014"), limit: int = Query(60)):
+async def library_search(type: str = Query("spell"), q: str = Query(""), edition: str = Query("2014"), limit: int = Query(60), category: str = Query("")):
     lib = await asyncio.to_thread(library5e)
-    return {"results": lib.search(type, q, "2024" if edition == "2024" else "2014", max(1, min(500, limit)))}
+    return {"results": lib.search(type, q, "2024" if edition == "2024" else "2014", max(1, min(500, limit)), category)}
+
+
+@app.get("/api/library/5e/details")
+async def library_details(type: str = Query(...), source: str = Query(...), name: str = Query(...)):
+    """What a class gives at each level, a race's traits, a background's skills, equipment and feature."""
+    from .dnd5e import details
+    return details.describe(await asyncio.to_thread(library5e), type, name, source)
 
 
 @app.get("/api/library/5e/entry")
@@ -316,72 +323,85 @@ async def library_reload():
     return await library_status()
 
 
-def _sheet_reply(state: dict) -> dict:
+def _sheet_reply(state: dict, who: str = "") -> dict:
     from .dnd5e.character import derive
-    char = state.get("character5e")
-    return {"character": char, "sheet": derive(char, library5e()) if char else None, "player": state.get("player")}
+    from .dnd5e.store import char_of
+    char = char_of(state, who)
+    return {"character": char, "sheet": derive(char, library5e()) if char else None, "player": state.get("player"),
+            "who": who, "party": state.get("party"), "party5e_sheet": state.get("party5e_sheet")}
+
+
+def _edition(s, conv_id: int) -> str:
+    return "2024" if s.conversations.get(conv_id)["scenario"].get("system") == "dnd5e-2024" else "2014"
+
+
+def _check_who(s, conv_id: int, state: dict, who: str) -> None:
+    if who and who not in (state.get("party") or {}):
+        raise ValueError(f"{who} is not in your party.")
 
 
 @app.get("/api/conversations/{conv_id}/character")
-async def get_character(conv_id: int):
+async def get_character(conv_id: int, who: str = Query("")):
     s = svc()
     s.conversations.get(conv_id)
-    return await asyncio.to_thread(_sheet_reply, s.conversations.get_state(conv_id))
+    from .dnd5e.store import pull_hp
+    state = s.conversations.get_state(conv_id)
+    pull_hp(state, who)
+    return await asyncio.to_thread(_sheet_reply, state, who)
 
 
 @app.patch("/api/conversations/{conv_id}/character")
-async def change_character(conv_id: int, body: dict[str, Any] = Body(...)):
-    """Add from the Library (drag and drop), remove, equip, pick, set: the numbers are worked out again."""
+async def change_character(conv_id: int, body: dict[str, Any] = Body(...), who: str = Query("")):
+    """Add from the Library (drag and drop), remove, equip, pick, set: the numbers are worked out again.
+    who = a companion's name changes that companion's sheet."""
     from .dnd5e import store
+    from .dnd5e.character import new_character
     s = svc()
     s.conversations.get(conv_id)
     not_busy(conv_id)
     state = s.conversations.get_state(conv_id)
+    _check_who(s, conv_id, state, who)
     lib = await asyncio.to_thread(library5e)
-    base = state.get("character5e")
-    if not base:
-        from .dnd5e.character import new_character
-        base = new_character("2024" if (s.conversations.get(conv_id)["scenario"].get("system") == "dnd5e-2024") else "2014")
-    state["character5e"] = store.apply_change(base, body.get("change") or {}, lib)
-    store.sync_player(state, lib)
+    store.pull_hp(state, who)
+    base = store.char_of(state, who) or new_character(_edition(s, conv_id))
+    store.put_char(state, who, store.apply_change(base, body.get("change") or {}, lib), lib)
     s.conversations.save_state(conv_id, state)
-    return _sheet_reply(state)
+    return _sheet_reply(state, who)
 
 
 @app.get("/api/conversations/{conv_id}/character/builder")
-async def character_builder(conv_id: int):
-    from .dnd5e import build
+async def character_builder(conv_id: int, who: str = Query("")):
+    from .dnd5e import build, store
+    from .dnd5e.character import new_character
     s = svc()
-    char = s.conversations.get_state(conv_id).get("character5e")
-    if not char:
-        from .dnd5e.character import new_character
-        char = new_character()
+    char = store.char_of(s.conversations.get_state(conv_id), who) or new_character(_edition(s, conv_id))
     return {"steps": await asyncio.to_thread(build.builder_steps, char, library5e()), "methods": build.ABILITY_METHODS}
 
 
 @app.get("/api/conversations/{conv_id}/character/levelup")
-async def character_levelup_plan(conv_id: int):
-    from .dnd5e import build
-    char = svc().conversations.get_state(conv_id).get("character5e")
+async def character_levelup_plan(conv_id: int, who: str = Query("")):
+    from .dnd5e import build, store
+    char = store.char_of(svc().conversations.get_state(conv_id), who)
     if not char:
-        raise ValueError("This game has no 5e sheet.")
+        raise ValueError("This sheet is not a 5e sheet yet.")
     return await asyncio.to_thread(build.level_up_plan, char, library5e())
 
 
 @app.post("/api/conversations/{conv_id}/character/levelup")
-async def character_levelup(conv_id: int, body: dict[str, Any] = Body(...)):
+async def character_levelup(conv_id: int, body: dict[str, Any] = Body(...), who: str = Query("")):
     """Level up: HP (average or a roll), the class table's new features, and the player's choices."""
     from .dnd5e import build, store
     s = svc()
     not_busy(conv_id)
     state = s.conversations.get_state(conv_id)
-    if not state.get("character5e"):
-        raise ValueError("This game has no 5e sheet.")
+    store.pull_hp(state, who)
+    char = store.char_of(state, who)
+    if not char:
+        raise ValueError("This sheet is not a 5e sheet yet.")
     lib = await asyncio.to_thread(library5e)
-    state["character5e"] = build.apply_level_up(state["character5e"], body.get("answers") or {}, lib)
-    store.sync_player(state, lib)
+    store.put_char(state, who, build.apply_level_up(char, body.get("answers") or {}, lib), lib)
     s.conversations.save_state(conv_id, state)
-    return _sheet_reply(state)
+    return _sheet_reply(state, who)
 
 
 @app.post("/api/conversations/{conv_id}/character/convert")
@@ -392,9 +412,32 @@ async def character_convert(conv_id: int):
     not_busy(conv_id)
     state = s.conversations.get_state(conv_id)
     lib = await asyncio.to_thread(library5e)
-    edition = "2024" if s.conversations.get(conv_id)["scenario"].get("system") == "dnd5e-2024" else "2014"
-    state["character5e"] = store.convert(state, lib, edition)
-    store.sync_player(state, lib)
+    store.put_char(state, "", store.convert(state, lib, _edition(s, conv_id)), lib)
+    s.conversations.save_state(conv_id, state)
+    return _sheet_reply(state)
+
+
+@app.post("/api/conversations/{conv_id}/character/party/auto")
+async def character_party_auto(conv_id: int, body: dict[str, Any] = Body(default={})):
+    """The system builds the companions' 5e sheets around the hero (front-liner, healer, spellcaster, support).
+    name = only that companion; otherwise every companion still without a sheet (or all, with "all": true)."""
+    from . import party
+    from .dnd5e import party5e, store
+    s = svc()
+    not_busy(conv_id)
+    conv = s.conversations.get(conv_id)
+    state = s.conversations.get_state(conv_id)
+    if state.get("party_mode") != "companions":
+        raise ValueError("This game is played solo.")
+    hero = state.get("character5e")
+    if not hero or not hero.get("cls"):
+        raise ValueError("Build your own hero first: the companions are chosen around your class.")
+    lib = await asyncio.to_thread(library5e)
+    only = str(body.get("name") or "")
+    comps = [c for c in party.companions(conv["scenario"]) if c["name"] in (state.get("party") or {})]
+    keep = {} if body.get("all") else {c["name"]: store.char_of(state, c["name"]) for c in comps}
+    for name, char in party5e.auto_build_all(comps, hero, lib, only=only, keep=keep).items():
+        store.put_char(state, name, char, lib)
     s.conversations.save_state(conv_id, state)
     return _sheet_reply(state)
 
@@ -410,6 +453,7 @@ async def use_character_feature(conv_id: int, body: dict[str, Any] = Body(...)):
     def prepare(st):
         if not st.get("character5e"):
             raise ValueError("This game has no 5e sheet.")
+        store.pull_hp(st, "")
         st["character5e"], line = store.use_feature(st["character5e"], str(body.get("name", "")), lib)
         store.sync_player(st, lib)
         return st, line
@@ -491,6 +535,17 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
     elif action == "act":
         prepare = lambda st: s.combat.player_action(st, body.get("move", "attack"), str(body.get("target", "")),  # noqa: E731
                                                     str(body.get("advantage", "")), str(body.get("ability", "")))
+    elif action == "step":  # one part of the player's turn (attack, bonus strike, dodge…): rolled at once, no reply yet
+        not_busy(conv_id)
+        state = s.conversations.get_state(conv_id)
+        if body.get("move") == "use":  # an option from the 5e list (Dash, Grapple, Second Wind, a spell…)
+            state, line = await asyncio.to_thread(_use_option, s, state, str(body.get("option", "")), str(body.get("target", "")),
+                                                  str(body.get("advantage", "")))
+        else:
+            state, line = s.combat.player_step(state, str(body.get("move", "attack")), str(body.get("target", "")),
+                                               str(body.get("advantage", "")), str(body.get("ability", "")))
+        s.conversations.save_state(conv_id, state)
+        return {"state": state, "line": line}
     elif action == "move":  # the player walks on the map (own turn, up to their speed); no reply from the GM
         not_busy(conv_id)
         state = s.combat.move_player(s.conversations.get_state(conv_id), body.get("x"), body.get("y"))
@@ -503,6 +558,38 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
     else:
         raise CombatError("Unknown combat action.")
     return stream_response(s.engine.send(conv_id, str(body.get("text", "")), prepare=prepare))
+
+
+def _use_option(s, state: dict, option_id: str, target: str, advantage: str):
+    from .dnd5e import actions, store
+    char = state.get("character5e")
+    if not char:
+        raise CombatError("The action list needs a 5e sheet.")
+    lib = library5e()
+    option = actions.find(char, lib, option_id)
+    if not option:
+        raise CombatError("That is not one of your options.")
+    if option["kind"] == "feature" and "uses_left" in option:
+        if option["uses_left"] <= 0:
+            raise CombatError(f"{option['name']} is used up until you rest.")
+        store.pull_hp(state, "")
+        char, result = store.use_feature(char, option["name"], lib)
+        store.put_char(state, "", char, lib)
+        option = {**option, "result": result, "hp": state["player"]["hp"]["current"]}
+    return s.combat.use_option(state, option, target, advantage)
+
+
+@app.get("/api/conversations/{conv_id}/combat/options")
+async def combat_options(conv_id: int):
+    """The 5e options for this turn, by cost (action, bonus action, reaction, free), and what is already spent."""
+    from .dnd5e import actions
+    state = svc().conversations.get_state(conv_id)
+    char = state.get("character5e")
+    if not char:
+        return {"groups": None}
+    combat = state.get("combat") or {}
+    return {"groups": await asyncio.to_thread(actions.options, char, library5e()), "spent": combat.get("spent") or {},
+            "extra_actions": combat.get("extra_actions", 0), "reaction_used": combat.get("reaction_round") == combat.get("round")}
 
 
 def _guess_kind(tiles: list[str]) -> str:
@@ -1775,10 +1862,19 @@ async def chat(conv_id: int, body: dict[str, Any] = Body(...)):
     s = svc()
     s.conversations.get(conv_id)
     text = str(body.get("content", ""))
-    intent = combat_intent(s.conversations.get_state(conv_id).get("combat") or {}, text)
+    combat = s.conversations.get_state(conv_id).get("combat") or {}
+    intent = combat_intent(combat, text)
     if intent:  # "I swing at the goblin's neck" / "/attack goblin 2": the app rolls it, the GM narrates it in the player's words
-        move, target, words = intent
-        return stream_response(s.engine.send(conv_id, words, prepare=lambda st: s.combat.player_action(st, move, target)))
+        move, target, words = intent  # a typed message is the whole turn: the action, a bonus strike if named, then the turn ends
+        moves, bonus_target = [move], ""
+        if move == "attack" and bonus_intent(text):
+            act_words, bonus_words = split_turn(words)
+            target = find_target(combat, act_words) or target
+            bonus_target = find_target(combat, bonus_words) if bonus_words else ""
+            moves.append("bonus_attack")
+        return stream_response(s.engine.send(conv_id, words, prepare=lambda st: s.combat.player_turn(st, moves, target, "", bonus_target)))
+    if combat.get("active") and end_intent(text):  # "/end" or "I end my turn": the parts already played are narrated, others act
+        return stream_response(s.engine.send(conv_id, text, prepare=lambda st: s.combat.player_action(st, "end")))
     return stream_response(s.engine.send(conv_id, text))
 
 

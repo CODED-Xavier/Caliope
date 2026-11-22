@@ -150,10 +150,23 @@ def regenerate(state: dict, when: str, times: int = 1) -> list[str]:
         out.append(f"{name} {p['current']}/{p['max']}")
     from .party import rest as party_rest
     if state.get("character5e") and when in ("short_rest", "long_rest"):  # 5e features come back on rests
-        from .dnd5e.store import rest as char_rest
+        from .dnd5e.store import pull_hp, rest as char_rest, sync_player
+        pull_hp(state, "")
         state["character5e"] = char_rest(state["character5e"], when, _library())
+        sync_player(state, _library())
         out.append("features refreshed")
-    return out + party_rest(state, when)
+    out += party_rest(state, when)
+    if state.get("party5e") and when in ("short_rest", "long_rest"):  # companions' 5e sheets: HP from the party, uses refilled
+        from .dnd5e.party5e import sync_companion
+        from .dnd5e.store import pull_hp, rest as char_rest
+        for name in list(state["party5e"]):
+            pull_hp(state, name)
+            state["party5e"][name] = char_rest(state["party5e"][name], when, _library())
+            hp = (state.get("party") or {}).get(name, {}).get("hp")
+            if hp is not None and when == "short_rest":
+                state["party5e"][name]["hp"] = {**state["party5e"][name].get("hp", {}), "current": hp}
+            sync_companion(state, name, _library())
+    return out
 
 
 def _library():

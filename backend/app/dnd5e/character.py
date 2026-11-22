@@ -201,6 +201,11 @@ def derive(char: dict, lib) -> dict:
         "xp": int(char.get("xp") or 0), "next_level_xp": XP_LEVELS[level] if level < 20 else None,
     }
     sheet["attacks"] = _attacks(weapons, cls, mods, prof, options, bool(shields))
+    if cls_name == "Monk":  # Martial Arts: an unarmed strike with DEX or STR and the monk's die
+        ab = "dex" if mods["dex"] >= mods["str"] else "str"
+        die = 4 if level < 5 else 6 if level < 11 else 8 if level < 17 else 10
+        sheet["attacks"].insert(0, {"name": "Unarmed Strike", "bonus": prof + mods[ab], "damage": f"1d{die}{_sig(mods[ab]) if mods[ab] else ''}",
+                                    "dtype": "bludgeoning", "range": "5 ft", "properties": [], "proficient": True, "ability": ab})
     sheet["features"] = _features(char, cls, look, level, mods)
     sheet.update(_slots(cls, level))
     sheet["warnings"] = look.warnings

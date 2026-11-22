@@ -36,25 +36,35 @@ function GameSheet({ convId, current, onReload, onDone }) {
   );
 }
 
+// Lines that live elsewhere (top bar, People, Bag, Journal): the card's own values are what's left (Lumencia's tiers…)
+const GENERIC_STATUS = /^(location|place|time|date|weather|relationships?|inventory|items|gold|quests?|conditions?|hp|ac|class|level|xp|str|dex|con|int|wis|cha|spell slots|inspiration|hit dice)$/i;
+
+/** The card's tracker values, inside the role-play Sheet tab. */
 function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, picked, convId, onReload, now }) {
   const status = latestStatus(messages) || (byApp && now ? { text: now, messageId: null } : null);  // before the first reply: the sheet as it stands
   const [editing, setEditing] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [draft, setDraft] = useState({});
-  if (choosing || (!status && !byApp && !every)) {
-    return <div className="tab-body"><GameSheet convId={convId} current={picked} onReload={onReload} onDone={status || byApp ? () => setChoosing(false) : null} /></div>;
+  if (choosing) {
+    return <div className="card-status"><GameSheet convId={convId} current={picked} onReload={onReload} onDone={() => setChoosing(false)} /></div>;
+  }
+  if (!status && !byApp && !every) {
+    return <div className="card-status"><button type="button" className="btn small" onClick={() => setChoosing(true)}>🗂 Add a tracker sheet (tiers, stats…)</button></div>;
   }
   if (!status) {
     return (
-      <div className="tab-body">
+      <div className="card-status">
         <div className="muted small">{byApp ? "The status appears after the first reply." : `No status yet. This card's AI writes a status block ${every ? `every ${every} replies` : "now and then"}, and it shows up here instead of in the story.`}</div>
       </div>
     );
   }
-  const lines = status.text.split("\n").map((l) => l.replace(/\*\*/g, "").trim()).filter((l) => l && !/^\[?INFO\]?$/i.test(l));
+  const lines = status.text.split("\n").map((l) => l.replace(/\*\*/g, "").trim()).filter((l) => l && !/^\[?INFO\]?$/i.test(l))
+    .map((l) => l.split(/\s+\|\s+/).filter((c) => { const k = c.indexOf(":"); return !(k > 0 && GENERIC_STATUS.test(c.slice(0, k).replace(/^-\s*/, "").trim())); }).join(" | "))
+    .filter(Boolean);
   const save = async () => { await onPatch({ card_status: { ...(values || {}), ...draft } }); setEditing(false); };
   return (
-    <div className="tab-body status-tab">
+    <div className="card-status status-tab">
+      {lines.length === 0 && <div className="muted tiny">This card keeps no values of its own.</div>}
       {lines.map((line, i) => {
         const cells = line.split(/\s+\|\s+/);
         return (
@@ -70,7 +80,7 @@ function StatusTab({ messages, every, byApp, fields, values, onPatch, sheetOwn, 
       })}
       {byApp ? (
         <>
-          <div className="muted tiny">Kept by the app: place, time, items and relationships come from the game; the card's own values change when the story changes them (the tracker reports it). Correct them here if needed.</div>
+          <div className="muted tiny">The card's own values, kept by the app: they change when the story changes them. Correct them here if needed.</div>
           <div className="row gap">
             {fields?.length > 0 && !editing && <button className="btn small" onClick={() => { setDraft({}); setEditing(true); }}>✎ Edit the values</button>}
             {!sheetOwn && !editing && <button className="btn small" onClick={() => setChoosing(true)}>🗂 Change the sheet</button>}
@@ -177,10 +187,11 @@ function Convert5e({ convId, state, busy, onState, openBuilder, onBuilderShown }
   );
 }
 
-function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, onState }) {
+function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, onState, cardStatus }) {
   const p = state.player;
   const [picOpen, setPicOpen] = useState(false);
   const numbers = kind !== "roleplay";
+  const [about, setAbout] = useState(!cardStatus);
   const hp = p.hp;
   const pct = clamp((hp.current / Math.max(1, hp.max)) * 100, 0, 100);
   return (
@@ -192,6 +203,9 @@ function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, o
         <div className="grow"><TextField className="title-input" value={p.name} onCommit={(v) => onPatch({ player: { name: v } })} /></div>
       </div>
       {picOpen && <MoodEditor portraits={p.portraits} mainOnly onChange={(v) => onPatch({ player: { portraits: v } })} />}
+      {cardStatus}
+      {cardStatus && <button type="button" className="section-title link-btn" onClick={() => setAbout((v) => !v)}>{about ? "▾ About you" : "▸ About you"}</button>}
+      {about && <>
       <div className="row gap">
         <TextField value={p.race} placeholder="Race" onCommit={(v) => onPatch({ player: { race: v } })} />
         <TextField value={p.class} placeholder="Class" onCommit={(v) => onPatch({ player: { class: v } })} />
@@ -245,7 +259,7 @@ function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, o
         onCommit={(v) => onPatch({ wishes: v })} />
       <label className="lbl">Your notes</label>
       <TextField multiline rows={3} value={state.notes} placeholder="Private notes (the AI does not see these)" onCommit={(v) => onPatch({ notes: v })} />
-      {!numbers && <div className="muted small">Roleplay cards focus on characters and relationships, so the numbers (HP, abilities, gold) are hidden. Switch the card type to Adventure to use them.</div>}
+      </>}
     </div>
   );
 }
@@ -781,7 +795,6 @@ function AdventureTab({ adventure, state, convId, onState, onFight, busy }) {
 /* ------------------------------------------------------------------ Panel */
 export const TABS = [
   ["adventure", "📕", "Adventure"],
-  ["status", "📜", "Status"],
   ["sheet", "🧙", "Sheet"],
   ["bag", "🎒", "Bag"],
   ["people", "👥", "People"],
@@ -796,12 +809,10 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
   const mode = conversation.scenario?.mode;
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
   const allowed = [...(game.features?.panels || TABS.map(([k]) => k)), ...(state.combat?.active ? ["combat"] : []),
-    "sheet", "status",  // always: your character (name, background, looks…) can be read, copied and edited there
+    "sheet",  // always: your character, and on role-play cards the card's own values (the old Status tab) too
     ...((game.messages || []).some((m) => m.meta?.scene_picture) ? ["map"] : []),
     ...(conversation.scenario?.adventure?.scenes?.length ? ["adventure", "combat"] : [])];  // the map bag lives on the map tab
-  const statusFirst = (game.features?.panels || []).includes("status") || !!game.status_by_app;
-  const tabs = TABS.filter(([k]) => allowed.includes(k) && (statusFirst || k !== "status"))
-    .concat(statusFirst ? [] : TABS.filter(([k]) => k === "status"));  // without a sheet it waits at the end, to pick one
+  const tabs = TABS.filter(([k]) => allowed.includes(k) && k !== "status");
   const active = tabs.some(([k]) => k === tab) ? tab : tabs[0]?.[0];
   return (
     <aside className="side-panel">
@@ -818,10 +829,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
       <div className="tab-scroll">
         {active === "adventure" && <AdventureTab adventure={conversation.scenario.adventure} state={state} convId={conversation.id}
           onState={onStateLoaded} onFight={() => onTab("combat")} busy={!canRoll} />}
-        {active === "status" && <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every}
-          byApp={!!game.status_by_app} fields={game.status_fields} sheetOwn={!!game.sheet_own}
-          picked={conversation.scenario?.sheet_template || ""} convId={conversation.id} onReload={onReload} now={game.status_now}
-          values={state.card_status} onPatch={onPatch} />}
+
         {active === "sheet" && kind === "adventure" && state.character5e && (
           <Sheet5e convId={conversation.id} state={state} busy={!canRoll} onUse={onFeature} onRest={onRest} onRoll={onRollToChat}
             onState={onStateLoaded} openBuilder={openBuilder} onBuilderShown={onBuilderShown} />
@@ -830,7 +838,11 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
           <>
             {kind === "adventure" && <Convert5e convId={conversation.id} state={state} busy={!canRoll} onState={onStateLoaded} openBuilder={openBuilder} onBuilderShown={onBuilderShown} />}
             <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} onPower={onPower} onRest={onRest} busy={!canRoll}
-              convId={conversation.id} onState={onStateLoaded} />
+              convId={conversation.id} onState={onStateLoaded}
+              cardStatus={kind === "roleplay" ? <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every}
+                byApp={!!game.status_by_app} fields={game.status_fields} sheetOwn={!!game.sheet_own}
+                picked={conversation.scenario?.sheet_template || ""} convId={conversation.id} onReload={onReload} now={game.status_now}
+                values={state.card_status} onPatch={onPatch} /> : null} />
           </>
         )}
         {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}

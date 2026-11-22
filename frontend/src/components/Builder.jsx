@@ -9,27 +9,111 @@ const SKILL_NAMES = { "animal handling": "Animal Handling", "sleight of hand": "
 const skillName = (s) => SKILL_NAMES[s] || s.charAt(0).toUpperCase() + s.slice(1);
 const roll4d6 = () => { const d = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 6)).sort((a, b) => a - b); return d[1] + d[2] + d[3]; };
 
-/** Pick from the Library with big cards (class, race, background, equipment). */
-function OptionCards({ type, edition, onPick, picked, busy }) {
+const CLASS_EMBLEMS = ["artificer", "barbarian", "bard", "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"];
+// race slugs with an emblem in /emblems/race-<slug>.png (most specific first: "half-orc" before "orc")
+const RACE_EMBLEMS = ["half-orc", "dragonborn", "tiefling", "aasimar", "warforged", "shifter", "triton", "goblin", "gnome", "dwarf", "human", "fairy", "drow", "elf", "orc"];
+const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** The emblem shown on a class (or race) card; classes without their own get the generic one. */
+export function emblemFor(type, name) {
+  const n = slug(name);
+  if (type === "class") return `/emblems/${CLASS_EMBLEMS.includes(n) ? n : "class"}.png`;
+  if (type === "race") { const r = RACE_EMBLEMS.find((x) => n === x || n.startsWith(`${x}-`) || n.endsWith(`-${x}`)); return r ? `/emblems/race-${r}.png` : ""; }
+  return "";
+}
+
+const EQUIP_CATEGORIES = [["", "All"], ["weapon", "Weapons"], ["armor", "Armour & shields"], ["gear", "Adventuring gear"], ["tools", "Tools"],
+  ["ammunition", "Ammunition"], ["mounts", "Mounts & vehicles"]];
+
+/** What a class gives at each level, a race's traits, a background's skills, gear and feature. */
+function Details({ type, entry }) {
+  const [d, setD] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => { api.libraryDetails(type, entry.source, entry.name).then(setD).catch((e) => setError(e.message)); }, [type, entry.source, entry.name]);
+  if (error) return <div className="error-text tiny">{error}</div>;
+  if (!d) return <div className="muted tiny">Loading…</div>;
+  const chips = (pairs) => <div className="chip-row tight">{pairs.filter(([, v]) => v && (!Array.isArray(v) || v.length)).map(([k, v]) => <span key={k} className="pill small"><strong>{k}</strong>&nbsp;{Array.isArray(v) ? v.join(", ") : v}</span>)}</div>;
+  if (d.kind === "class") {
+    return (
+      <div className="details">
+        {chips([["Hit die", d.hit_die], ["Saves", d.saves], ["Armour", d.armor], ["Weapons", d.weapons], ["Spellcasting", d.spellcasting]])}
+        {d.skills && <div className="small">{`Skills: ${d.skills}`}</div>}
+        {d.subclasses.length > 0 && <div className="small">{`${d.subclass_title} (level ${d.subclass_level}): ${d.subclasses.join(", ")}`}</div>}
+        <table className="level-table">
+          <thead><tr><th>Lv</th><th>Prof</th><th>Features</th>{d.levels.some((l) => l.slots || l.pact) && <th>Slots</th>}</tr></thead>
+          <tbody>
+            {d.levels.map((l) => (
+              <tr key={l.level} className={l.features.length ? "" : "quiet"}>
+                <td>{l.level}</td><td>{`+${l.prof}`}</td><td>{l.features.join(", ") || "–"}</td>
+                {d.levels.some((x) => x.slots || x.pact) && <td>{l.pact ? `${l.pact.count} × ${l.pact.level}` : Object.entries(l.slots || {}).map(([k, v]) => `${v}×${k}`).join(" ") || "–"}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+  if (d.kind === "race") {
+    return (
+      <div className="details">
+        {chips([["Ability scores", d.abilities], ["Speed", `${d.speed} ft`], ["Size", d.size], ["Darkvision", d.darkvision ? `${d.darkvision} ft` : ""], ["Subraces", d.subraces]])}
+        {d.traits.map((t) => <div key={t.name} className="small"><strong>{t.name}.</strong> <span className="muted">{t.text}</span></div>)}
+      </div>
+    );
+  }
+  return (
+    <div className="details">
+      {chips([["Skills", d.skills], ["Tools", d.tools], ["Languages", d.languages]])}
+      {d.equipment.length > 0 && <div className="small"><strong>Equipment.</strong> <span className="muted">{d.equipment.join("; ")}</span></div>}
+      {d.feature && <div className="small"><strong>{d.feature.name}.</strong> <span className="muted">{d.feature.text}</span></div>}
+    </div>
+  );
+}
+
+/** Pick from the Library with big cards (class, race, background, equipment). The ▸ arrow shows what it gives. */
+function OptionCards({ type, edition, onPick, picked, busy, categories }) {
   const [q, setQ] = useState("");
+  const [cat, setCat] = useState("");
+  const [open, setOpen] = useState("");
   const [results, setResults] = useState([]);
   useEffect(() => {
-    const t = setTimeout(() => { api.librarySearch(type, q, edition).then((r) => setResults((r?.results || []).slice(0, 60))).catch(() => setResults([])); }, 200);
+    const t = setTimeout(() => { api.librarySearch(type, q, edition, cat).then((r) => setResults((r?.results || []).slice(0, 80))).catch(() => setResults([])); }, 200);
     return () => clearTimeout(t);
-  }, [type, q, edition]);
+  }, [type, q, edition, cat]);
+  const detailed = ["class", "race", "background"].includes(type);
   return (
     <>
       <input className="field big-touch" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" aria-label="Search" />
+      {categories && (
+        <div className="chip-row tight">
+          {EQUIP_CATEGORIES.map(([k, label]) => <button key={k || "all"} type="button" className={`pill small ${cat === k ? "on" : ""}`} onClick={() => setCat(k)}>{label}</button>)}
+        </div>
+      )}
       <div className="option-cards">
         {results.length === 0 && <div className="muted small pad">Nothing found.</div>}
-        {results.map((r) => (
-          <button key={`${r.source}-${r.name}`} type="button" disabled={busy} className={`option-card ${picked && picked.name === r.name && picked.source === r.source ? "on" : ""}`}
-            onClick={() => onPick({ type: r.type || type, name: r.name, source: r.source })}>
-            <span className="option-name">{r.name}</span>
-            <span className="option-src">{`${r.source}${r.srd ? " · SRD" : ""}`}</span>
-            {r.summary && <span className="option-sum">{r.summary}</span>}
-          </button>
-        ))}
+        {results.map((r) => {
+          const key = `${r.source}-${r.name}`;
+          const img = emblemFor(r.type || type, r.name);
+          const isOpen = open === key;
+          return (
+            <div key={key} className={`option-card ${img ? "with-emblem" : ""} ${picked && picked.name === r.name && picked.source === r.source ? "on" : ""} ${isOpen ? "open" : ""}`}>
+              <button type="button" className="option-main" disabled={busy} onClick={() => onPick({ type: r.type || type, name: r.name, source: r.source })}>
+                {img && <img className="option-emblem" src={img} alt="" />}
+                <span className="option-text">
+                  <span className="option-name">{r.name}</span>
+                  <span className="option-src">{`${r.source}${r.srd ? " · SRD" : ""}${r.category ? ` · ${r.category}` : ""}`}</span>
+                  {r.summary && !isOpen && <span className="option-sum">{r.summary}</span>}
+                </span>
+              </button>
+              {detailed && (
+                <button type="button" className="option-more" aria-expanded={isOpen} title={isOpen ? "Hide" : "See what it gives"} onClick={() => setOpen(isOpen ? "" : key)}>
+                  {isOpen ? "▾" : "▸"}
+                </button>
+              )}
+              {isOpen && <Details type={r.type || type} entry={r} />}
+            </div>
+          );
+        })}
       </div>
     </>
   );
@@ -113,7 +197,7 @@ function Pick({ step, chosen, onSave, busy }) {
  * The 5e builder, like Roll20's Charactermancer: one step at a time with big cards. Every choice goes on the sheet
  * at once, so you can close it and come back.
  */
-export default function Builder({ convId, onClose, onChanged }) {
+export default function Builder({ convId, onClose, onChanged, who = "" }) {
   const [steps, setSteps] = useState([]);
   const [methods, setMethods] = useState(null);
   const [data, setData] = useState(null);
@@ -122,17 +206,17 @@ export default function Builder({ convId, onClose, onChanged }) {
   const [error, setError] = useState("");
   const load = async (next) => {
     try {
-      const [b, c] = await Promise.all([api.builder5e(convId), api.character5e(convId)]);
+      const [b, c] = await Promise.all([api.builder5e(convId, who), api.character5e(convId, who)]);
       setSteps(b.steps || []); setMethods(b.methods); setData(c);
       if (next) setAt(next);
     } catch (e) { setError(e.message); }
   };
-  useEffect(() => { load(); }, [convId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [convId, who]); // eslint-disable-line react-hooks/exhaustive-deps
   const nextAfter = (id) => { const i = steps.findIndex((s) => s.id === id); return steps[i + 1]?.id || id; };
   const apply = async (change, advance = true) => {
     setBusy(true); setError("");
     try {
-      const r = await api.changeCharacter5e(convId, change);
+      const r = await api.changeCharacter5e(convId, change, who);
       onChanged?.(r);
       await load(advance ? nextAfter(at) : null);
     } catch (e) { setError(e.message); } finally { setBusy(false); }
@@ -143,7 +227,7 @@ export default function Builder({ convId, onClose, onChanged }) {
   const current = step ? { class: ch.cls, race: ch.race, background: ch.background }[step.id] : null;
 
   return (
-    <Modal title="5e character builder" onClose={onClose} wide footer={<button type="button" className="btn primary" onClick={onClose}>Done</button>}>
+    <Modal title={who ? `5e builder · ${who}` : "5e character builder"} onClose={onClose} wide footer={<button type="button" className="btn primary" onClick={onClose}>Done</button>}>
       <div className="builder">
         <nav className="builder-steps" aria-label="Steps">
           {steps.map((s, i) => (
@@ -177,7 +261,7 @@ export default function Builder({ convId, onClose, onChanged }) {
           {step?.id === "equipment" && (
             <>
               <div className="muted small">{`Weapons and armour from the Library. On your sheet now: ${(ch.items || []).map((x) => x.name).join(", ") || "nothing"}. Tick "worn" on the sheet to wear armour and hold weapons.`}</div>
-              <OptionCards type="baseitem" edition={edition} busy={busy} onPick={(ref) => apply({ op: "add", ...ref }, false)} />
+              <OptionCards type="baseitem" edition={edition} busy={busy} categories onPick={(ref) => apply({ op: "add", ...ref }, false)} />
             </>
           )}
         </div>

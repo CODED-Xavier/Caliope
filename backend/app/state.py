@@ -132,6 +132,9 @@ def _story_part(merged: dict) -> dict:
         out["character5e"] = merged["character5e"]
         if isinstance(merged.get("character5e_sheet"), dict):
             out["character5e_sheet"] = merged["character5e_sheet"]
+    for key in ("party5e", "party5e_sheet"):  # app/dnd5e/party5e.py: companions' 5e characters and their numbers
+        if isinstance(merged.get(key), dict):
+            out[key] = merged[key]
     if merged.get("party_mode") in ("solo", "companions"):  # app/party.py
         from .party import normalize_party
         out["party_mode"] = merged["party_mode"]

@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import { LibraryPicker, DRAG_TYPE } from "./Library.jsx";
-import Builder from "./Builder.jsx";
+import Builder, { emblemFor } from "./Builder.jsx";
 import LevelUp from "./LevelUp.jsx";
+import Modal from "./Modal.jsx";
 
 const ABILS = [["str", "STR"], ["dex", "DEX"], ["con", "CON"], ["int", "INT"], ["wis", "WIS"], ["cha", "CHA"]];
 const sig = (n) => (n >= 0 ? `+${n}` : `${n}`);
@@ -17,7 +18,7 @@ const SKILL_NAMES = {
  * The D&D 5e sheet kept by the app: every number is worked out from the class, race, background, scores and items.
  * Things come from the Library (drag a row onto the sheet, or press ＋); the rules are checked before they go on.
  */
-export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, onState, openBuilder, onBuilderShown }) {
+export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, onState, openBuilder, onBuilderShown, who = "" }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null); // { text, change } — a refused change can be added anyway
   const [showLib, setShowLib] = useState(false);
@@ -26,24 +27,26 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
   const [openFeat, setOpenFeat] = useState(null);
   const [showSkills, setShowSkills] = useState(false);
   const [working, setWorking] = useState(false);
-  const charKey = JSON.stringify(state.character5e || null);
+  const charKey = JSON.stringify((who ? (state.party5e || {})[who] : state.character5e) || null);
   const lastKey = useRef("");
 
   useEffect(() => { if (openBuilder) { setModal("builder"); onBuilderShown?.(); } }, [openBuilder]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (lastKey.current === charKey && data) return;
     lastKey.current = charKey;
-    api.character5e(convId).then(setData).catch((e) => setError({ text: e.message }));
-  }, [convId, charKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    api.character5e(convId, who).then(setData).catch((e) => setError({ text: e.message }));
+  }, [convId, charKey, who]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const took = (r) => {
     setData(r);
     lastKey.current = JSON.stringify(r.character || null);
-    onState?.({ ...state, character5e: r.character, ...(r.player ? { player: r.player } : {}) });
+    onState?.(who
+      ? { ...state, party5e: { ...(state.party5e || {}), [who]: r.character }, party: r.party || state.party, party5e_sheet: r.party5e_sheet || state.party5e_sheet }
+      : { ...state, character5e: r.character, ...(r.player ? { player: r.player } : {}), ...(r.party5e_sheet ? { party5e_sheet: r.party5e_sheet, party: r.party } : {}) });
   };
   const change = async (c) => {
     setWorking(true); setError(null);
-    try { took(await api.changeCharacter5e(convId, c)); } catch (e) { setError({ text: e.message, change: c.op === "add" && !c.homebrew ? c : null }); } finally { setWorking(false); }
+    try { took(await api.changeCharacter5e(convId, c, who)); } catch (e) { setError({ text: e.message, change: c.op === "add" && !c.homebrew ? c : null }); } finally { setWorking(false); }
   };
   const add = (ref) => change({ op: "add", ...ref });
   const drop = (e) => {
@@ -67,8 +70,9 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
       onDragOver={(e) => { if (Array.from(e.dataTransfer.types || []).includes(DRAG_TYPE)) { e.preventDefault(); setOver(true); } }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(false); }} onDrop={drop}>
       <div className="s5-head">
+        {sh?.class && <img className="s5-emblem" src={emblemFor("class", sh.class)} alt="" />}
         <div className="grow">
-          <div className="s5-name">{p.name || "Your hero"}</div>
+          <div className="s5-name">{who || p.name || "Your hero"}</div>
           <div className="muted small">{[sh?.race && `${sh.subrace ? `${sh.subrace} ` : ""}${sh.race}`, sh?.class && `${sh.class} ${sh.level}${sh.subclass ? ` (${sh.subclass})` : ""}`, sh?.background].filter(Boolean).join(" · ") || "Nothing chosen yet"}</div>
         </div>
         <button type="button" className="btn small ghost" onClick={() => setModal("builder")} title="Class, race, background, scores, skills, equipment">✎ Builder</button>
@@ -175,8 +179,8 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
                       <span className="pips" title={f.per === "short" ? `${left} of ${f.uses_max} left · back after a short rest` : `${left} of ${f.uses_max} left · back after a long rest`}>
                         {Array.from({ length: f.uses_max }).map((_, i) => <span key={i} className={`pip ${i < left ? "on" : ""}`} />)}
                       </span>
-                      <button type="button" className="btn small primary" disabled={disabled || left <= 0} onClick={() => onUse?.(f.name)}
-                        title={left <= 0 ? (f.per === "short" ? "Used up: back after a short rest" : "Used up: back after a long rest") : "Use it: the app spends it and tells the Aedo"}>Use</button>
+                      {!who && <button type="button" className="btn small primary" disabled={disabled || left <= 0} onClick={() => onUse?.(f.name)}
+                        title={left <= 0 ? (f.per === "short" ? "Used up: back after a short rest" : "Used up: back after a long rest") : "Use it: the app spends it and tells the Aedo"}>Use</button>}
                     </>
                   ) : null}
                   {(fi >= 0 || oi >= 0 || xi >= 0) && (
@@ -203,10 +207,15 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
         </div>
       ))}
 
-      <div className="row gap">
-        <button className="btn small grow" disabled={busy || inFight} onClick={() => onRest?.("short")} title="About an hour of rest">☕ Short rest</button>
-        <button className="btn small grow" disabled={busy || inFight} onClick={() => onRest?.("long")} title="A night's sleep: refills more and heals">🛌 Long rest</button>
-      </div>
+      {!who && (
+        <div className="row gap">
+          <button className="btn small grow" disabled={busy || inFight} onClick={() => onRest?.("short")} title="About an hour of rest">☕ Short rest</button>
+          <button className="btn small grow" disabled={busy || inFight} onClick={() => onRest?.("long")} title="A night's sleep: refills more and heals">🛌 Long rest</button>
+        </div>
+      )}
+      {!who && state.party_mode === "companions" && Object.keys(state.party || {}).length > 0 && (
+        <Companions convId={convId} state={state} busy={disabled} heroReady={!!ch.cls} onState={onState} onRoll={onRoll} />
+      )}
 
       {error && (
         <div className="error-text small s5-error">
@@ -220,8 +229,73 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
       </div>
       {showLib && <LibraryPicker edition={ch.edition || "2014"} onAdd={add} busy={disabled} />}
 
-      {modal === "builder" && <Builder convId={convId} onClose={() => setModal(null)} onChanged={took} />}
-      {modal === "levelup" && <LevelUp convId={convId} onClose={() => setModal(null)} onDone={(r) => { took(r); setModal(null); }} />}
+      {modal === "builder" && <Builder convId={convId} who={who} onClose={() => setModal(null)} onChanged={took} />}
+      {modal === "levelup" && <LevelUp convId={convId} who={who} onClose={() => setModal(null)} onDone={(r) => { took(r); setModal(null); }} />}
+    </div>
+  );
+}
+
+const ROLE_LABELS = { front: "front-liner", healer: "healer", caster: "spellcaster", support: "support" };
+
+/**
+ * The companions' 5e sheets: the system builds them around your hero (a balanced party has a front-liner, a healer,
+ * a spellcaster and a support, though in D&D one class can do several), or you build one step by step.
+ */
+function Companions({ convId, state, busy, heroReady, onState, onRoll }) {
+  const [working, setWorking] = useState("");
+  const [error, setError] = useState("");
+  const [building, setBuilding] = useState("");
+  const [viewing, setViewing] = useState("");
+  const names = Object.keys(state.party || {});
+  const sheets = state.party5e_sheet || {};
+  const missing = names.filter((n) => !(state.party5e || {})[n]);
+  const took = (r) => onState?.({ ...state, party: r.party || state.party, party5e_sheet: r.party5e_sheet || state.party5e_sheet,
+    party5e: { ...(state.party5e || {}), ...Object.fromEntries(names.map((n) => [n, (state.party5e || {})[n]]).filter(([, v]) => v)) } });
+  const auto = async (body, tag) => {
+    setWorking(tag); setError("");
+    try {
+      await api.autoParty5e(convId, body);
+      const full = await api.state(convId);
+      onState?.(full);
+    } catch (e) { setError(e.message); } finally { setWorking(""); }
+  };
+  const roles = new Set(Object.values(sheets).flatMap((x) => x.roles || []));
+  return (
+    <div className="companions5e">
+      <div className="section-title">Your companions</div>
+      <div className="chip-row tight" title="A balanced party: a front-liner, a healer, a spellcaster and a support. In D&D one class can cover several.">
+        {Object.entries(ROLE_LABELS).map(([k, label]) => <span key={k} className={`pill small ${roles.has(k) ? "on" : ""}`}>{roles.has(k) ? "✓ " : ""}{label}</span>)}
+      </div>
+      {!heroReady && <div className="muted tiny">Build your own hero first: the system picks the companions around your class.</div>}
+      {missing.length > 0 && heroReady && (
+        <button type="button" className="btn small primary" disabled={busy || !!working} onClick={() => auto({}, "all")}>
+          {working === "all" ? "Building…" : `🎲 Let the system build ${missing.length === 1 ? missing[0] : `all ${missing.length}`}`}
+        </button>
+      )}
+      {error && <div className="error-text tiny">{error}</div>}
+      {names.map((n) => {
+        const sh = sheets[n];
+        const hp = (state.party || {})[n] || {};
+        return (
+          <div key={n} className="s5-row companion-row">
+            {sh && <img className="s5-emblem small" src={emblemFor("class", sh.class)} alt="" />}
+            <div className="grow">
+              <strong>{n}</strong>
+              <div className="muted tiny">{sh ? `${sh.class} ${sh.level}${sh.subclass ? ` (${sh.subclass})` : ""} · AC ${sh.ac} · ${hp.hp}/${hp.max_hp} HP · ${(sh.roles || []).map((r) => ROLE_LABELS[r]).join(", ")}` : "No 5e sheet yet"}</div>
+            </div>
+            {sh && <button type="button" className="btn small" onClick={() => setViewing(n)}>Sheet</button>}
+            <button type="button" className="btn small" disabled={busy || !heroReady || !!working} title="The system picks class, race, background and gear to fill a gap in the party"
+              onClick={() => auto({ name: n }, n)}>{working === n ? "…" : "🎲"}</button>
+            <button type="button" className="btn small" disabled={busy} title="Build step by step, like your own hero" onClick={() => setBuilding(n)}>✎</button>
+          </div>
+        );
+      })}
+      {building && <Builder convId={convId} who={building} onClose={() => { setBuilding(""); api.state(convId).then((s) => onState?.(s)).catch(() => {}); }} onChanged={took} />}
+      {viewing && (
+        <Modal title={viewing} onClose={() => setViewing("")} wide>
+          <Sheet5e convId={convId} state={state} who={viewing} busy={busy} onRoll={onRoll} onState={onState} />
+        </Modal>
+      )}
     </div>
   );
 }

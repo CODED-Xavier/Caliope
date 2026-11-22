@@ -99,12 +99,15 @@ Easier: pick a mode under the text box (**🗣 Speak · ✋ Act · 💭 Think ·
 - **Click any picture in the story** to see it big. Pictures you add to a character in the card editor now also show up in games you already started.
 - **Companions**: cards can have up to 3 companions (card editor → 👥 Companions). Start a game with **Play with companions** to have them fight beside you, or **Play solo** for fights scaled to one hero. At 0 HP you make death saving throws instead of losing at once.
 - **New look**: the icons on the left are the main menu (Games opens your list of games). Under the top bar you see your party's HP (adventures) or your card's tracker (role-play). **Library** opens the D&D 5e rules: classes, spells, feats, items.
+- **Your turn in a 5e fight:** in the Combat tab you have an action, a bonus action, movement and a reaction; *Your options* lists everything you can do sorted by cost (Grapple, Dash, Second Wind, spells…). Used ones grey out. Press **⏭ End turn** when you're done: the Aedo tells your turn, then everyone else acts. Typing your turn in the chat works too.
+- **Companions with 5e sheets:** under *Your companions* in the Sheet tab, 🎲 lets the system build them around your class (front-liner, healer, spellcaster, support), ✎ builds one step by step.
+- **The builder** now has emblems; the ▸ arrow on a class, race or background shows what it gives (a class's 20 levels).
 - **D&D 5e sheet** (adventures): in the Sheet tab press **Convert to a 5e sheet** or **Build with the 5e builder**. The app works out AC, HP, attacks and features. Drag spells and items onto it from **📚 Open the Library**, click a skill to roll it, press **Use** on Second Wind, and **⬆ Level up** when you have the XP. Tell us if a number looks wrong (hover AC to see how it was counted).
 - **In a fight**, just write your attack (*"I swing at the goblin's neck"*) or type **/attack goblin 2**: the app rolls it and the fight updates. On your turn, click a lit square on the grid to move. Check buttons show the DC before you roll.
 - **📚 Research a work** (in the Muse): type an anime/game/book name, tick the wiki pages, and get a draft card with its world, characters and lore.
 - **🔁** in the music controls loops the current song.
 - **Adventures:** in the card editor, *Adventure: scenes, maps and fights* imports a published adventure (PDF or pasted text). In play the **📕 Adventure** tab shows your scene, the map, XP and **⚔ Fight here**.
-- The **Status** tab in the right panel can show a ready character sheet (D&D 5e, Tormenta20, Vampire, Call of Cthulhu…): open it and pick one. The app keeps the numbers up to date.
+- The **Sheet** tab is your one character tab: on role-play cards it shows the card's own values (Lumencia's tiers…) at the top, and *Add a tracker sheet* picks a ready one (Tormenta20, Vampire, Call of Cthulhu…). The app keeps the numbers up to date.
 - The **right panel** has your Sheet, Bag, People (relationships from −100 to +100, plus notes about each character: yours and the Aedo's ✒), Journal and more.
 - The small **‹ ›** bubbles on the edges of the chat hide the side columns for more room.
 - **🪶 The Muse** (left sidebar): brainstorm stories with the AI and turn them into new cards.

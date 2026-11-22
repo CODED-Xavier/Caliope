@@ -80,13 +80,17 @@ class Library:
             card["level"] = e.get("level", 0)
         elif kind == "subrace":
             card["race"] = e.get("raceName", "")
+        elif kind == "baseitem":
+            card["category"] = item_category(e)
         return card
 
-    def search(self, kind: str, q: str = "", edition: str = "2014", limit: int = 60) -> list[dict]:
+    def search(self, kind: str, q: str = "", edition: str = "2014", limit: int = 60, category: str = "") -> list[dict]:
         q = (q or "").lower().strip()
         out = []
         for (k, name, _), e in self.items.items():
             if k != kind or edition_of(e) != edition:
+                continue
+            if category and item_category(e) != category:
                 continue
             if q and q not in name and q not in str(e.get("className", "")).lower():
                 continue
@@ -100,6 +104,16 @@ class Library:
         if not e:
             return None
         return {**e, "text": render(e.get("entries") or e.get("entry") or ""), "title": strip_tags(e["name"])}
+
+
+ITEM_CATEGORIES = {"M": "weapon", "R": "weapon", "LA": "armor", "MA": "armor", "HA": "armor", "S": "armor",
+                   "A": "ammunition", "AF": "ammunition", "AT": "tools", "GS": "tools", "INS": "tools", "T": "tools",
+                   "MNT": "mounts", "VEH": "mounts", "SHP": "mounts", "AIR": "mounts", "TAH": "mounts"}
+
+
+def item_category(e: dict) -> str:
+    """weapon, armor, ammunition, tools, mounts, or gear (everything else: packs, rope, a holy symbol…)."""
+    return ITEM_CATEGORIES.get(str(e.get("type") or "").split("|")[0], "gear")
 
 
 def default_library(data_dir: Path) -> Library:

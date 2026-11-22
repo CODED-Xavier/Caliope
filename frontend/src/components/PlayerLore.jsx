@@ -3,7 +3,7 @@ import HelpTip from "./HelpTip.jsx";
 import { api } from "../api.js";
 
 const blank = () => ({ id: Math.random().toString(36).slice(2, 12), name: "", keys: "", content: "", summary: "", enabled: true });
-const toForm = (e) => ({ ...e, keys: (e.keys || []).join(", ") });
+const toForm = (e) => ({ ...e, keys: Array.isArray(e.keys) ? e.keys.join(", ") : String(e.keys || "") }); // a saved persona may keep them as text
 
 /**
  * The player's own lore entries (a new great house, a home village…). Canon in this game.

@@ -49,6 +49,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState("");
   const [lore, setLore] = useState([]);
+  const [loreKey, setLoreKey] = useState(0); // a loaded persona redraws the world additions box with its entries
   const [startId, setStartId] = useState("default");
   const [showCast, setShowCast] = useState(false);
 
@@ -124,7 +125,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
       <PersonaBar player={p} lore={lore} onLoad={(persona) => {
         // the card's own sheet shape stays (stats, class list); the persona fills in who you are
         setP((x) => ({ ...x, ...Object.fromEntries(Object.entries(persona.player || {}).filter(([k, v]) => v !== "" && v != null && !(k === "stats" && !Object.keys(v || {}).length))) }));
-        if ((persona.lore || []).length) setLore(persona.lore);
+        if ((persona.lore || []).length) { setLore(persona.lore); setLoreKey((k) => k + 1); }
       }} />
       {hasTeam && (
         <div className="way-pick">
@@ -212,7 +213,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
         </>
       )}
 
-      <PlayerLore entries={NO_LORE} onChange={setLore} />
+      <PlayerLore key={loreKey} entries={loreKey ? lore : NO_LORE} onChange={setLore} />
 
       {error && <div className="error-text small">{error}</div>}
       <div className="row gap end">

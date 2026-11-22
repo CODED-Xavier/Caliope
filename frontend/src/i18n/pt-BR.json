@@ -1679,7 +1679,71 @@
 "Status": "Status",
 "Search…": "Buscar…",
 "Used up: back after a short rest": "Esgotado: volta depois de um descanso curto",
-"Used up: back after a long rest": "Esgotado: volta depois de um descanso longo"
+"Used up: back after a long rest": "Esgotado: volta depois de um descanso longo",
+"All": "Tudo",
+"Weapons": "Armas",
+"Armour & shields": "Armaduras e escudos",
+"Adventuring gear": "Equipamento de aventura",
+"Tools": "Ferramentas",
+"Ammunition": "Munição",
+"Mounts & vehicles": "Montarias e veículos",
+"Hit die": "Dado de vida",
+"Saves": "Salvaguardas",
+"Armour": "Armadura",
+"Spellcasting": "Conjuração",
+"Lv": "Nv",
+"Prof": "Prof",
+"Slots": "Espaços",
+"Ability scores": "Atributos",
+"Darkvision": "Visão no escuro",
+"Subraces": "Sub-raças",
+"See what it gives": "Ver o que dá",
+"What is left this turn": "O que resta neste turno",
+"Attack, Dodge, a spell, something else": "Atacar, Esquivar, uma magia, outra coisa",
+"✔ Action used": "✔ Ação usada",
+"● Action": "● Ação",
+"A Martial Arts strike, Second Wind, a bonus-action spell…": "Um golpe de Artes Marciais, Retomar o Fôlego, uma magia de ação bônus…",
+"✔ Bonus used": "✔ Bônus usada",
+"● Bonus action": "● Ação bônus",
+"Click a lit square on the map to move": "Clique num quadrado aceso no mapa para se mover",
+"One check or reaction per round": "Um teste ou reação por rodada",
+"✔ Reaction used": "✔ Reação usada",
+"● Reaction": "● Reação",
+"Martial Arts: an Unarmed Strike as your bonus action": "Artes Marciais: um Ataque Desarmado como ação bônus",
+"Attack first, then strike again as a bonus action": "Ataque primeiro, depois golpeie de novo com a ação bônus",
+"👊 Bonus strike": "👊 Golpe bônus",
+"Your turn is over: the Aedo tells what you did, then everyone else acts": "Seu turno acabou: o Aedo conta o que você fez, depois todos os outros agem",
+"⏭ End turn (the Aedo tells it)": "⏭ Encerrar turno (o Aedo narra)",
+"⏭ End turn": "⏭ Encerrar turno",
+"Your turn: an action, a bonus action, your movement and a reaction. The app rolls each part at once; press End turn and the Aedo tells it, then everyone else acts. Typing your turn in the chat does it all in one go.": "Seu turno: uma ação, uma ação bônus, seu deslocamento e uma reação. O app rola cada parte na hora; aperte Encerrar turno e o Aedo narra, depois todos os outros agem. Escrever seu turno no chat faz tudo de uma vez.",
+"Your companions": "Seus companheiros",
+"A balanced party: a front-liner, a healer, a spellcaster and a support. In D&D one class can cover several.": "Um grupo equilibrado: um combatente da linha de frente, um curandeiro, um conjurador e um suporte. No D&D uma classe pode cobrir vários papéis.",
+"Build your own hero first: the system picks the companions around your class.": "Crie seu herói primeiro: o sistema escolhe os companheiros em volta da sua classe.",
+"Building…": "Criando…",
+"No 5e sheet yet": "Ainda sem ficha 5e",
+"The system picks class, race, background and gear to fill a gap in the party": "O sistema escolhe classe, raça, antecedente e equipamento para preencher um papel que falta no grupo",
+"Build step by step, like your own hero": "Criar passo a passo, como o seu herói",
+"🗂 Add a tracker sheet (tiers, stats…)": "🗂 Adicionar uma ficha de acompanhamento (níveis, atributos…)",
+"This card keeps no values of its own.": "Este card não tem valores próprios.",
+"The card's own values, kept by the app: they change when the story changes them. Correct them here if needed.": "Os valores do próprio card, mantidos pelo app: mudam quando a história os muda. Corrija aqui se precisar.",
+"▾ About you": "▾ Sobre você",
+"▸ About you": "▸ Sobre você",
+"Bonus action": "Ação bônus",
+"Reaction": "Reação",
+"Free": "Livre",
+"▾ Your options": "▾ Suas opções",
+"▸ Your options": "▸ Suas opções",
+"Dash": "Disparada",
+"Disengage": "Desengajar",
+"Help": "Ajudar",
+"Use an Object": "Usar um objeto",
+"Grapple": "Agarrar",
+"Shove": "Empurrar",
+"Opportunity Attack": "Ataque de oportunidade",
+"Interact with an object": "Interagir com um objeto",
+"Martial Arts strike": "Golpe de Artes Marciais",
+" · used": " · usada",
+" · used this round": " · usada nesta rodada"
 },
 "patterns": [
 [
@@ -2233,6 +2297,26 @@
 [
 "{0} of {1} left · back after a long rest",
 "Restam {0} de {1} · volta depois de um descanso longo"
+],
+[
+"Skills: {0}",
+"Perícias: {0}"
+],
+[
+"{0} (level {1}): {2}",
+"{0} (nível {1}): {2}"
+],
+[
+"5e builder · {0}",
+"Criador 5e · {0}"
+],
+[
+"🎲 Let the system build {0}",
+"🎲 Deixar o sistema criar {0}"
+],
+[
+", {0} heals",
+", {0} curas"
 ]
 ]
 }
