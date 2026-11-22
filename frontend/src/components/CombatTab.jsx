@@ -4,6 +4,8 @@ import { api } from "../api.js";
 import HelpTip from "./HelpTip.jsx";
 import BattleMap, { SIDE_COLOR, TILE_STYLE } from "./BattleMap.jsx";
 import MapEditor from "./MapEditor.jsx";
+import Modal from "./Modal.jsx";
+import { emblemFor } from "./Builder.jsx";
 
 const MAP_TYPES = { field: "Open field", forest: "Forest", road: "Road through the woods", dungeon: "Dungeon", cave: "Cave", tavern: "Tavern", river: "River crossing", street: "Town street" };
 const MAP_FEATURES = ["rocks", "trees", "bushes", "barrels", "water", "mud"];
@@ -227,7 +229,7 @@ function reachable(combat, me, left) {
   return cost;
 }
 
-function Grid({ combat, selected, onSelect, convId, onState, busy, myTurn, current }) {
+function Grid({ combat, selected, onSelect, convId, onState, busy, myTurn, current, faces = {} }) {
   const { w, h, tiles = [], background = "", name = "", geom = null, fog = null, painted = false } = combat.grid;
   const [painting, setPainting] = useState(false);
   const [paintError, setPaintError] = useState("");
@@ -235,7 +237,8 @@ function Grid({ combat, selected, onSelect, convId, onState, busy, myTurn, curre
     setPainting(true); setPaintError("");
     try { const r = await api.combatPaintMap(convId); onState?.(r.state); } catch (e) { setPaintError(e.message); } finally { setPainting(false); }
   };
-  const people = combat.combatants;
+  // tokens: your portrait, your companions' portraits, and a race emblem for enemies ("Goblin 2" -> the goblin emblem)
+  const people = combat.combatants.map((c) => ({ ...c, image: faces[c.name] || (c.side === "enemy" ? emblemFor("race", c.name.replace(/\s*\d+$/, "")) : "") }));
   const me = people.find((c) => c.side === "player");
   const [hover, setHover] = useState(null);
   const [walkError, setWalkError] = useState("");
@@ -319,7 +322,7 @@ function OptionsList({ convId, combat, target, adv, busy, onStep }) {
 }
 
 /* ---------------------------------------------------------------- active fight */
-function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, onState, martialArts, is5e }) {
+function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, onState, martialArts, is5e, faces }) {
   const people = useMemo(() => combat.order.map((id) => combat.combatants.find((c) => c.id === id)), [combat]);
   const enemies = people.filter((c) => c.side === "enemy" && c.hp > 0);
   const [target, setTarget] = useState(enemies[0]?.id || "");
@@ -329,11 +332,20 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, o
   const [stepLine, setStepLine] = useState("");
   const [stepError, setStepError] = useState("");
   const [stepping, setStepping] = useState(false);
+  const [describing, setDescribing] = useState(false);
+  const [words, setWords] = useState("");
+  // "Want to describe it?": your words go under that roll in the round card; no rule changes, no AI call
+  const describe = async () => {
+    const text = words.trim();
+    setDescribing(false); setWords("");
+    if (!text) return;
+    try { const r = await api.combatDescribe(convId, text); onState(r.state); setStepLine((l) => { const [h, ...rest] = l.split("\n"); return [h, `💬 "${text}"`, ...rest].join("\n"); }); } catch (e) { setStepError(e.message); }
+  };
   const spent = combat.spent || { action: false, bonus: false, attacked: false };
   // one part of your turn (attack, bonus strike, dodge): rolled at once, your turn goes on until you end it
   const step = async (body) => {
     setStepping(true); setStepError("");
-    try { const r = await api.combatStep(convId, body); setStepLine(r.line); onState(r.state); } catch (e) { setStepError(e.message); } finally { setStepping(false); }
+    try { const r = await api.combatStep(convId, body); setStepLine(r.line); onState(r.state); setDescribing(true); } catch (e) { setStepError(e.message); } finally { setStepping(false); }
   };
   useEffect(() => { if (!enemies.some((e) => e.id === target)) setTarget(enemies[0]?.id || ""); }, [combat]); // eslint-disable-line
   const current = people[combat.turn % people.length];
@@ -356,7 +368,18 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, o
         <span className="tag">{combat.system === "pool" ? "d10 pool" : "d20"}</span>
       </div>
       <Grid combat={combat} selected={selected} onSelect={select} convId={convId} onState={onState} busy={busy}
-        myTurn={current?.side === "player"} current={current} />
+        myTurn={current?.side === "player"} current={current} faces={faces} />
+      {describing && (
+        <Modal title="Want to describe it?" onClose={() => { setDescribing(false); setWords(""); }}
+          footer={<><button type="button" className="btn ghost" onClick={() => { setDescribing(false); setWords(""); }}>Skip</button>
+            <button type="button" className="btn primary" disabled={!words.trim()} onClick={describe}>Add it</button></>}>
+          <div className="muted small">{stepLine.split("\n")[0].replace(/\*\*/g, "")}</div>
+          <textarea className="field" rows={3} autoFocus value={words} onChange={(e) => setWords(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); describe(); } }}
+            placeholder="I swing my sword, trying to cut the goblin's head clean off!" />
+          <div className="muted tiny">A bit of roleplay for the round card, under this roll. It changes nothing in the rules.</div>
+        </Modal>
+      )}
       <div className="turn-order">
         {people.map((c) => (
           <div key={c.id} className={`fighter ${c.id === current?.id ? "current" : ""} ${c.hp <= 0 ? "down" : ""} ${c.id === target ? "targeted" : ""}`} onClick={() => select(c.id)}>
@@ -458,7 +481,9 @@ function sceneHasFoes(game) {
 export default function CombatTab({ game, busy, onCombat, onCombatEdit, onState }) {
   const combat = game.state.combat;
   if (combat?.active) return <FightView combat={combat} busy={busy} onAction={onCombat} onEdit={onCombatEdit} pools={game.state.resources} abilities={game.state.abilities}
-    convId={game.conversation.id} onState={onState} martialArts={!!game.state.character5e_sheet?.martial_arts} is5e={!!game.state.character5e} />;
+    convId={game.conversation.id} onState={onState} martialArts={!!game.state.character5e_sheet?.martial_arts} is5e={!!game.state.character5e}
+    faces={Object.fromEntries([...(game.npcs || []).filter((n) => n.portraits?.default).map((n) => [n.name, n.portraits.default]),
+      ...(game.state.player?.portraits?.default ? [[game.state.player.name, game.state.player.portraits.default]] : [])])} />;
   return (
     <>
       {combat && !combat.active && combat.log?.length > 0 && (

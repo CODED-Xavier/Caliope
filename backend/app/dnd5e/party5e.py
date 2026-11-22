@@ -226,7 +226,7 @@ def sync_companion(state: dict, name: str, lib) -> dict:
     state.setdefault("party5e_sheet", {})[name] = {
         "class": sheet["class"], "subclass": sheet["subclass"], "level": sheet["level"], "ac": sheet["ac"],
         "hp_max": sheet["hp_max"], "attack_bonus": best["bonus"] if best else sheet["prof"],
-        "damage": best["damage"] if best else "1d4", "range": rng, "init_bonus": sheet["initiative"],
+        "damage": best["damage"] if best else "1d4", "weapon": best["name"] if best else "", "range": rng, "init_bonus": sheet["initiative"],
         "speed": max(1, sheet["speed"] // 5), "roles": sorted(char_roles(char)),
     }
     p = state.setdefault("party", {})

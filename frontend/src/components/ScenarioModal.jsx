@@ -481,6 +481,8 @@ function Editor({ initial, id, onCancel, onSaved }) {
 
       {error && <div className="error-text small">{error}</div>}
       <div className="row gap end">
+        {id && <a className="btn" href={`/api/scenarios/${id}/export.caliope`} download
+          title="The card with all its pictures in one .caliope file, to share it (the other player uses Import a card)">📦 Export card</a>}
         <button className="btn" onClick={onCancel}>Back</button>
         <button className="btn primary" onClick={save}>Save card</button>
       </div>

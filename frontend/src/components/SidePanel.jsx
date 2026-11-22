@@ -831,7 +831,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
           onState={onStateLoaded} onFight={() => onTab("combat")} busy={!canRoll} />}
 
         {active === "sheet" && kind === "adventure" && state.character5e && (
-          <Sheet5e convId={conversation.id} state={state} busy={!canRoll} onUse={onFeature} onRest={onRest} onRoll={onRollToChat}
+          <Sheet5e convId={conversation.id} state={state} npcs={npcs} busy={!canRoll} onUse={onFeature} onRest={onRest} onRoll={onRollToChat}
             onState={onStateLoaded} openBuilder={openBuilder} onBuilderShown={onBuilderShown} />
         )}
         {active === "sheet" && !(kind === "adventure" && state.character5e) && (

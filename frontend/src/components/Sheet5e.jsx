@@ -4,6 +4,7 @@ import { LibraryPicker, DRAG_TYPE } from "./Library.jsx";
 import Builder, { emblemFor } from "./Builder.jsx";
 import LevelUp from "./LevelUp.jsx";
 import Modal from "./Modal.jsx";
+import { portraitSrc } from "../portraits.js";
 
 const ABILS = [["str", "STR"], ["dex", "DEX"], ["con", "CON"], ["int", "INT"], ["wis", "WIS"], ["cha", "CHA"]];
 const sig = (n) => (n >= 0 ? `+${n}` : `${n}`);
@@ -18,7 +19,7 @@ const SKILL_NAMES = {
  * The D&D 5e sheet kept by the app: every number is worked out from the class, race, background, scores and items.
  * Things come from the Library (drag a row onto the sheet, or press ＋); the rules are checked before they go on.
  */
-export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, onState, openBuilder, onBuilderShown, who = "" }) {
+export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, onState, openBuilder, onBuilderShown, who = "", npcs = [] }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null); // { text, change } — a refused change can be added anyway
   const [showLib, setShowLib] = useState(false);
@@ -70,6 +71,7 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
       onDragOver={(e) => { if (Array.from(e.dataTransfer.types || []).includes(DRAG_TYPE)) { e.preventDefault(); setOver(true); } }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(false); }} onDrop={drop}>
       <div className="s5-head">
+        {who && faceOf(npcs, who) && <img className="s5-face" src={portraitSrc(faceOf(npcs, who))} alt="" />}
         {sh?.class && <img className="s5-emblem" src={emblemFor("class", sh.class)} alt="" />}
         <div className="grow">
           <div className="s5-name">{who || p.name || "Your hero"}</div>
@@ -214,7 +216,7 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
         </div>
       )}
       {!who && state.party_mode === "companions" && Object.keys(state.party || {}).length > 0 && (
-        <Companions convId={convId} state={state} busy={disabled} heroReady={!!ch.cls} onState={onState} onRoll={onRoll} />
+        <Companions convId={convId} state={state} npcs={npcs} busy={disabled} heroReady={!!ch.cls} onState={onState} onRoll={onRoll} />
       )}
 
       {error && (
@@ -235,13 +237,15 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
   );
 }
 
+const faceOf = (npcs, name) => ((npcs || []).find((n) => n.name === name)?.portraits?.default || "");
+
 const ROLE_LABELS = { front: "front-liner", healer: "healer", caster: "spellcaster", support: "support" };
 
 /**
  * The companions' 5e sheets: the system builds them around your hero (a balanced party has a front-liner, a healer,
  * a spellcaster and a support, though in D&D one class can do several), or you build one step by step.
  */
-function Companions({ convId, state, busy, heroReady, onState, onRoll }) {
+function Companions({ convId, state, npcs, busy, heroReady, onState, onRoll }) {
   const [working, setWorking] = useState("");
   const [error, setError] = useState("");
   const [building, setBuilding] = useState("");
@@ -278,7 +282,8 @@ function Companions({ convId, state, busy, heroReady, onState, onRoll }) {
         const hp = (state.party || {})[n] || {};
         return (
           <div key={n} className="s5-row companion-row">
-            {sh && <img className="s5-emblem small" src={emblemFor("class", sh.class)} alt="" />}
+            {faceOf(npcs, n) ? <img className="s5-face small" src={portraitSrc(faceOf(npcs, n))} alt="" />
+              : sh && <img className="s5-emblem small" src={emblemFor("class", sh.class)} alt="" />}
             <div className="grow">
               <strong>{n}</strong>
               <div className="muted tiny">{sh ? `${sh.class} ${sh.level}${sh.subclass ? ` (${sh.subclass})` : ""} · AC ${sh.ac} · ${hp.hp}/${hp.max_hp} HP · ${(sh.roles || []).map((r) => ROLE_LABELS[r]).join(", ")}` : "No 5e sheet yet"}</div>
@@ -293,7 +298,7 @@ function Companions({ convId, state, busy, heroReady, onState, onRoll }) {
       {building && <Builder convId={convId} who={building} onClose={() => { setBuilding(""); api.state(convId).then((s) => onState?.(s)).catch(() => {}); }} onChanged={took} />}
       {viewing && (
         <Modal title={viewing} onClose={() => setViewing("")} wide>
-          <Sheet5e convId={convId} state={state} who={viewing} busy={busy} onRoll={onRoll} onState={onState} />
+          <Sheet5e convId={convId} state={state} who={viewing} npcs={npcs} busy={busy} onRoll={onRoll} onState={onState} />
         </Modal>
       )}
     </div>

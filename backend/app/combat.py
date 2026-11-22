@@ -569,6 +569,52 @@ class CombatEngine:
         mine = self.current(combat)["side"] == "player"
         return state, line + ("\n\n" + self.turn_left(state) if mine else "")
 
+    @staticmethod
+    def describe_last(state: dict, text: str) -> dict:
+        """Your own words for the part of the turn you just played ("Want to describe it?"): shown under its header in
+        the round card. They change no rule and call no AI by themselves."""
+        combat = state.get("combat") or {}
+        lines = combat.get("turn_lines") or []
+        if not combat.get("active") or not lines:
+            raise CombatError("There is nothing of your turn to describe yet.")
+        text = " ".join(str(text or "").split())[:400]
+        if not text:
+            return state
+        head, _, rest = lines[-1].partition("\n")
+        quoted = f'💬 "{text}"'
+        lines[-1] = f"{head}\n{quoted}" + (f"\n{rest}" if rest else "")
+        log = combat.get("log") or []
+        if log and log[-1].partition("\n")[0] == head:
+            log[-1] = lines[-1]
+        return state
+
+    def _flavour(self, c: dict, target: dict, block: str) -> str:
+        """A line of colour before and after a companion's roll, from its weapon and the result (no AI, no wait)."""
+        lines = block.split("\n")
+        weapon = c.get("weapon") or ""
+        name, foe = c["name"], target["name"]
+        if c.get("range", 1) > 1:
+            before = self.rng.choice([f"*{name} takes aim and looses a shot at {foe}{' with the ' + weapon if weapon else ''}.*",
+                                      f"*{name} draws, breathes out, and fires at {foe}.*"])
+        else:
+            w = f" the {weapon}" if weapon else " a weapon"
+            before = self.rng.choice([f"*{name} closes the distance and swings{w} at {foe}.*",
+                                      f"*{name} steps in hard, bringing{w} down on {foe}.*",
+                                      f"*{name} feints, then strikes at {foe} with{w}.*"])
+        roll = next((x for x in lines if x.startswith("🎲")), "")
+        m = re.search(r"= (-?\d+) vs AC (\d+)", roll)
+        if "defeated" in block:
+            after = self.rng.choice([f"*{foe} crumples to the ground.*", f"*{foe} goes down and stays down.*"])
+        elif "CRITICAL" in roll:
+            after = "*A brutal, perfect hit!*"
+        elif "HIT" in roll:
+            after = self.rng.choice(["*It lands!*", "*A solid hit.*", f"*{foe} staggers back.*"])
+        elif m and int(m.group(2)) - int(m.group(1)) <= 2:
+            after = "*So close: a near miss!*"
+        else:
+            after = self.rng.choice(["*The blow goes wide.*", f"*{foe} slips aside.*"])
+        return "\n".join([lines[0], before, *lines[1:], after])
+
     def player_step(self, state: dict, action: str, target_id: str = "", advantage: str = "", ability_id: str = "") -> tuple[dict, str]:
         """One part of the player's turn (from the Combat tab's buttons): rolled at once, the turn goes on."""
         combat, me = self._check_my_turn(state)
@@ -806,6 +852,8 @@ class CombatEngine:
                 elif distance(c["x"], c["y"], target["x"], target["y"]) <= c.get("range", 1):
                     drained = f" ({c['mp_name']} spent: no more {spell['name']})" if spell and not casting else ""
                     block = self._attack(combat, c, target, head=f"**{c['name']} attacks {target['name']}**{drained}")
+                    if c.get("companion"):
+                        block = self._flavour(c, target, block)
                     if moved:  # header first, then the move, then the roll
                         head, _, rest = block.partition("\n")
                         block = f"{head}\n{moved}\n{rest}"
@@ -823,7 +871,7 @@ class CombatEngine:
             if back:
                 lines.append("\U0001F504 " + ", ".join(back))
         done = self._finished(combat)
-        text = f"⚔️ **Round {round_no}**\n\n" + "\n\n".join(lines)
+        text = f"⚔️ **Round {round_no}**\n\n" + "\n\n".join(self._by_turns(combat, lines))
         me = me_down(combat)
         if done == "you have fallen":
             if me.get("dying"):
@@ -838,6 +886,19 @@ class CombatEngine:
             text += "\n\n🏁 " + end_line.replace("⚔️ ", "")
         combat["log"] = (combat.get("log", []) + lines)[-30:]
         return state, text
+
+    @staticmethod
+    def _by_turns(combat: dict, lines: list[str]) -> list[str]:
+        """The round told turn by turn: a "**Name's turn**" heading whenever the one acting changes."""
+        names = sorted((c["name"] for c in combat["combatants"]), key=len, reverse=True)
+        out, current = [], None
+        for line in lines:
+            who = next((n for n in names if line.startswith(f"**{n} ") or line.startswith(f"**{n}**")), None)
+            if who and who != current:
+                out.append(f"**{who}'s turn**")
+                current = who
+            out.append(line)
+        return out
 
     # ------------------------------------------------------------------ edits from the panel
     def edit(self, state: dict, cid: str, hp: int | None = None, conditions: list[str] | None = None,

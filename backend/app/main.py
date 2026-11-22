@@ -560,6 +560,11 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
                                                str(body.get("advantage", "")), str(body.get("ability", "")))
         s.conversations.save_state(conv_id, state)
         return {"state": state, "line": line}
+    elif action == "describe":  # "Want to describe it?": the player's words under the part of the turn just played
+        not_busy(conv_id)
+        state = s.combat.describe_last(s.conversations.get_state(conv_id), str(body.get("text", "")))
+        s.conversations.save_state(conv_id, state)
+        return {"state": state}
     elif action == "move":  # the player walks on the map (own turn, up to their speed); no reply from the GM
         not_busy(conv_id)
         state = s.combat.move_player(s.conversations.get_state(conv_id), body.get("x"), body.get("y"))

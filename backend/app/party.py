@@ -113,10 +113,11 @@ def allies(state: dict, scenario: dict) -> list[dict]:
         if not cur or cur["hp"] <= 0:
             continue
         sh = {**c["sheet"], **{k: v for k, v in ((state.get("party5e_sheet") or {}).get(c["name"]) or {}).items()
-                               if k in ("ac", "attack_bonus", "damage", "range", "speed", "init_bonus")}}
+                               if k in ("ac", "attack_bonus", "damage", "range", "speed", "init_bonus", "weapon")}}
         out.append({"name": c["name"], "hp": cur["max_hp"], "current_hp": cur["hp"], "ac": sh["ac"],
                     "attack_bonus": sh["attack_bonus"], "damage": sh["damage"], "range": sh["range"], "speed": sh["speed"],
-                    "init_bonus": sh["init_bonus"], "role": sh["role"], "heal": sh["heal"], "heals": sh["heals"], "companion": True})
+                    "init_bonus": sh["init_bonus"], "role": sh["role"], "heal": sh["heal"], "heals": sh["heals"], "companion": True,
+                    "weapon": sh.get("weapon", "")})
     return out
 
 

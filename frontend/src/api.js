@@ -223,6 +223,7 @@ export const api = {
   autoParty5e: (id, body = {}) => request("POST", `/api/conversations/${id}/character/party/auto`, body),
   libraryDetails: (type, source, name) => request("GET", `/api/library/5e/details?type=${encodeURIComponent(type)}&source=${encodeURIComponent(source)}&name=${encodeURIComponent(name)}`),
   combatOptions: (id) => request("GET", `/api/conversations/${id}/combat/options`),
+  combatDescribe: (id, text) => request("POST", `/api/conversations/${id}/combat`, { action: "describe", text }),
   combatStep: (id, body) => request("POST", `/api/conversations/${id}/combat`, { action: "step", ...body }),
   convertCharacter5e: (id) => request("POST", `/api/conversations/${id}/character/convert`, {}),
   restartConversation: (id, keep) => request("POST", `/api/conversations/${id}/restart`, { keep }),

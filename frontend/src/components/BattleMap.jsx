@@ -60,14 +60,31 @@ export default function BattleMap({ w, h, tiles = [], background = "", tokens = 
         const [x, y] = k.split(",").map(Number);
         return <rect key={`r${k}`} x={x * cell + 1} y={y * cell + 1} width={cell - 2} height={cell - 2} className="reach-cell" pointerEvents="none" />;
       })}
-      {tokens.map((c) => (
-        <g key={c.id} transform={`translate(${c.x * cell + cell / 2},${c.y * cell + cell / 2})`} className="token"
-          onMouseDown={(e) => { e.stopPropagation(); onToken?.(c.id); }}>
-          <circle r={cell * 0.42} fill={c.hp > 0 ? SIDE_COLOR[c.side] : "var(--muted)"} stroke={c.id === selected ? "var(--text)" : "#0006"}
-            strokeWidth={c.id === selected ? 3 : 1} opacity={c.hp > 0 ? 1 : 0.45} />
-          <text textAnchor="middle" dy="4" fontSize="11" fill="#fff" fontWeight="700" pointerEvents="none">{c.hp > 0 ? initials(c.name) : "✝"}</text>
-        </g>
-      ))}
+      {tokens.map((c) => {
+        const r = cell * 0.44;
+        const img = c.image && c.hp > 0 ? (c.image.startsWith("/emblems/") ? c.image : portraitSrc(c.image)) : "";
+        return (
+          <g key={c.id} transform={`translate(${c.x * cell + cell / 2},${c.y * cell + cell / 2})`} className="token"
+            onMouseDown={(e) => { e.stopPropagation(); onToken?.(c.id); }}>
+            {img ? (
+              <>
+                <clipPath id={`tok-${maskId}-${c.id}`}><circle r={r - 1.5} /></clipPath>
+                <circle r={r} fill="#111" />
+                <image href={img} x={-r} y={-r} width={r * 2} height={r * 2} clipPath={`url(#tok-${maskId}-${c.id})`} preserveAspectRatio="xMidYMid slice"
+                  style={c.image.startsWith("/emblems/") ? { imageRendering: "pixelated" } : undefined} />
+                <circle r={r - 1} fill="none" stroke={c.id === selected ? "var(--text)" : SIDE_COLOR[c.side]} strokeWidth={c.id === selected ? 3.5 : 2.5} />
+              </>
+            ) : (
+              <>
+                <circle r={cell * 0.42} fill={c.hp > 0 ? SIDE_COLOR[c.side] : "var(--muted)"} stroke={c.id === selected ? "var(--text)" : "#0006"}
+                  strokeWidth={c.id === selected ? 3 : 1} opacity={c.hp > 0 ? 1 : 0.45} />
+                <text textAnchor="middle" dy="4" fontSize="11" fill="#fff" fontWeight="700" pointerEvents="none">{c.hp > 0 ? initials(c.name) : "✝"}</text>
+              </>
+            )}
+            <title>{`${c.name} · ${c.hp}/${c.max_hp} HP`}</title>
+          </g>
+        );
+      })}
     </svg>
   );
 }

@@ -1750,7 +1750,15 @@
 "Books and rules": "Livros e regras",
 "Which rules list each book's races, feats and items appear in. The 2014 and 2024 core books are fixed; the rest follows the book's own marks unless you choose.": "Em qual lista de regras aparecem as raças, talentos e itens de cada livro. Os livros básicos de 2014 e 2024 são fixos; os outros seguem as marcas do próprio livro, a menos que você escolha.",
 "as marked": "como marcado",
-"both": "ambas"
+"both": "ambas",
+"Want to describe it?": "Quer descrever?",
+"Skip": "Pular",
+"Add it": "Adicionar",
+"I swing my sword, trying to cut the goblin's head clean off!": "Giro minha espada tentando arrancar a cabeça do goblin de uma vez!",
+"A bit of roleplay for the round card, under this roll. It changes nothing in the rules.": "Um pouco de interpretação para o cartão da rodada, abaixo desta rolagem. Não muda nada nas regras.",
+"📦 Export card": "📦 Exportar card",
+"Export the card with all its pictures as a .caliope file, to share it (the other player uses ⤒ Import a card)": "Exporta o card com todas as imagens num arquivo .caliope, para compartilhar (o outro jogador usa ⤒ Importar um card)",
+"The card with all its pictures in one .caliope file, to share it (the other player uses Import a card)": "O card com todas as imagens num arquivo .caliope, para compartilhar (o outro jogador usa Importar um card)"
 },
 "patterns": [
 [

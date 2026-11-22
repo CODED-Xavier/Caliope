@@ -11,7 +11,9 @@ const roll4d6 = () => { const d = Array.from({ length: 4 }, () => 1 + Math.floor
 
 const CLASS_EMBLEMS = ["artificer", "barbarian", "bard", "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"];
 // race slugs with an emblem in /emblems/race-<slug>.png (most specific first: "half-orc" before "orc")
-const RACE_EMBLEMS = ["half-orc", "dragonborn", "tiefling", "aasimar", "warforged", "shifter", "triton", "goblin", "gnome", "dwarf", "human", "fairy", "drow", "elf", "orc"];
+const RACE_EMBLEMS = ["custom-lineage", "shadar-kai", "half-orc", "dragonborn", "tiefling", "aasimar", "warforged", "autognome", "lizardfolk", "shifter", "triton",
+  "goblin", "gnome", "dwarf", "human", "fairy", "faerie", "drow", "eladrin", "goliath", "halfling", "minotaur", "boggart", "kobold", "kender", "lupin",
+  "merfolk", "vampire", "dhampir", "satyr", "skeleton", "elf", "orc"];
 const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** The emblem shown on a class (or race) card; classes without their own get the generic one. */

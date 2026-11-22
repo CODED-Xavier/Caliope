@@ -866,3 +866,5 @@ button.s5-ability:hover:not(:disabled) { border-color: var(--accent); }
 .lib-books { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; margin-top: 6px; }
 .lib-book { display: flex; align-items: center; gap: 6px; }
 .lib-book .mono { min-width: 54px; }
+.s5-face { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); }
+.s5-face.small { width: 36px; height: 36px; border-radius: 50%; }

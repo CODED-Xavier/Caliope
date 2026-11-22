@@ -37,6 +37,8 @@ export default function MainMenu({ onPlay, onEdit, onCreate, onImport, refreshKe
             <div className="row gap tile-actions">
               <button className="btn small primary grow" onClick={() => onPlay(c.id)}>▶ Play</button>
               <button className="btn small" onClick={() => onEdit(c.id)} title="Edit the card">✎ Edit</button>
+              <a className="btn small" href={`/api/scenarios/${c.id}/export.caliope`} download
+                title="Export the card with all its pictures as a .caliope file, to share it (the other player uses ⤒ Import a card)">📦</a>
             </div>
           </div>
         ))}
