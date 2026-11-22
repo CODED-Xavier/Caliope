@@ -588,13 +588,16 @@ class PromptBuilder:
     # ----------------------------------------------------- analysis / summarizing
     def analysis_messages(self, *, scenario: dict, state: dict, npcs: list[dict], exchanges: list[tuple[str, str]],
                           tracker: str = "full", calendar: dict | None = None, status_fields: str = "",
-                          resource_line: str = "") -> list[dict]:
+                          resource_line: str = "", language: str = "en") -> list[dict]:
         """Ask the model what changed in the latest exchange(s). `lite` skips HP, gold, items and quests."""
         mode = scenario.get("mode", "gm_world")
         npc_names = ", ".join(n["name"] for n in npcs) or "none yet"
         full = tracker == "full"
         lines = ["You are a precise game-state tracker for a text roleplaying game. You do not write story.",
                  "Read the latest exchange(s) and report ONLY changes that clearly happened in them, as ONE JSON object."]
+        if language == "pt-BR":  # the update lines under each reply are read by the player
+            lines.append("Write every free-text value (reasons, notes, item, quest and place names you make up) in Brazilian "
+                         "Portuguese (pt-BR); keep names that already exist exactly as they are.")
         if full:
             lines += [
                 "- hp_change: net change to the player's hit points (negative = damage, positive = healing), else 0.",

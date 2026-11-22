@@ -1278,7 +1278,7 @@
 "Already have a .gguf model?": "Já tem um modelo .gguf?",
 "uses it without a new download.": "usa sem baixar de novo.",
 "Models are kept in Calíope's folder:": "Os modelos ficam na pasta do Calíope:",
-"Deactivated models stay on disk but leave the model lists.": "Modelos desativados continuam no disco, mas saem das listas de modelos.",
+"Deactivated models stay on disk but leave the model lists.": "Modelos desativados ficam no disco, mas saem das listas de modelos.",
 "🔍 Search my PC for the pictures folder…": "🔍 Procurar a pasta de imagens no meu PC…",
 "Copy in": "Copiar para cá",
 "📁 Calíope's folder for this card:": "📁 Pasta do Calíope para este card:",
@@ -1812,7 +1812,87 @@
 "What using it costs (0 = free)": "Quanto custa usar (0 = grátis)",
 "Paid with": "Pago com",
 "What it does, and its limits (the Aedo follows this)": "O que ela faz e seus limites (o Aedo segue isto)",
-"＋ Add a skill": "＋ Adicionar habilidade"
+"＋ Add a skill": "＋ Adicionar habilidade",
+"HIT": "ACERTO",
+"MISS": "ERRO",
+"CRITICAL HIT": "ACERTO CRÍTICO",
+"KNOCKED PRONE": "DERRUBADO",
+"It lands!": "Acertou!",
+"A solid hit.": "Um golpe firme.",
+"The blow goes wide.": "O golpe passa longe.",
+"So close: a near miss!": "Por pouco: quase acertou!",
+"A brutal, perfect hit!": "Um golpe brutal e perfeito!",
+"Unknown action.": "Ação desconhecida.",
+"There is no fight going on.": "Não há luta acontecendo.",
+"That combatant is not in this fight.": "Esse combatente não está nesta luta.",
+"No enemy is left standing. End your turn to finish the fight.": "Nenhum inimigo continua de pé. Encerre seu turno para terminar a luta.",
+"You already used your action this turn. You can still use a bonus action, move, or end your turn.": "Você já usou sua ação neste turno. Ainda pode usar uma ação bônus, se mover ou encerrar o turno.",
+"There is nothing of your turn to describe yet.": "Ainda não há nada do seu turno para descrever.",
+"You have no attack to make as a bonus action (a Monk's Martial Arts gives one).": "Você não tem ataque para fazer como ação bônus (as Artes Marciais do Monge dão um).",
+"You already used your bonus action this turn.": "Você já usou sua ação bônus neste turno.",
+"Martial Arts: take the Attack action first, then strike again as a bonus action.": "Artes Marciais: faça a ação Atacar primeiro, depois golpeie de novo como ação bônus.",
+"You already used your reaction this round. It comes back at the start of your next turn.": "Você já usou sua reação nesta rodada. Ela volta no começo do seu próximo turno.",
+"Nobody else acts this round.": "Ninguém mais age nesta rodada.",
+"That square is outside the map.": "Esse quadrado está fora do mapa.",
+"That square is taken.": "Esse quadrado está ocupado.",
+"You cannot stand there (wall, tree, rock, crate or deep water).": "Você não pode ficar ali (parede, árvore, rocha, caixote ou água funda).",
+"You are down: your death saves are rolled on your turns while your companions fight on. Use “Others act” to play the round.": "Você caiu: seus testes contra a morte são rolados nos seus turnos enquanto seus companheiros continuam lutando. Use “Os outros agem” para jogar a rodada.",
+"The model did not suggest any enemies. Fill them in yourself.": "O modelo não sugeriu inimigos. Preencha você mesmo.",
+"Moving away provokes no opportunity attacks this turn.": "Afastar-se não provoca ataques de oportunidade neste turno.",
+"See the player's message above.": "Veja a mensagem do jogador acima.",
+"all enemies are down": "todos os inimigos caíram",
+"you have fallen": "você caiu",
+"features refreshed": "habilidades recarregadas",
+"Empty dice expression.": "Expressão de dados vazia.",
+"none yet": "nenhum ainda",
+"a few minutes": "alguns minutos",
+"Unarmed Strike": "Ataque Desarmado",
+"clear and cold": "céu limpo e frio",
+"grey and overcast": "cinzento e nublado",
+"light snow": "neve fraca",
+"heavy snow": "neve forte",
+"freezing fog": "névoa congelante",
+"icy rain": "chuva gelada",
+"clear and mild": "céu limpo e ameno",
+"light rain": "chuva fraca",
+"heavy rain": "chuva forte",
+"morning fog": "névoa da manhã",
+"clear and hot": "céu limpo e quente",
+"sunny with a light breeze": "ensolarado com brisa leve",
+"humid and hazy": "úmido e enevoado",
+"cool and clear": "fresco e limpo",
+"windy, leaves blowing": "ventando, folhas voando",
+"a warm downpour": "um aguaceiro quente",
+"saved their life": "salvou a vida dele(a)",
+"defended them": "defendeu",
+"helped them": "ajudou",
+"kept a promise": "cumpriu uma promessa",
+"gave a gift": "deu um presente",
+"trusted them with a secret": "confiou um segredo",
+"kind words": "palavras gentis",
+"showed respect": "mostrou respeito",
+"flirting they enjoyed": "flerte que gostou",
+"sided with them": "ficou do lado dele(a)",
+"was rude": "foi grosseiro(a)",
+"went against them": "foi contra",
+"mocked them": "zombou",
+"unwelcome advances": "investidas indesejadas",
+"caught lying": "pego(a) mentindo",
+"broke a promise": "quebrou uma promessa",
+"threatened them": "ameaçou",
+"hurt someone they care about": "feriu alguém querido",
+"stole from them": "roubou",
+"attacked them": "atacou",
+"betrayed them": "traiu",
+"cold": "frio",
+"wary": "desconfiado",
+"trusted": "de confiança",
+"devoted": "devotado",
+"Combat starts!": "A luta começa!",
+"hit an error.": "deu um erro.",
+"The map picture could not be read.": "Não foi possível ler a imagem do mapa.",
+"No grid was found on this picture. Set the square size by hand.": "Nenhuma grade foi encontrada nesta imagem. Defina o tamanho do quadrado à mão.",
+"Jukebox": "Jukebox"
 },
 "patterns": [
 [
@@ -2017,7 +2097,7 @@
 ],
 [
 "{0}'s turn",
-"vez de {0}"
+"Turno de {0}"
 ],
 [
 "{0} · a {1} has {2} days",
@@ -2418,6 +2498,442 @@
 [
 "{0} / {1} EXP",
 "{0} / {1} EXP"
+],
+[
+"Still {0}'s turn: {1}. End your turn when you're done.",
+"Ainda é o turno de {0}: {1}. Encerre o turno quando terminar."
+],
+[
+"a bonus action (Martial Arts strike), {0} ft of movement",
+"uma ação bônus (golpe de Artes Marciais), {0} pés de movimento"
+],
+[
+"a bonus action (Martial Arts strike)",
+"uma ação bônus (golpe de Artes Marciais)"
+],
+[
+"a bonus action, {0} ft of movement",
+"uma ação bônus, {0} pés de movimento"
+],
+[
+"your action, a bonus action, {0} ft of movement",
+"sua ação, uma ação bônus, {0} pés de movimento"
+],
+[
+"{0} ft of movement",
+"{0} pés de movimento"
+],
+[
+"Round {0}",
+"Rodada {0}"
+],
+[
+"{0} attacks {1}",
+"{0} ataca {1}"
+],
+[
+"{0} attacks {1} ({2})",
+"{0} ataca {1} ({2})"
+],
+[
+"{0} strikes {1} (Unarmed Strike, bonus action)",
+"{0} golpeia {1} (Ataque Desarmado, ação bônus)"
+],
+[
+"{0} makes an opportunity attack on {1} (reaction)",
+"{0} faz um ataque de oportunidade em {1} (reação)"
+],
+[
+"🎲 d{0}({1}) {2} = {3} vs AC {4} →",
+"🎲 d{0}({1}) {2} = {3} contra CA {4} →"
+],
+[
+"🎲 d{0}({1}) {2} = {3} vs AC {4} ({5}) →",
+"🎲 d{0}({1}) {2} = {3} contra CA {4} ({5}) →"
+],
+[
+"disadvantage",
+"desvantagem"
+],
+[
+"advantage",
+"vantagem"
+],
+[
+"natural {0}, {1}",
+"natural {0}, {1}"
+],
+[
+"💥 {0} damage ({1}) → {2} {3}/{4} HP",
+"💥 {0} de dano ({1}) → {2} {3}/{4} PV"
+],
+[
+"💥 {0} damage → {1} {2}/{3} HP",
+"💥 {0} de dano → {1} {2}/{3} PV"
+],
+[
+"🏃 {0} moves {1} squares ({2} ft) toward {3}.",
+"🏃 {0} anda {1} quadrados ({2} pés) até {3}."
+],
+[
+"🏃 {0} dashes {1} squares ({2} ft) toward {3}, still out of reach: no attack this turn.",
+"🏃 {0} dispara {1} quadrados ({2} pés) até {3}, ainda fora de alcance: sem ataque neste turno."
+],
+[
+"{0} is defeated!",
+"{0} foi derrotado(a)!"
+],
+[
+"{0} falls unconscious!",
+"{0} cai inconsciente!"
+],
+[
+"{0} falls, dying!",
+"{0} cai, morrendo!"
+],
+[
+"(death saves each turn)",
+"(testes contra a morte a cada turno)"
+],
+[
+"{0} is back on their feet!",
+"{0} está de pé de novo!"
+],
+[
+"a hit while dying: death save failure ({0}/3)",
+"um golpe enquanto morre: falha no teste contra a morte ({0}/3)"
+],
+[
+"{0}'s death save",
+"Teste contra a morte de {0}"
+],
+[
+"{0} dies.",
+"{0} morre."
+],
+[
+"{0} is stable",
+"{0} está estável"
+],
+[
+"(unconscious).",
+"(inconsciente)."
+],
+[
+"natural 20!",
+"20 natural!"
+],
+[
+"natural 1: two failures",
+"1 natural: duas falhas"
+],
+[
+"{0} gets back up with 1 HP.",
+"{0} se levanta com 1 PV."
+],
+[
+"{0} takes aim and looses a shot at {1} with the {2}.",
+"{0} faz pontaria e dispara contra {1} com {2}."
+],
+[
+"{0} takes aim and looses a shot at {1}.",
+"{0} faz pontaria e dispara contra {1}."
+],
+[
+"{0} draws, breathes out, and fires at {1}.",
+"{0} puxa, solta o ar e atira em {1}."
+],
+[
+"{0} closes the distance and swings the {1} at {2}.",
+"{0} encurta a distância e golpeia {2} com {1}."
+],
+[
+"{0} closes the distance and swings a weapon at {1}.",
+"{0} encurta a distância e golpeia {1} com a arma."
+],
+[
+"{0} steps in hard, bringing the {1} down on {2}.",
+"{0} avança com força e desce {1} sobre {2}."
+],
+[
+"{0} steps in hard, bringing a weapon down on {1}.",
+"{0} avança com força e desce a arma sobre {1}."
+],
+[
+"{0} feints, then strikes at {1} with the {2}.",
+"{0} finta e então ataca {1} com {2}."
+],
+[
+"{0} feints, then strikes at {1} with a weapon.",
+"{0} finta e então ataca {1} com a arma."
+],
+[
+"{0} crumples to the ground.",
+"{0} desaba no chão."
+],
+[
+"{0} goes down and stays down.",
+"{0} cai e não levanta mais."
+],
+[
+"{0} staggers back.",
+"{0} cambaleia para trás."
+],
+[
+"{0} slips aside.",
+"{0} se esquiva para o lado."
+],
+[
+"{0} closes in",
+"{0} se aproxima"
+],
+[
+"{0} runs at {1}",
+"{0} corre até {1}"
+],
+[
+"{0} dodges",
+"{0} se esquiva"
+],
+[
+"{0} dashes",
+"{0} dispara"
+],
+[
+"{0} acts",
+"{0} age"
+],
+[
+"🛡 Attacks against {0} have disadvantage until their next turn.",
+"🛡 Ataques contra {0} têm desvantagem até o próximo turno."
+],
+[
+"🏃 +{0} ft of movement this turn.",
+"🏃 +{0} pés de movimento neste turno."
+],
+[
+"{0} heals {1}",
+"{0} cura {1}"
+],
+[
+"({0} heals left)",
+"({0} curas restantes)"
+],
+[
+"💚 +{0} HP ({1}) → {2} {3}/{4} HP",
+"💚 +{0} PV ({1}) → {2} {3}/{4} PV"
+],
+[
+"💚 heals {0} ({1}) → {2}/{3} HP",
+"💚 cura {0} ({1}) → {2}/{3} PV"
+],
+[
+"💚 heals {0} ({1}) → HP {2}/{3}",
+"💚 cura {0} ({1}) → PV {2}/{3}"
+],
+[
+"💥 power {0} ({1})",
+"💥 poder {0} ({1})"
+],
+[
+"(already full)",
+"(já cheio)"
+],
+[
+"{0} uses {1}",
+"{0} usa {1}"
+],
+[
+"{0} uses {1} on {2}",
+"{0} usa {1} em {2}"
+],
+[
+"{0} casts {1} at {2}",
+"{0} conjura {1} em {2}"
+],
+[
+"{0} tries to {1} {2}",
+"{0} tenta {1} {2}"
+],
+[
+"⚔️ Combat starts! Turn order: {0}. Enemies: {1}.",
+"⚔️ A luta começa! Ordem dos turnos: {0}. Inimigos: {1}."
+],
+[
+"🏁 The fight is over: {0} Defeated: {1}.",
+"🏁 A luta acabou: {0} Derrotados: {1}."
+],
+[
+"🏁 The fight is over: {0}",
+"🏁 A luta acabou: {0}"
+],
+[
+"🩹 The companions stabilize {0}, who comes to with 1 HP.",
+"🩹 Os companheiros estabilizam {0}, que volta a si com 1 PV."
+],
+[
+"🩹 {0} survives: left for dead or captured, waking later with {1} HP.",
+"🩹 {0} sobrevive: dado(a) como morto(a) ou capturado(a), acordando depois com {1} PV."
+],
+[
+"{0} ({1} HP)",
+"{0} ({1} PV)"
+],
+[
+"{0} is already down.",
+"{0} já caiu."
+],
+[
+"At most {0} combatants.",
+"No máximo {0} combatentes."
+],
+[
+"(cover: +1 defense die)",
+"(cobertura: +1 dado de defesa)"
+],
+[
+"(cover +2)",
+"(cobertura +2)"
+],
+[
+"Not enough {0}: {1} needed, you have {2}.",
+"{0} insuficiente: precisa de {1}, você tem {2}."
+],
+[
+"You have no {0}.",
+"Você não tem {0}."
+],
+[
+"{0} spent: no more {1}",
+"{0} gasto: acabou {1}"
+],
+[
+"⏳ Time passes ({0}). It is now {1}.",
+"⏳ O tempo passa ({0}). Agora é {1}."
+],
+[
+"Weather: {0}.",
+"Clima: {0}."
+],
+[
+"Weather: {0}",
+"Clima: {0}"
+],
+[
+"Cannot understand dice expression: {0}",
+"Não entendi a expressão de dados: {0}"
+],
+[
+"{0} Bought {1} for {2} {3} ({4} left: {5}).",
+"{0} Comprou {1} por {2} {3} ({4} restante: {5})."
+],
+[
+"{0}: relationship {1} → {2} ({3})",
+"{0}: relação {1} → {2} ({3})"
+],
+[
+"{0}: relationship {1} → {2} ({3}), now {4}",
+"{0}: relação {1} → {2} ({3}), agora {4}"
+],
+[
+"{0}: relationship {1} → {2}",
+"{0}: relação {1} → {2}"
+],
+[
+"{0}: relationship {1} → {2}, now {3}",
+"{0}: relação {1} → {2}, agora {3}"
+],
+[
+"Note on {0}: {1}",
+"Nota sobre {0}: {1}"
+],
+[
+"New character: {0}",
+"Novo personagem: {0}"
+],
+[
+"New place: {0}",
+"Novo lugar: {0}"
+],
+[
+"New quest: {0}",
+"Nova missão: {0}"
+],
+[
+"Location: {0}",
+"Local: {0}"
+],
+[
+"Appointment: {0}",
+"Compromisso: {0}"
+],
+[
+"New day: {0}",
+"Novo dia: {0}"
+],
+[
+"Recovered: {0}",
+"Recuperado: {0}"
+],
+[
+"HP {0} ({1})",
+"PV {0} ({1})"
+],
+[
+"Gold {0} ({1})",
+"Ouro {0} ({1})"
+],
+[
+"Item +{0} {1}",
+"Item +{0} {1}"
+],
+[
+"Item -{0} {1}",
+"Item -{0} {1}"
+],
+[
+"Quest '{0}': {1}",
+"Missão '{0}': {1}"
+],
+[
+"Quest '{0}' looks {1}: confirm it in the Bag tab",
+"Missão '{0}' parece {1}: confirme na aba Bolsa"
+],
+[
+"money: {0}",
+"dinheiro: {0}"
+],
+[
+"{0} (grade up: {1} → {2})",
+"{0} (subiu de grau: {1} → {2})"
+],
+[
+"A night's rest.",
+"Uma noite de descanso."
+],
+[
+"A short rest.",
+"Um descanso curto."
+],
+[
+"Recovered: {0}.",
+"Recuperado: {0}."
+],
+[
+"Added {0} to the folder \"{1}\": {2}. Already here (kept): {3}.",
+"{0} adicionados à pasta \"{1}\": {2}. Já estavam aqui (mantidos): {3}."
+],
+[
+"Added {0}: {1}. Already here (kept): {2}.",
+"{0} adicionados: {1}. Já estavam aqui (mantidos): {2}."
+],
+[
+"({0}) - natural 20!",
+"({0}) - 20 natural!"
+],
+[
+"({0}) - natural 1!",
+"({0}) - 1 natural!"
 ]
 ]
 }

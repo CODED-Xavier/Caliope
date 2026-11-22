@@ -468,7 +468,7 @@ Run **`build-exe.bat`** (after Play.bat ran once). It builds the folder `Caliope
 | Narration voice | Piper voice, speed, read every reply |
 | Backups | Daily copy, days to keep |
 | Open in its own window | App window or a normal browser tab |
-| Interface language | English or Português (Brasil) for menus, buttons and help; changes at once. The story's language is set apart (*Language of the story*) |
+| Interface language | English or Português (Brasil) for menus, buttons and help, and for the app's own lines in the chat: round cards ("Turno de Aster", "ACERTO", "6 de dano"), companions' flavour lines, ✨ uses, dice, rests and the update lines under replies. Changes at once. The story's language is set apart (*Language of the story*); in a Portuguese story the tracker also writes its reasons and notes in Portuguese. Your own messages and the Aedo's story are never changed |
 
 Every setting has a **?** with a short explanation.
 
@@ -579,6 +579,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.29.0 | Your turn by the 5e rules (action, bonus action, movement, reaction, End turn) with the option list sorted by cost; companions with 5e sheets built by the system around your hero or step by step; class and race emblems; ▸ details on classes, races and backgrounds; equipment categories; one Sheet tab (Status merged into it); the sheet owns gear and notes; fight damage reaches the sheet; the Aedo no longer acts for you when the app starts a fight; personas bring their world additions |
 | 2.29.1 | A book's placeholder classes are left out of the builder; hide repeated entries and choose each book's rules list (2014, 2024 or both) in the Library |
 | 2.30.0 | 📦 Export on every card tile and in the card editor; "Want to describe it?" after each part of your turn; the round card told by turns with your words and companion flavour; portrait tokens on the battle map; companion pictures on their sheets; 18 more race emblems (Goliath, Halfling, Minotaur, Kobold, Lizardfolk, Satyr, Vampire…) |
+| 2.34.0 | Portuguese all the way: round cards, flavour lines, ✨ uses, dice, rests and update lines translated on screen; the tracker's reasons and notes in the story's language; the last untranslated screen lines |
 | 2.33.1 | Your skills on the start screen and in the Sheet tab, always in front of the Aedo, used by naming them in the story (cost paid by the app); your character's picture on the start screen and big on the Sheet tab |
 | 2.33.0 | Companions with faces: "Set up your companions" on the start screen (name, background, appearance, personality, pictures with named moods; kept on the card or for one game); their Standard picture on their first turn in a fight; mood pictures in the story |
 | 2.32.0 | Cards with their own sheet (Lumencia) are filled on the start screen like a D&D sheet; Stats with EXP bars that raise the grade when full; the card's rule text (">=8") is never taken as a value; no tracker strip over role-play stories |

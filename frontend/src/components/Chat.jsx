@@ -165,7 +165,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
         <div className="user-col">
           {editing ? editor : (
             <>
-              <div className={`bubble ${isDice ? "dice" : ""} ${isCombat ? "combat-card" : ""}`}>
+              <div className={`bubble ${isDice ? "dice" : ""} ${isCombat ? "combat-card" : ""} ${isCombat || isDice || m.meta?.app_line || m.content.startsWith("\u2728") ? "app-text" : ""}`}>
                 {isCombat ? <CombatText text={m.content} npcs={npcs} /> : <Markdown text={showThoughts(m.content)} story={!isDice} />}
               </div>
               {m.meta?.edited && <div className="muted tiny edited">edited</div>}

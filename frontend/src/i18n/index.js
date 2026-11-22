@@ -3,7 +3,8 @@
  *
  * The screens are written in English. When PT-BR is on, a watcher swaps every English text on the page (and
  * placeholders, tooltips) for its translation as it appears, and puts the English back when you switch back.
- * Stories, chat messages and anything you type are never touched.
+ * Stories, chat messages and anything you type are never touched; only the app's own lines in the chat are (round
+ * cards, dice, ✨ uses, rests, update chips).
  * The translations live in pt-BR.json: "exact" texts, and "patterns" where {0}, {1}… stand for names and numbers.
  */
 import PT from "./pt-BR.json";
@@ -13,7 +14,8 @@ export const UI_LANGUAGES = [
   { id: "pt-BR", label: "Português (Brasil)" },
 ];
 
-const SKIP = ".bubble, .no-tr, .pre, .recap-text, textarea, input, code, pre, script, style, [contenteditable]";
+// Chat bubbles are never touched, except the app's own lines in them (round cards, dice, ✨ uses, rests): .app-text
+const SKIP = ".bubble:not(.app-text), .no-tr, .pre, .recap-text, textarea, input, code, pre, script, style, [contenteditable]";
 const ATTRS = ["placeholder", "title", "aria-label", "alt"];
 
 let lang = "en";
@@ -56,11 +58,15 @@ export function tr(text) {
   if (!core || !/[A-Za-z]/.test(core)) return s;
   let out = lookup(core);
   if (out == null) {
-    // "⚙ Settings", "Name:", "Saving…": try without leading symbols and trailing punctuation
-    const m = core.match(/^([^A-Za-z"'(]*)(.*?)([\s:.…!?)]*)$/s);
+    // "⚙ Settings", "Name:", "Saving…", "💥 6 damage … HP ·": try without the leading symbols, the trailing
+    // punctuation, or both
+    const m = core.match(/^([^A-Za-z"'(]*)(.*?)([\s:.…!?)·]*)$/s);
     if (m && (m[1] || m[3])) {
-      const mid = lookup(m[2]);
-      if (mid != null) out = m[1] + mid + m[3];
+      for (const [lead, mid, tail] of [["", m[1] + m[2], m[3]], [m[1], m[2] + m[3], ""], [m[1], m[2], m[3]]]) {
+        if (!lead && !tail) continue;
+        const got = lookup(mid.trim());
+        if (got != null) { out = lead + got + tail; break; }
+      }
     }
   }
   if (out == null) return s;
@@ -84,7 +90,7 @@ function doText(node) {
 }
 
 function doAttrs(el) {
-  if (el.closest(".bubble, .no-tr")) return;
+  if (el.closest(".bubble:not(.app-text), .no-tr")) return;
   let recs = attrOrig.get(el);
   for (const a of ATTRS) {
     const now = el.getAttribute(a);
@@ -104,7 +110,7 @@ function walk(root) {
   if (root.matches?.(SKIP) && root.tagName !== "INPUT" && root.tagName !== "TEXTAREA") return;
   doAttrs(root);
   const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) => (n.nodeType === 1 && n.matches(".bubble, .no-tr, .pre, .recap-text, code, pre, script, style")
+    acceptNode: (n) => (n.nodeType === 1 && n.matches(".bubble:not(.app-text), .no-tr, .pre, .recap-text, code, pre, script, style")
       ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
   });
   for (let n = tw.nextNode(); n; n = tw.nextNode()) {

@@ -1014,7 +1014,8 @@ class ChatEngine:
         status_lines = statusbook.tracker_lines(state, tpl) if tpl else ""
         res_line = resources.tracker_line(state)
         prompt = self.prompts.analysis_messages(scenario=scenario, state=state, npcs=npcs, exchanges=exchanges, tracker=tracker,
-                                                calendar=cal if cal_on else None, status_fields=status_lines, resource_line=res_line)
+                                                calendar=cal if cal_on else None, status_fields=status_lines, resource_line=res_line,
+                                                language=scenario.get("language") or settings.get("response_language", "en"))
         try:
             raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker, cal_on, bool(status_lines), bool(res_line)),
                                       temperature=0.2,
