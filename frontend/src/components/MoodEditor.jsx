@@ -62,16 +62,25 @@ export default function MoodEditor({ portraits, onChange, compact, mainOnly }) {
         const shown = url || (n !== 0 ? pics.default : "");
         return (
           <div key={n} className={`mood-slot ${url ? "" : "empty"}`}>
-            <div className="mood-pic" title={url || (n ? "Uses the main picture" : "No picture")}>
+            <div className={`mood-pic ${mainOnly ? "clickable" : ""}`} title={mainOnly ? "Choose a picture on this PC" : url || (n ? "Uses the main picture" : "No picture")}
+              onClick={mainOnly ? () => pick(n) : undefined}>
               {shown ? <img src={portraitSrc(shown)} alt={label} loading="lazy" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} /> : <span className="muted">?</span>}
               {busy === n && <span className="spinner mood-busy" />}
             </div>
             <div className="mood-label tiny">{label}</div>
+            {mainOnly ? (
+              <div className="mood-btns words">
+                <button type="button" className="btn small" onClick={() => pick(n)}>📁 From this PC</button>
+                <button type="button" className="btn small ghost" onClick={() => askLink(n)}>🔗 Link</button>
+                {url && <button type="button" className="icon-btn" title="Remove" onClick={() => setSlot(n, "")}>✕</button>}
+              </div>
+            ) : (
             <div className="mood-btns">
               <button type="button" className="icon-btn" title="Choose a picture on this PC" onClick={() => pick(n)}>⬆</button>
               <button type="button" className="icon-btn" title="Paste a link" onClick={() => askLink(n)}>🔗</button>
               {url && <button type="button" className="icon-btn" title="Remove" onClick={() => setSlot(n, "")}>✕</button>}
             </div>
+            )}
           </div>
         );
       })}

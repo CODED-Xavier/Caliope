@@ -1892,7 +1892,9 @@
 "hit an error.": "deu um erro.",
 "The map picture could not be read.": "Não foi possível ler a imagem do mapa.",
 "No grid was found on this picture. Set the square size by hand.": "Nenhuma grade foi encontrada nesta imagem. Defina o tamanho do quadrado à mão.",
-"Jukebox": "Jukebox"
+"Jukebox": "Jukebox",
+"📁 From this PC": "📁 Deste PC",
+"🔗 Link": "🔗 Link"
 },
 "patterns": [
 [
