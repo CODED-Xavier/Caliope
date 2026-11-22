@@ -74,7 +74,8 @@ def normalize_abilities(raw, resources: list[dict] | None = None) -> list[dict]:
             "dice": _dice(a.get("dice", "")),
             "bonus": None if bonus in (None, "") else max(-5, min(20, as_int(bonus))),
             "range": max(1, min(30, as_int(a.get("range", 1), 1))),
-            "description": truncate(str(a.get("description", "")).strip(), 200),
+            "description": truncate(str(a.get("description", "")).strip(), 600),
+            **({"own": True} if a.get("own") else {}),
         })
         if len(out) >= MAX_ABILITIES:
             break
@@ -208,12 +209,66 @@ def gm_notes(state: dict, abilities: list[dict]) -> str:
     pools = pools_line(state)
     if not pools:
         return ""
-    lines = [f"Player's resources: {pools}."]
-    if abilities:
-        lines.append("Abilities: " + "; ".join(f"{a['name']} ({cost_text(a['costs'])})" for a in abilities[:12]) + ".")
+    lines = [f"Player's resources: {pools}."]  # the abilities themselves are in "The player's skills"
     empty = [n for n, p in (state.get("resources") or {}).items() if p["current"] == 0]
     if empty:
         lines.append(f"Out of {', '.join(empty)}: the player is drained and cannot use abilities that cost it; show the exhaustion.")
+    return "\n".join(lines)
+
+
+def _key(text: str) -> str:
+    return " ".join(re.sub(r"[^\w]+", " ", (text or "").lower()).split())
+
+
+def skills_in_text(text: str, abilities: list[dict]) -> list[dict]:
+    """The player's skills named in a message ("I use my soul forge" -> Soul Forge). Names shorter than 4 letters are
+    not looked for (too easy to say by chance)."""
+    words = f" {_key(text)} "
+    found = []
+    for a in abilities or []:
+        name = _key(a.get("name", ""))
+        if len(name.replace(" ", "")) >= 4 and f" {name} " in words and a not in found:
+            found.append(a)
+    return found[:3]
+
+
+def skills_section(abilities: list[dict]) -> str:
+    """The player's skills, always in front of the Aedo: what each really does, its cost."""
+    if not abilities:
+        return ""
+    lines = ["## The player's skills (real; these are the special things they can do)"]
+    for a in abilities[:MAX_ABILITIES]:
+        cost = f" (costs {cost_text(a['costs'])})" if a.get("costs") else ""
+        lines.append(f"- {a['name']}{cost}: {a.get('description') or 'as its name says'}")
+    lines.append("When the player uses one (by name, in their own words), it works as described here, within its limits; "
+                 "do not give them other powers, and do not forget these.")
+    return "\n".join(lines)
+
+
+def use_named_skills(state: dict, found: list[dict]) -> list[dict]:
+    """Skills named in the player's message: costs are paid when the pools allow it. Returns what happened."""
+    out = []
+    for a in found:
+        why = can_pay(state, a["costs"]) if a.get("costs") else ""
+        if not why and a.get("costs"):
+            pay(state, a["costs"])
+        out.append({"id": a["id"], "name": a["name"], "ok": not why, "why": why})
+    return out
+
+
+def used_section(used: list[dict], abilities: list[dict], state: dict) -> str:
+    """For the turn the player names a skill: what it does, and whether it worked (paid) or falters."""
+    if not used:
+        return ""
+    by_id = {a["id"]: a for a in abilities or []}
+    lines = ["## The player uses a skill this turn (resolved by the app)"]
+    for u in used:
+        a = by_id.get(u["id"], {})
+        if u["ok"]:
+            paid = f" Paid: {cost_text(a.get('costs') or {})} (now {pools_line(state)})." if a.get("costs") else ""
+            lines.append(f"- {u['name']} WORKS: {a.get('description') or 'as its name says'}.{paid} Show it happening as described.")
+        else:
+            lines.append(f"- {u['name']} FALTERS: {u['why']} Show the attempt failing from exhaustion.")
     return "\n".join(lines)
 
 

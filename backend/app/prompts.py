@@ -359,6 +359,14 @@ class PromptBuilder:
         res_notes = resource_notes(state, state.get("abilities") or [])
         if res_notes:
             extra = "## Resources (kept by the app)\n" + res_notes + ("\n\n" + extra if extra else "")
+        from .resources import skills_section, used_section
+        last_user_msg = next((h for h in reversed(history) if h["role"] == "user"), None)
+        used = used_section((last_user_msg or {}).get("meta", {}).get("skills_used") or [], state.get("abilities") or [], state)
+        if used:
+            extra = used + ("\n\n" + extra if extra else "")
+        own_skills = skills_section(state.get("abilities") or [])
+        if own_skills:
+            extra = own_skills + ("\n\n" + extra if extra else "")
         if cal_on:
             extra = "## Date and time (kept by the app)\n" + gm_notes(state, cal) + ("\n\n" + extra if extra else "")
         scene_plan = planned_scene(route, state) or scene_section(adv, state)

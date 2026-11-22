@@ -24,7 +24,7 @@ export function startValues(groups) {
  * The card's own sheet (Lumencia: Tier, Affiliation, Attributes 1-10, Stats with grades and EXP), grouped like
  * the card's status block. Used on the start screen and in the Sheet tab.
  */
-export default function CardSheetForm({ groups, values, onChange }) {
+export default function CardSheetForm({ groups, values, onChange, hide }) {
   const set = (k, v) => onChange({ ...values, [k]: v });
   return (
     <div className="card-sheet-form">
@@ -32,7 +32,7 @@ export default function CardSheetForm({ groups, values, onChange }) {
         <fieldset className="card-sheet-group" key={`${g.title}-${gi}`}>
           {g.title && <legend>{g.title}</legend>}
           <div className="card-sheet-fields">
-            {g.fields.map((f) => {
+            {g.fields.filter((f) => !(hide && hide.test(f.key))).map((f) => {
               if (f.progress) {
                 const p = parseProgress(values[f.key]) || { grade: "", exp: 0, max: f.max || 100 };
                 const grade = p.grade.replace(/^-$/, "");

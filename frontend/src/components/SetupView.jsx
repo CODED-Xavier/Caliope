@@ -7,6 +7,8 @@ import HelpTip from "./HelpTip.jsx";
 import { CharacterPreview, StartPicker } from "./CardExtras.jsx";
 import PersonaBar from "./Personas.jsx";
 import CardSheetForm, { startValues } from "./CardSheetForm.jsx";
+import SkillsEditor from "./SkillsEditor.jsx";
+import MoodEditor from "./MoodEditor.jsx";
 import CompanionSetup, { companionFace, withEdits } from "./CompanionSetup.jsx";
 import { portraitSrc } from "../portraits.js";
 import { abilityMod, fmtMod } from "../utils.js";
@@ -15,6 +17,7 @@ import { abilityMod, fmtMod } from "../utils.js";
 const HIT_DIE = { barbarian: 12, fighter: 10, paladin: 10, ranger: 10, bard: 8, cleric: 8, druid: 8, monk: 8, rogue: 8, warlock: 8, sorcerer: 6, wizard: 6 };
 const CLASSES = ["Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk", "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"];
 const STANDARD = [15, 14, 13, 12, 10, 8];
+const SKILLS_FIELD = /^(skills?|habilidades?|abilities|powers|poderes)\b/i; // the card's own Skills field: filled from "Your skills"
 
 const roll4d6 = () => {
   const d = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 6)).sort((a, b) => a - b);
@@ -57,6 +60,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   const [showCast, setShowCast] = useState(false);
   const [sheet, setSheet] = useState(null); // the card's own sheet (Lumencia: Tier, Attributes, Stats with EXP)
   const [sheetValues, setSheetValues] = useState({});
+  const [skills, setSkills] = useState([]); // your own skills: the Aedo always sees them; name one in the story to use it
   const [compEdits, setCompEdits] = useState({}); // "Set up your companions": changes by the companion's card name
   const [keepComp, setKeepComp] = useState(true);
   const [showComp, setShowComp] = useState(false);
@@ -138,7 +142,9 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
         else delete player.stats;
         // only what you filled: an empty box or a stat without a grade ("- [0/100]") keeps the card's own value
         const own = sheet ? Object.fromEntries(Object.entries(sheetValues).filter(([, v]) => { const t = String(v || "").trim(); return t && !/^-?\s*\[\d+\/\d+\]$/.test(t); })) : null;
-        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", ...(own ? { card_status: own } : {}), ...teamOpts() });
+        const mySkills = skills.filter((k) => String(k.name || "").trim());
+        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", ...(own ? { card_status: own } : {}),
+          ...(mySkills.length ? { abilities: mySkills } : {}), ...teamOpts() });
       }
     } catch (e) { setError(e.message); setBusy(false); }
   };
@@ -214,6 +220,12 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
         </>
       ) : (
         <>
+          <div className="row gap center setup-me">
+            <div className="setup-portrait" title="Your character's picture: it shows on your sheet">
+              <MoodEditor portraits={p.portraits} mainOnly onChange={(v) => set("portraits", v)} />
+            </div>
+            <div className="grow muted tiny">{"Your character's picture (optional): a file from this PC or a link. It shows on your Sheet tab."}</div>
+          </div>
           <div className="row gap">
             <div className="grow"><label className="lbl">Name</label><input className="field" value={p.name} onChange={(e) => set("name", e.target.value)} autoFocus /></div>
             {adventure && <div className="grow"><label className="lbl">Race</label>
@@ -265,7 +277,16 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
                   <div className="card-rules muted">{sheet.rules}</div>
                 </details>
               )}
-              <CardSheetForm groups={sheet.groups} values={sheetValues} onChange={setSheetValues} />
+              <CardSheetForm groups={sheet.groups} values={sheetValues} onChange={setSheetValues} hide={SKILLS_FIELD} />
+            </>
+          )}
+          {!adventure && (
+            <>
+              <div className="section-title">Your skills</div>
+              <div className="muted tiny">{(card.resources || []).length
+                ? "Your special abilities, written your way. The Aedo always sees them and follows what you write. In the story, just name one (\"I use my Soul Forge\") and it happens, paying its cost. They also sit in the Sheet tab with a Use button."
+                : "Your special abilities, written your way. The Aedo always sees them and follows what you write. In the story, just name one (\"I use my Soul Forge\") and it happens. They also sit in the Sheet tab with a Use button."}</div>
+              <SkillsEditor skills={skills} onChange={setSkills} resources={(card.resources || []).map((r) => r.name)} />
             </>
           )}
         </>

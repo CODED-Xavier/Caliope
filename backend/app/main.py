@@ -1788,6 +1788,7 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
                                       player=player, setup=str(body.get("setup") or ""),
                                       card_status=body.get("card_status") if isinstance(body.get("card_status"), dict) else None,
                                       companions=body.get("companions") if isinstance(body.get("companions"), list) else None,
+                                      abilities=body.get("abilities") if isinstance(body.get("abilities"), list) else None,
                                       player_lore=body.get("player_lore") if isinstance(body.get("player_lore"), list) else None)
     return full_conversation(conv["id"])
 

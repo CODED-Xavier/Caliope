@@ -25,7 +25,16 @@ class NotFound(Exception):
     pass
 
 
-PLAYER_FIELDS = ("name", "race", "class", "level", "background", "description", "traits", "stats", "hp", "ac", "skills")
+def _skills_field(tpl: str, card_status: dict | None, abilities: list | None) -> dict:
+    """The card's own "Skills" field (Lumencia's INFO block) lists the skills made on the start screen."""
+    names = [str(a.get("name") or "").strip() for a in abilities or [] if isinstance(a, dict) and str(a.get("name") or "").strip()]
+    field = next((f for f in statusbook.custom_fields(tpl) if re.match(r"^(skills?|habilidades?|abilities|powers|poderes)\b", f, re.I)), None)
+    if not names or not field or str((card_status or {}).get(field) or "").strip() not in ("", "-"):
+        return {}
+    return {field: " / ".join(names)}
+
+
+PLAYER_FIELDS = ("name", "race", "class", "level", "background", "description", "traits", "stats", "hp", "ac", "skills", "portraits")
 
 
 
@@ -51,7 +60,8 @@ class ConversationRepository:
     # ------------------------------------------------------------ conversations
     def create(self, scenario: dict | None = None, title: str = "", player_name: str | None = None,
                player: dict | None = None, setup: str = "", player_lore: list | None = None, start: str = "",
-               party_mode: str = "", card_status: dict | None = None, companions: list | None = None) -> dict:
+               party_mode: str = "", card_status: dict | None = None, companions: list | None = None,
+               abilities: list | None = None) -> dict:
         """`player` comes from the start screen and is laid over the card's starting sheet.
         `card_status`: the card's own sheet (Tier, Attributes, Stats...) filled on the start screen.
         `setup` is "app" (made on the start screen), "card" (the card asks in the story) or ""."""
@@ -80,6 +90,10 @@ class ConversationRepository:
             if data.get("resources"):
                 state["resources"] = start_pools(data["resources"])
                 state["abilities"] = [dict(a) for a in data.get("abilities") or []]
+            if abilities:  # your own skills, made on the start screen
+                from .resources import MAX_ABILITIES, normalize_abilities
+                mine = normalize_abilities([{**a, "own": True} for a in abilities if isinstance(a, dict)], data.get("resources"))
+                state["abilities"] = ([dict(a) for a in state.get("abilities") or []] + mine)[:MAX_ABILITIES]
             cal = data.get("calendar") or {}
             if cal.get("enabled") and cal.get("months"):
                 state["clock"] = {"minutes": 0, "seed": random.randrange(1, 1_000_000)}
@@ -130,7 +144,7 @@ class ConversationRepository:
                 if tpl and extra.get("status") and resolve_features(data).get("status_by", "app") == "app":
                     statusbook.harvest(state, tpl, extra["status"])  # the opening's block gives the card's starting values
                     self.save_state(conv_id, state)
-                mine = statusbook.clean_values(tpl, card_status) if tpl and card_status else {}
+                mine = statusbook.clean_values(tpl, {**(card_status or {}), **_skills_field(tpl, card_status, abilities)}) if tpl and (card_status or abilities) else {}
                 if mine:  # the sheet filled on the start screen: the story does not ask for it again
                     state["card_status"] = {**(state.get("card_status") or {}), **mine}
                     state["sheet_from_chat"] = True
@@ -141,7 +155,8 @@ class ConversationRepository:
                     self.update_npc(npc_id, met=True)
                 self.add_message(conv_id, "assistant", opening, {"opening": True, **extra})
             tpl = statusbook.template_of(data)
-            mine = statusbook.clean_values(tpl, card_status) if tpl and card_status and not state.get("sheet_from_chat") else {}
+            mine = statusbook.clean_values(tpl, {**(card_status or {}), **_skills_field(tpl, card_status, abilities)}) \
+                if tpl and (card_status or abilities) and not state.get("sheet_from_chat") else {}
             if mine:  # no opening: the start screen's sheet still counts
                 state["card_status"] = {**(state.get("card_status") or {}), **mine}
                 state["sheet_from_chat"] = True

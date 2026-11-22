@@ -1796,7 +1796,23 @@
 "✎ Set up your companions": "✎ Prepare seus companheiros",
 "Who travels with you. Give each one a face for every mood: their Standard picture shows on their first turn in a fight, and the story shows the mood that fits (two pictures per reply at most).": "Quem viaja com você. Dê a cada um um rosto para cada humor: a imagem Padrão aparece no primeiro turno deles numa luta, e a história mostra o humor que combina (no máximo duas imagens por resposta).",
 "A companion needs a name.": "Um companheiro precisa de um nome.",
-"Where they come from, why they travel with you": "De onde vem, por que viaja com você"
+"Where they come from, why they travel with you": "De onde vem, por que viaja com você",
+"Your character's picture: it shows on your sheet": "A imagem do seu personagem: aparece na sua ficha",
+"Your character's picture (optional): a file from this PC or a link. It shows on your Sheet tab.": "A imagem do seu personagem (opcional): um arquivo deste PC ou um link. Ela aparece na aba Ficha.",
+"Your skills": "Suas habilidades",
+"Your special abilities, written your way. The Aedo always sees them and follows what you write. In the story, just name one (\"I use my Soul Forge\") and it happens, paying its cost. They also sit in the Sheet tab with a Use button.": "Suas habilidades especiais, escritas do seu jeito. O Aedo sempre as vê e segue o que você escreveu. Na história, é só citar uma (\"uso minha Soul Forge\") e ela acontece, pagando o custo. Elas também ficam na aba Ficha com um botão Usar.",
+"Your special abilities, written your way. The Aedo always sees them and follows what you write. In the story, just name one (\"I use my Soul Forge\") and it happens. They also sit in the Sheet tab with a Use button.": "Suas habilidades especiais, escritas do seu jeito. O Aedo sempre as vê e segue o que você escreveu. Na história, é só citar uma (\"uso minha Soul Forge\") e ela acontece. Elas também ficam na aba Ficha com um botão Usar.",
+"Skills and powers": "Habilidades e poderes",
+"No skills yet. Add your special abilities: the Aedo always sees them, and naming one in the story uses it.": "Nenhuma habilidade ainda. Adicione suas habilidades especiais: o Aedo sempre as vê, e citar uma na história a usa.",
+"✎ Edit skills": "✎ Editar habilidades",
+"Your character (click to change the picture)": "Seu personagem (clique para trocar a imagem)",
+"Add your character's picture": "Adicionar a imagem do seu personagem",
+"Skill name (Soul Forge…)": "Nome da habilidade (Soul Forge…)",
+"Skill name": "Nome da habilidade",
+"What using it costs (0 = free)": "Quanto custa usar (0 = grátis)",
+"Paid with": "Pago com",
+"What it does, and its limits (the Aedo follows this)": "O que ela faz e seus limites (o Aedo segue isto)",
+"＋ Add a skill": "＋ Adicionar habilidade"
 },
 "patterns": [
 [

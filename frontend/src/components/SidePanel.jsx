@@ -13,6 +13,7 @@ import SheetPicker from "./SheetPicker.jsx";
 import { GridOverlay } from "./AdventureEditor.jsx";
 import PlayerLore from "./PlayerLore.jsx";
 import CardSheetForm, { startValues } from "./CardSheetForm.jsx";
+import SkillsEditor from "./SkillsEditor.jsx";
 import { CalendarBox } from "./Calendar.jsx";
 import { CantosBox, MapBag } from "./Cantos.jsx";
 
@@ -151,30 +152,52 @@ function ResourcesBox({ state, onPatch, onPower, onRest, busy, convId, onState }
           </div>
         );
       })}
-      {(state.abilities || []).length > 0 && (
-        <>
-          <div className="section-title">Powers</div>
-          {state.abilities.map((a) => {
-            const short = Object.entries(a.costs || {}).find(([k, v]) => (pools[k]?.current ?? 0) < v);
-            return (
-              <div className="ability-card" key={a.id}>
-                <div className="grow small">
-                  <strong>{a.name}</strong> <span className="muted tiny">· {Object.entries(a.costs || {}).map(([k, v]) => `${v} ${k}`).join(", ") || "free"}{a.dice ? ` · ${a.dice}` : ""}</span>
-                  {a.description && <div className="muted tiny">{a.description}</div>}
-                </div>
-                <button className="btn small" disabled={busy || inFight || !!short} onClick={() => onPower(a.id)}
-                  title={inFight ? "In a fight, use it from the Combat tab" : short ? `Not enough ${short[0]}` : "Use it now: the app pays the cost and tells the Aedo"}>Use</button>
-              </div>
-            );
-          })}
-        </>
-      )}
       <div className="row gap">
         <button className="btn small grow" disabled={busy || inFight} onClick={() => onRest("short")} title="About an hour of rest">☕ Short rest</button>
         <button className="btn small grow" disabled={busy || inFight} onClick={() => onRest("long")} title="A night's sleep: refills more and heals">🛌 Long rest</button>
       </div>
       <button className="link-btn tiny" disabled={busy} onClick={sync} title="After editing the card's resources or powers">↻ Update from the card</button>
       {err && <div className="error-text small">{err}</div>}
+    </>
+  );
+}
+
+/** Your skills and the card's powers: what each does, Use (the app pays the cost and tells the Aedo), and ✎ to edit
+ * them. Naming a skill in your message ("I use my Soul Forge") uses it too. */
+function SkillsBox({ state, onPatch, onPower, busy, kind }) {
+  const list = state.abilities || [];
+  const pools = state.resources || {};
+  const inFight = !!state.combat?.active;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState([]);
+  if (!list.length && kind !== "roleplay") return null;
+  const save = async () => {
+    await onPatch({ abilities: draft.filter((a) => String(a.name || "").trim()).map((a) => (a.id ? a : { ...a, own: true })) });
+    setEditing(false);
+  };
+  return (
+    <>
+      <div className="section-title">Skills and powers</div>
+      {!list.length && !editing && <div className="muted tiny">No skills yet. Add your special abilities: the Aedo always sees them, and naming one in the story uses it.</div>}
+      {!editing && list.map((a) => {
+        const short = Object.entries(a.costs || {}).find(([k, v]) => (pools[k]?.current ?? 0) < v);
+        return (
+          <div className="ability-card" key={a.id}>
+            <div className="grow small">
+              <strong>{a.name}</strong> <span className="muted tiny">· {Object.entries(a.costs || {}).map(([k, v]) => `${v} ${k}`).join(", ") || "free"}{a.dice ? ` · ${a.dice}` : ""}</span>
+              {a.description && <div className="muted tiny">{a.description}</div>}
+            </div>
+            <button className="btn small" disabled={busy || inFight || !!short} onClick={() => onPower(a.id)}
+              title={inFight ? "In a fight, use it from the Combat tab" : short ? `Not enough ${short[0]}` : "Use it now: the app pays the cost and tells the Aedo"}>Use</button>
+          </div>
+        );
+      })}
+      {editing ? (
+        <>
+          <SkillsEditor skills={draft} onChange={setDraft} resources={Object.keys(pools)} />
+          <div className="row gap"><button className="btn small primary" onClick={save}>Save</button><button className="btn small" onClick={() => setEditing(false)}>Cancel</button></div>
+        </>
+      ) : <button className="btn small" disabled={busy} onClick={() => { setDraft(list.map((a) => ({ ...a }))); setEditing(true); }}>✎ Edit skills</button>}
     </>
   );
 }
@@ -215,14 +238,20 @@ function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, o
   const pct = clamp((hp.current / Math.max(1, hp.max)) * 100, 0, 100);
   return (
     <div className="tab-body">
-      <div className="row gap center">
-        <button type="button" className="player-pic" title="Your picture (shown beside your messages)" onClick={() => setPicOpen(!picOpen)}>
-          {p.portraits?.default ? <img src={portraitSrc(p.portraits.default)} alt="" /> : <span>＋</span>}
+      {p.portraits?.default && (
+        <button type="button" className="player-hero" title="Your character (click to change the picture)" onClick={() => setPicOpen(!picOpen)}>
+          <img src={portraitSrc(p.portraits.default)} alt={p.name || ""} />
         </button>
+      )}
+      <div className="row gap center">
+        {!p.portraits?.default && <button type="button" className="player-pic" title="Add your character's picture" onClick={() => setPicOpen(!picOpen)}>
+          <span>＋</span>
+        </button>}
         <div className="grow"><TextField className="title-input" value={p.name} onCommit={(v) => onPatch({ player: { name: v } })} /></div>
       </div>
       {picOpen && <MoodEditor portraits={p.portraits} mainOnly onChange={(v) => onPatch({ player: { portraits: v } })} />}
       {cardStatus}
+      <SkillsBox state={state} onPatch={onPatch} onPower={onPower} busy={busy} kind={kind} />
       {cardStatus && <button type="button" className="section-title link-btn" onClick={() => setAbout((v) => !v)}>{about ? "▾ About you" : "▸ About you"}</button>}
       {about && <>
       <div className="row gap">

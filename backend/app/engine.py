@@ -218,6 +218,15 @@ class ChatEngine:
                 text = f"{text}\n\n{line}".strip() if text else line
                 meta = {"snapshot": before, kind: True, "app_line": line}
                 yield {"type": "state", "state": new_state, "npcs": self.repo.list_npcs(conv_id), "changes": []}
+            if text and prepare is None and not text.startswith("/") and not resources.is_ability(text):
+                st_now = self.repo.get_state(conv_id)
+                named = resources.skills_in_text(text, st_now.get("abilities") or [])
+                if named and not (st_now.get("combat") or {}).get("active"):  # "I use my soul forge": the app pays it
+                    before = self.repo.capture_snapshot(conv_id)
+                    used = resources.use_named_skills(st_now, named)
+                    self.repo.save_state(conv_id, st_now)
+                    meta = {"snapshot": before, "skills_used": used}
+                    yield {"type": "state", "state": st_now, "npcs": self.repo.list_npcs(conv_id), "changes": []}
             user_msg = self.repo.add_message(conv_id, "user", text, meta)
             self._auto_title(conv_id, text)
             yield {"type": "user_message", "message": user_msg}
