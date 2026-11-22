@@ -408,10 +408,10 @@ class CombatEngine:
         occupied = {(o["x"], o["y"]) for o in combat["combatants"] if o["hp"] > 0 and o["id"] != me["id"]}
         g = combat["grid"]
         tiles = g.get("tiles") or []
-        nx, ny = path_step(tiles, (me["x"], me["y"]), (target["x"], target["y"]), occupied, left) if left else (me["x"], me["y"])
+        nx, ny = path_step(tiles, (me["x"], me["y"]), (target["x"], target["y"]), occupied, left, (g["w"], g["h"])) if left else (me["x"], me["y"])
         dash = distance(nx, ny, target["x"], target["y"]) > reach
         if dash:  # the Dash action: the whole turn spent running toward it
-            nx, ny = path_step(tiles, (me["x"], me["y"]), (target["x"], target["y"]), occupied, left + me.get("speed", 6))
+            nx, ny = path_step(tiles, (me["x"], me["y"]), (target["x"], target["y"]), occupied, left + me.get("speed", 6), (g["w"], g["h"]))
         budget = left + (me.get("speed", 6) if dash else 0)
         steps = walk_cost(tiles, (me["x"], me["y"]), (nx, ny), occupied, budget, (g["w"], g["h"])) or distance(me["x"], me["y"], nx, ny)
         me["x"], me["y"] = nx, ny
@@ -489,7 +489,7 @@ class CombatEngine:
                 if distance(c["x"], c["y"], target["x"], target["y"]) > reach:
                     occupied = {(o["x"], o["y"]) for o in combat["combatants"] if o["hp"] > 0 and o["id"] != c["id"]}
                     nx, ny = path_step(combat["grid"].get("tiles") or [], (c["x"], c["y"]), (target["x"], target["y"]),
-                                       occupied, c.get("speed", 6))
+                                       occupied, c.get("speed", 6), (combat["grid"]["w"], combat["grid"]["h"]))
                     if (nx, ny) != (c["x"], c["y"]):
                         steps = distance(c["x"], c["y"], nx, ny)
                         c["x"], c["y"] = nx, ny

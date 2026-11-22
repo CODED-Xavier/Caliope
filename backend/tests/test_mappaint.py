@@ -1,9 +1,15 @@
 import unittest
 
-from app import adventure, mappaint
+from app import adventure
 from app.maps import TYPES, generate
 
+try:
+    from app import mappaint  # needs numpy and Pillow (the app's own Python has both)
+except ImportError:
+    mappaint = None
 
+
+@unittest.skipIf(mappaint is None, "the painter needs numpy and Pillow")
 class PaintTests(unittest.TestCase):
     def test_every_type_paints_a_lined_up_picture(self):
         import io

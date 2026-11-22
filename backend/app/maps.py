@@ -98,11 +98,12 @@ def distance(ax: int, ay: int, bx: int, by: int) -> int:
     return max(abs(ax - bx), abs(ay - by))
 
 
-def path_step(tiles: list[str], start: tuple[int, int], goal: tuple[int, int], occupied: set, max_steps: int) -> tuple[int, int]:
+def path_step(tiles: list[str], start: tuple[int, int], goal: tuple[int, int], occupied: set, max_steps: int,
+              size: tuple[int, int] | None = None) -> tuple[int, int]:
     """Where a creature ends after walking up to `max_steps` squares toward `goal` (shortest path around obstacles).
     Difficult terrain costs 2 squares."""
-    if not tiles:
-        h = w = MAX_SIDE
+    if not tiles:  # a plain grid: its own size (fight grids go up to 80 squares), not the generator's 24
+        w, h = size or (MAX_SIDE, MAX_SIDE)
     else:
         h, w = len(tiles), len(tiles[0])
     best, best_d = start, distance(*start, *goal)

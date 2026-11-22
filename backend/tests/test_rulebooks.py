@@ -2,6 +2,14 @@
 import io
 import unittest
 
+def _has(mod: str) -> bool:
+    try:
+        __import__(mod)
+        return True
+    except ImportError:
+        return False
+
+
 from app.rulebooks import RulebookError, ocr_available, read_pdf, read_text, split_sections
 from tests.test_core import FakeLLM, collect, make_services, new_game
 
@@ -57,6 +65,7 @@ def make_pdf(pages: list[list[tuple[str, str]]], as_images: bool = False) -> byt
 BOOK = [[("Grappling", GRAPPLE * 2)], [("Falling", FALLING * 2), ("Resting", RESTING * 2)]]
 
 
+@unittest.skipUnless(_has("reportlab"), "making test PDFs needs reportlab")
 class ReadingTests(unittest.TestCase):
     def test_text_pdf_sections_and_pages(self):
         pages, info = read_pdf(make_pdf(BOOK), use_ocr=False)
@@ -84,6 +93,7 @@ class ReadingTests(unittest.TestCase):
             read_pdf(b"%PDF-1.4 broken", use_ocr=False)
 
 
+@unittest.skipUnless(_has("reportlab"), "making test PDFs needs reportlab")
 class RulebookFlowTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.llm = FakeLLM()

@@ -135,3 +135,13 @@ class DroppedGearTests(unittest.TestCase):
         from app.engine import USED_UP
         kept = [n for n in ("Longsword", "Shield", "Chain mail", "Potion of healing", "Arrows", "Torch") if not USED_UP.search(n)]
         self.assertEqual(kept, ["Longsword", "Shield", "Chain mail"])
+
+
+class WideGridTests(unittest.TestCase):
+    def test_enemies_walk_on_grids_wider_than_24(self):
+        eng = engine(6)
+        state, _ = eng.start(tough(), "d20", [{"name": "Rat", "hp": 3, "ac": 5, "init_bonus": -5}], grid={"w": 40, "h": 6})
+        me, rat = me_of(state), next(c for c in state["combat"]["combatants"] if c["side"] == "enemy")
+        me["x"], me["y"], rat["x"], rat["y"] = 5, 2, 35, 2
+        state, line = eng.player_action(state, "dodge")
+        self.assertLess(rat["x"], 35)  # it walked toward the player instead of standing still

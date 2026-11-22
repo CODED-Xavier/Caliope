@@ -1,10 +1,19 @@
 """Audit leftovers: cached memory vectors, re-sending app-result messages."""
 import unittest
 
+def _has(mod: str) -> bool:
+    try:
+        __import__(mod)
+        return True
+    except ImportError:
+        return False
+
+
 from app.engine import strip_app_line
 from tests.test_core import FakeLLM, collect, make_services, new_game
 
 
+@unittest.skipUnless(_has("numpy"), "the vector cache is only used with numpy")
 class MemoryCacheTests(unittest.IsolatedAsyncioTestCase):
     async def test_cache_follows_changes(self):
         llm = FakeLLM()
