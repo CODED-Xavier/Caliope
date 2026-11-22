@@ -44,7 +44,7 @@ from .checks import roll_line
 from . import shop
 from . import resources
 from . import adventure, bestiary, mappaint, party, sheets, statusbook, wikiresearch
-from . import worldtime
+from . import systems, worldtime
 from .engine import BusyError
 from .llm import LLMError
 from .scenarios import generate_scenario, normalize_scenario
@@ -286,6 +286,27 @@ async def save_companions(scenario_id: int, body: dict[str, Any] = Body(...)):
     data = {**scenario["data"], "name": scenario["name"]}
     data["npcs"] = apply_companion_edits(data.get("npcs") or [], body.get("companions"))
     return svc().scenarios.update(scenario_id, data)
+
+
+@app.post("/api/scenarios/{scenario_id}/systems/find")
+async def find_systems(scenario_id: int):
+    """🔍 Find systems: the card's own sheet proposed from its text (catalog parsed, the rest read by the AI)."""
+    scenario = svc().scenarios.get(scenario_id)
+    if not scenario:
+        raise NotFound(f"Scenario {scenario_id} not found")
+    return {"systems": await systems.read_card(svc().llm, scenario["data"])}
+
+
+@app.post("/api/scenarios/{scenario_id}/systems/try")
+async def try_systems(scenario_id: int, body: dict[str, Any] = Body(default={})):
+    """The start screen: the sheet as you set it, checked by the card's rules, with the numbers worked out."""
+    scenario = svc().scenarios.get(scenario_id)
+    if not scenario:
+        raise NotFound(f"Scenario {scenario_id} not found")
+    sys_def = scenario["data"].get("systems") or {}
+    st = systems.merge_state(sys_def, body.get("state"))
+    error = systems.set_part(sys_def, st, str(body["slot"]), str(body.get("item") or "")) if body.get("slot") else ""
+    return {"state": st, "computed": systems.compute(sys_def, st), "error": error}
 
 
 @app.put("/api/scenarios/{scenario_id}")
@@ -1286,6 +1307,27 @@ async def set_sheet_template(conv_id: int, data: dict[str, Any] = Body(...)):
     return {"ok": True}
 
 
+@app.post("/api/conversations/{conv_id}/systems")
+async def change_systems(conv_id: int, data: dict[str, Any] = Body(...)):
+    """The Sheet tab: install a part ({slot, item}) or set a stat ({stat, value}), checked by the card's rules."""
+    not_busy(conv_id)
+    s = svc()
+    sys_def = s.conversations.get(conv_id)["scenario"].get("systems") or {}
+    if not sys_def:
+        raise HTTPException(400, "This game's card keeps no sheet of its own.")
+    state = s.conversations.get_state(conv_id)
+    st = systems.normalize_state(sys_def, state.get("systems"))
+    if data.get("slot"):
+        error = systems.set_part(sys_def, st, str(data["slot"]), str(data.get("item") or ""))
+        if error:
+            raise HTTPException(400, error)
+    elif data.get("stat"):
+        systems.apply_changes(sys_def, st, [{"stat": str(data["stat"]), "value": data.get("value")}])
+    state["systems"] = st
+    s.conversations.save_state(conv_id, state)
+    return full_conversation(conv_id)
+
+
 @app.post("/api/conversations/{conv_id}/card-status")
 async def save_card_status(conv_id: int, data: dict[str, Any] = Body(...)):
     """✎ The card's own sheet edited in the Sheet tab: saved, and the status under the last reply shows it at once."""
@@ -1789,6 +1831,7 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
                                       card_status=body.get("card_status") if isinstance(body.get("card_status"), dict) else None,
                                       companions=body.get("companions") if isinstance(body.get("companions"), list) else None,
                                       abilities=body.get("abilities") if isinstance(body.get("abilities"), list) else None,
+                                      systems_state=body.get("systems_state") if isinstance(body.get("systems_state"), dict) else None,
                                       player_lore=body.get("player_lore") if isinstance(body.get("player_lore"), list) else None)
     return full_conversation(conv["id"])
 
@@ -1822,6 +1865,15 @@ def _status_now(conv_id: int) -> str:
     return statusbook.render(tpl, s.conversations.get_state(conv_id), s.conversations.list_npcs(conv_id)) if tpl else ""
 
 
+def _systems_view(conv_id: int) -> dict | None:
+    s = svc()
+    sys_def = s.conversations.get(conv_id)["scenario"].get("systems") or {}
+    if not sys_def:
+        return None
+    st = systems.normalize_state(sys_def, s.conversations.get_state(conv_id).get("systems"))
+    return {"systems": sys_def, "state": st, "computed": systems.compute(sys_def, st)}
+
+
 def full_conversation(conv_id: int) -> dict:
     s = svc()
     return {
@@ -1833,6 +1885,7 @@ def full_conversation(conv_id: int) -> dict:
         "pinned_limit": int(s.settings.get("pinned_memory_limit")),
         "features": resolve_features(s.conversations.get(conv_id)["scenario"], s.settings.all()),
         "status_fields": statusbook.custom_fields(statusbook.template_of(s.conversations.get(conv_id)["scenario"]) or ""),
+        "systems_view": _systems_view(conv_id),
         "status_form": statusbook.sheet_form(statusbook.template_of(s.conversations.get(conv_id)["scenario"]) or "",
                                              s.conversations.get_state(conv_id).get("card_status")),
         "status_by_app": bool(s.engine._status_template(s.conversations.get(conv_id)["scenario"], s.settings.all())),

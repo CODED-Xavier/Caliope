@@ -14,6 +14,7 @@ import { GridOverlay } from "./AdventureEditor.jsx";
 import PlayerLore from "./PlayerLore.jsx";
 import CardSheetForm, { startValues } from "./CardSheetForm.jsx";
 import SkillsEditor from "./SkillsEditor.jsx";
+import SystemsSheet from "./SystemsSheet.jsx";
 import { CalendarBox } from "./Calendar.jsx";
 import { CantosBox, MapBag } from "./Cantos.jsx";
 
@@ -229,7 +230,24 @@ function Convert5e({ convId, state, busy, onState, openBuilder, onBuilderShown }
   );
 }
 
-function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, onState, cardStatus }) {
+/** The card's own sheet in play (Black Sheep's stats and loadout): changes go through the app's rules. */
+function CardSystems({ view, convId, onReload, busy }) {
+  const [error, setError] = useState("");
+  const [working, setWorking] = useState(false);
+  const change = async (body) => {
+    setWorking(true); setError("");
+    try { await api.changeSystems(convId, body); await onReload?.(); } catch (e) { setError(e.message); } finally { setWorking(false); }
+  };
+  return (
+    <>
+      <div className="section-title">{view.systems.loadout?.name ? `Sheet · ${view.systems.loadout.name}` : "Sheet"}</div>
+      <SystemsSheet systems={view.systems} state={view.state} computed={view.computed} error={error} busy={busy || working}
+        onValue={(stat, value) => change({ stat, value })} onPart={(slot, item) => change({ slot, item })} />
+    </>
+  );
+}
+
+function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, onState, cardStatus, systemsView, onReload }) {
   const p = state.player;
   const [picOpen, setPicOpen] = useState(false);
   const numbers = kind !== "roleplay";
@@ -251,6 +269,7 @@ function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, o
       </div>
       {picOpen && <MoodEditor portraits={p.portraits} mainOnly onChange={(v) => onPatch({ player: { portraits: v } })} />}
       {cardStatus}
+      {systemsView && <CardSystems view={systemsView} convId={convId} onReload={onReload} busy={busy} />}
       <SkillsBox state={state} onPatch={onPatch} onPower={onPower} busy={busy} kind={kind} />
       {cardStatus && <button type="button" className="section-title link-btn" onClick={() => setAbout((v) => !v)}>{about ? "▾ About you" : "▸ About you"}</button>}
       {about && <>
@@ -886,7 +905,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
           <>
             {kind === "adventure" && <Convert5e convId={conversation.id} state={state} busy={!canRoll} onState={onStateLoaded} openBuilder={openBuilder} onBuilderShown={onBuilderShown} />}
             <SheetTab state={state} onPatch={onPatch} mode={mode} kind={kind} onPower={onPower} onRest={onRest} busy={!canRoll}
-              convId={conversation.id} onState={onStateLoaded}
+              convId={conversation.id} onState={onStateLoaded} systemsView={game.systems_view} onReload={onReload}
               cardStatus={kind === "roleplay" ? <StatusTab messages={game.messages} every={conversation.scenario?.information?.status_every}
                 byApp={!!game.status_by_app} fields={game.status_fields} sheetOwn={!!game.sheet_own}
                 picked={conversation.scenario?.sheet_template || ""} convId={conversation.id} onReload={onReload} now={game.status_now}

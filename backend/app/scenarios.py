@@ -115,6 +115,11 @@ STORY_LENGTHS = {"open": "", "one-shot": "a one-shot (one sitting, about 15-30 r
 SYSTEMS = ("dnd5e-2014", "dnd5e-2024")
 
 
+def _systems(raw):
+    from .systems import normalize
+    return normalize(raw)
+
+
 def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
     raw = raw if isinstance(raw, dict) else {}
     mode = raw.get("mode") if raw.get("mode") in MODES else default_mode
@@ -175,6 +180,7 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "currency": truncate(str(raw.get("currency") or "gold").strip(), 20) or "gold",
         "resources": normalize_resources(raw.get("resources")),
         "abilities": normalize_abilities(raw.get("abilities"), normalize_resources(raw.get("resources"))),
+        "systems": _systems(raw.get("systems")),  # the card's own sheet kept by the app (app/systems.py)
         "alternate_openings": [_clip(x, 6000) for x in raw.get("alternate_openings", [])[:10] if str(x).strip()] if isinstance(raw.get("alternate_openings"), list) else [],
         "opening_message": str(raw.get("opening_message", "")),
         "starts": normalize_starts(raw.get("starts")),

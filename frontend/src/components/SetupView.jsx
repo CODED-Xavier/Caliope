@@ -8,6 +8,7 @@ import { CharacterPreview, StartPicker } from "./CardExtras.jsx";
 import PersonaBar from "./Personas.jsx";
 import CardSheetForm, { startValues } from "./CardSheetForm.jsx";
 import SkillsEditor from "./SkillsEditor.jsx";
+import SystemsSheet from "./SystemsSheet.jsx";
 import MoodEditor from "./MoodEditor.jsx";
 import CompanionSetup, { companionFace, withEdits } from "./CompanionSetup.jsx";
 import { portraitSrc } from "../portraits.js";
@@ -60,6 +61,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   const [showCast, setShowCast] = useState(false);
   const [sheet, setSheet] = useState(null); // the card's own sheet (Lumencia: Tier, Attributes, Stats with EXP)
   const [sheetValues, setSheetValues] = useState({});
+  const [sys, setSys] = useState(null); // the card's own sheet (Black Sheep: stats and loadout), checked by the app
   const [skills, setSkills] = useState([]); // your own skills: the Aedo always sees them; name one in the story to use it
   const [compEdits, setCompEdits] = useState({}); // "Set up your companions": changes by the companion's card name
   const [keepComp, setKeepComp] = useState(true);
@@ -77,8 +79,12 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
       });
       // Imported cards usually create the character inside the story: offer that first,
       // unless the card keeps its own sheet: then it is filled here, like a D&D sheet.
+      if (d.systems && (d.systems.stats || d.systems.loadout)) {
+        api.trySystems(scenarioId, {}).then((r) => setSys({ ...r, error: "" })).catch(() => {});
+      }
       api.startSheet(scenarioId).then((sh) => {
         if (sh?.groups?.length && d.kind !== "adventure") { setSheet(sh); setSheetValues(startValues(sh.groups)); setWay("app"); }
+        else if (d.systems && (d.systems.stats || d.systems.loadout)) setWay("app");
         else if ((d.information?.description || "").trim()) setWay("card");
       }).catch(() => { if ((d.information?.description || "").trim()) setWay("card"); });
     }).catch((e) => setError(e.message));
@@ -113,6 +119,14 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   };
 
   const withTeam = hasTeam && partyMode === "companions";
+  const sysTry = async (body) => {
+    try { const r = await api.trySystems(scenarioId, { state: sys?.state, ...body }); setSys({ ...r, error: r.error || "" }); } catch (e) { setSys((x) => ({ ...x, error: e.message })); }
+  };
+  const sysValue = (stat, value) => {
+    const next = { ...sys.state, values: { ...sys.state.values, [stat]: value } };
+    setSys((x) => ({ ...x, state: next }));
+    api.trySystems(scenarioId, { state: next }).then((r) => setSys({ ...r, error: "" })).catch(() => {});
+  };
   const teamOpts = () => {
     const list = Object.entries(compEdits).map(([of, e]) => ({ of, ...e }));
     return withTeam && list.length ? { companions: list } : {};
@@ -144,7 +158,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
         const own = sheet ? Object.fromEntries(Object.entries(sheetValues).filter(([, v]) => { const t = String(v || "").trim(); return t && !/^-?\s*\[\d+\/\d+\]$/.test(t); })) : null;
         const mySkills = skills.filter((k) => String(k.name || "").trim());
         await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", ...(own ? { card_status: own } : {}),
-          ...(mySkills.length ? { abilities: mySkills } : {}), ...teamOpts() });
+          ...(mySkills.length ? { abilities: mySkills } : {}), ...(sys?.state ? { systems_state: sys.state } : {}), ...teamOpts() });
       }
     } catch (e) { setError(e.message); setBusy(false); }
   };
@@ -278,6 +292,14 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
                 </details>
               )}
               <CardSheetForm groups={sheet.groups} values={sheetValues} onChange={setSheetValues} hide={SKILLS_FIELD} />
+            </>
+          )}
+          {sys?.state && (
+            <>
+              <div className="section-title">{`${card.name}'s sheet`}</div>
+              <div className="muted tiny">Kept by the app with the card's rules: pick your parts (the budget and level locks are checked) and set your starting numbers. It lives in the Sheet tab, and the Aedo sees the real numbers.</div>
+              <SystemsSheet systems={card.systems} state={sys.state} computed={sys.computed} error={sys.error}
+                onValue={sysValue} onPart={(slot, item) => sysTry({ slot, item })} />
             </>
           )}
           {!adventure && (

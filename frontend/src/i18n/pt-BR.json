@@ -594,7 +594,7 @@
 "Looks": "Aparência",
 "🖼 Pictures and moods (one picture per mood)": "🖼 Imagens e humores (uma imagem por humor)",
 "moods)": "humores)",
-"(none)": "(nenhum)",
+"(none)": "(nenhuma)",
 "Profile always in the prompt": "Perfil sempre no prompt",
 "＋ Add character": "＋ Adicionar personagem",
 "Money is called": "O dinheiro se chama",
@@ -1894,7 +1894,15 @@
 "No grid was found on this picture. Set the square size by hand.": "Nenhuma grade foi encontrada nesta imagem. Defina o tamanho do quadrado à mão.",
 "Jukebox": "Jukebox",
 "📁 From this PC": "📁 Deste PC",
-"🔗 Link": "🔗 Link"
+"🔗 Link": "🔗 Link",
+"Kept by the app with the card's rules: pick your parts (the budget and level locks are checked) and set your starting numbers. It lives in the Sheet tab, and the Aedo sees the real numbers.": "Mantida pelo app com as regras do card: escolha suas peças (o orçamento e os bloqueios de nível são conferidos) e defina seus números iniciais. Ela fica na aba Ficha, e o Aedo vê os números reais.",
+"🧩 Card sheet": "🧩 Ficha do card",
+"The player's sheet kept by the app for this card: stats with ranges, XP that raises the level, and a loadout whose parts cost points from a budget. It shows on the start screen and the Sheet tab, and the Aedo sees its numbers.": "A ficha do jogador mantida pelo app para este card: atributos com limites, XP que sobe o nível e um equipamento cujas peças custam pontos de um orçamento. Ela aparece na tela inicial e na aba Ficha, e o Aedo vê seus números.",
+"Read this card's text and lorebook": "Ler o texto e o lorebook deste card",
+"🔍 Find systems": "🔍 Encontrar sistemas",
+"✎ Edit as JSON": "✎ Editar como JSON",
+"Check the numbers against the card (the reader never invents them; empty means the card didn't say). Then apply, and save the card.": "Confira os números com o card (o leitor nunca os inventa; vazio quer dizer que o card não disse). Depois aplique e salve o card.",
+"Loadout": "Equipamento"
 },
 "patterns": [
 [
@@ -2936,6 +2944,42 @@
 [
 "({0}) - natural 1!",
 "({0}) - 1 natural!"
+],
+[
+"Sheet · {0}",
+"Ficha · {0}"
+],
+[
+"Not valid JSON: {0}",
+"JSON inválido: {0}"
+],
+[
+"({0} stats{1})",
+"({0} atributos{1})"
+],
+[
+", {0} slots, {1} parts",
+", {0} espaços, {1} peças"
+],
+[
+"Speed {0} ({1} {2})",
+"Velocidade {0} ({1} {2})"
+],
+[
+"Not enough {0}: {1} of {2}.",
+"{0} insuficientes: {1} de {2}."
+],
+[
+"{0} needs Level {1} ({2} {3} now).",
+"{0} precisa do Nível {1} ({2} {3} agora)."
+],
+[
+"{0} takes {1} parts, not {2}.",
+"{0} aceita peças {1}, não {2}."
+],
+[
+"{0} (level up!)",
+"{0} (subiu de nível!)"
 ]
 ]
 }

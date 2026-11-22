@@ -119,7 +119,18 @@ def _calendar_part(merged: dict) -> dict:
             "date_label": truncate(str(merged.get("date_label") or ""), 120),
             "wishes": truncate(str(merged.get("wishes") or ""), 600),          # the player's hints for the Aedo
             "finished": bool(merged.get("finished")),                           # the card's ending was reached
-            "sheet_from_chat": bool(merged.get("sheet_from_chat"))} | _story_part(merged)
+            "sheet_from_chat": bool(merged.get("sheet_from_chat")),
+            "systems": _systems_part(merged.get("systems"))} | _story_part(merged)
+
+
+def _systems_part(raw) -> dict:
+    """The card's own sheet in play (app/systems.py): values and the loadout; the card's rules check them on use."""
+    raw = raw if isinstance(raw, dict) else {}
+    values = {truncate(str(k), 30): (v if isinstance(v, (int, float)) and not isinstance(v, bool) else truncate(str(v), 80))
+              for k, v in list((raw.get("values") if isinstance(raw.get("values"), dict) else {}).items())[:30]}
+    loadout = {truncate(str(k), 30): truncate(str(v or ""), 80)
+               for k, v in list((raw.get("loadout") if isinstance(raw.get("loadout"), dict) else {}).items())[:16]}
+    return {"values": values, "loadout": loadout} if values or loadout else {}
 
 
 def _story_part(merged: dict) -> dict:
@@ -180,6 +191,8 @@ def normalize_updates(raw) -> dict:
                              for c in _list(raw.get("resource_changes")) if isinstance(c, dict)],
         "status_changes": [{"field": str(c.get("field", "")), "value": str(c.get("value", ""))}
                            for c in _list(raw.get("status_changes")) if isinstance(c, dict)],
+        "system_changes": [{"stat": str(c.get("stat", "")), "delta": c.get("delta"), "value": c.get("value")}
+                           for c in _list(raw.get("system_changes")) if isinstance(c, dict)],
         "appointments": [],
     }
     for ap in _list(raw.get("appointments")):

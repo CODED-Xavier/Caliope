@@ -70,6 +70,7 @@ The sidebar shows **Model server online** when it's ready.
 2. If the card has more than one start, choose one under **Choose your start**.
 3. Create your character: **Who are you?** (roleplay cards) or **Create your sheet** (adventure cards).
    - Cards like Lumencia have their own sheet, and you fill it right here, like a D&D sheet: Tier, Affiliation, Attributes (1–10) and Stats (a grade like C- and its EXP, 0 / 100). Open **What the card asks for** to see the card's rules. The story then starts with your sheet ready. As you play, EXP fills each Stat's bar; a full bar raises its grade. See and correct it all in the **Sheet** tab (**✎ Edit the values**).
+   - Some cards have **their own sheet** (Black Sheep's mech): pick your parts from the dropdowns; the app checks the point budget and level locks and shows the totals. It's in the Sheet tab while you play.
    - Add **your picture** next to the name (it shows big on your Sheet tab) and **your skills**: a name and what each one does. In the story, just write *"I use my Soul Forge"* and it happens as you described (the app pays its cost, if it has one).
    - If you chose *Let the story ask me*, answer in the chat: the Sheet tab fills in by itself. If something didn't arrive, press **📋** under your message to read it again.
    - **✨ Fill the empty fields** suggests a background, looks and personality for you.

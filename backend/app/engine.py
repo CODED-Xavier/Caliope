@@ -17,7 +17,7 @@ from typing import AsyncIterator
 
 from .appearance import appearance_line, appearance_seed
 from .checks import find_checks
-from . import adventure, aedo_desk, reputation, resources, routes, sheetchat
+from . import adventure, aedo_desk, reputation, resources, routes, sheetchat, systems
 from .places import find_place, place_picture
 from .shop import find_offers, is_trade
 from . import statusbook
@@ -1013,11 +1013,16 @@ class ChatEngine:
         tpl = self._status_template(scenario, settings)
         status_lines = statusbook.tracker_lines(state, tpl) if tpl else ""
         res_line = resources.tracker_line(state)
+        sys_def = scenario.get("systems") or {}
+        sys_line = systems.tracker_line(sys_def, state.get("systems") or {}) if state.get("systems") else ""
+        if sys_line:
+            res_line = (res_line + "\n" + sys_line).strip()
         prompt = self.prompts.analysis_messages(scenario=scenario, state=state, npcs=npcs, exchanges=exchanges, tracker=tracker,
                                                 calendar=cal if cal_on else None, status_fields=status_lines, resource_line=res_line,
                                                 language=scenario.get("language") or settings.get("response_language", "en"))
         try:
-            raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker, cal_on, bool(status_lines), bool(res_line)),
+            raw = await self.llm.chat(prompt, json_schema=analysis_schema(tracker, cal_on, bool(status_lines), bool(resources.tracker_line(state)),
+                                                                          bool(sys_line)),
                                       temperature=0.2,
                                       max_tokens=1100 if tracker == "full" else 900)  # a cut JSON would lose the whole update
         except LLMError as exc:
@@ -1057,6 +1062,8 @@ class ChatEngine:
             changes += statusbook.apply_changes(new_state, tpl, updates.get("status_changes", []))
         if res_line and not any(resources.is_ability(u) or "\u2694" in u for u, _ in exchanges):
             changes += resources.apply_tracker(new_state, updates.get("resource_changes", []))  # the app counted ✨/⚔ turns
+        if sys_line and new_state.get("systems"):
+            changes += systems.apply_changes(sys_def, new_state["systems"], updates.get("system_changes", []))
         if cal_on:
             changes += self._move_clock(new_state, cal, updates)
         adv = scenario.get("adventure") or {}

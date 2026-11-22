@@ -61,7 +61,7 @@ class ConversationRepository:
     def create(self, scenario: dict | None = None, title: str = "", player_name: str | None = None,
                player: dict | None = None, setup: str = "", player_lore: list | None = None, start: str = "",
                party_mode: str = "", card_status: dict | None = None, companions: list | None = None,
-               abilities: list | None = None) -> dict:
+               abilities: list | None = None, systems_state: dict | None = None) -> dict:
         """`player` comes from the start screen and is laid over the card's starting sheet.
         `card_status`: the card's own sheet (Tier, Attributes, Stats...) filled on the start screen.
         `setup` is "app" (made on the start screen), "card" (the card asks in the story) or ""."""
@@ -90,6 +90,9 @@ class ConversationRepository:
             if data.get("resources"):
                 state["resources"] = start_pools(data["resources"])
                 state["abilities"] = [dict(a) for a in data.get("abilities") or []]
+            if data.get("systems"):  # the card's own sheet: its start, or the start screen's checked by its rules
+                from .systems import merge_state
+                state["systems"] = merge_state(data["systems"], systems_state)
             if abilities:  # your own skills, made on the start screen
                 from .resources import MAX_ABILITIES, normalize_abilities
                 mine = normalize_abilities([{**a, "own": True} for a in abilities if isinstance(a, dict)], data.get("resources"))

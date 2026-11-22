@@ -364,6 +364,10 @@ class PromptBuilder:
         used = used_section((last_user_msg or {}).get("meta", {}).get("skills_used") or [], state.get("abilities") or [], state)
         if used:
             extra = used + ("\n\n" + extra if extra else "")
+        from .systems import SYSTEM_RULES, prompt_text
+        sheet = prompt_text(scenario.get("systems") or {}, state.get("systems") or {})
+        if sheet:
+            extra = "## The player's sheet (kept by the app)\n" + sheet + "\n" + SYSTEM_RULES + ("\n\n" + extra if extra else "")
         own_skills = skills_section(state.get("abilities") or [])
         if own_skills:
             extra = own_skills + ("\n\n" + extra if extra else "")
@@ -711,9 +715,10 @@ _APPOINTMENT = {"type": "object", "properties": {"text": {"type": "string"}, "wh
                                                 "days_from_now": {"type": "integer"}}, "required": ["text", "when", "days_from_now"]}
 
 
-def analysis_schema(tracker: str, calendar: bool = False, status: bool = False, resources: bool = False) -> dict:
+def analysis_schema(tracker: str, calendar: bool = False, status: bool = False, resources: bool = False,
+                    systems: bool = False) -> dict:
     base = ANALYSIS_SCHEMA if tracker == "full" else ANALYSIS_SCHEMA_LITE
-    if not calendar and not status and not resources:
+    if not calendar and not status and not resources and not systems:
         return base
     props = dict(base["properties"])
     required = list(base["required"])
@@ -732,6 +737,10 @@ def analysis_schema(tracker: str, calendar: bool = False, status: bool = False, 
             "resource": {"type": "string"}, "delta": {"type": "integer"}, "reason": {"type": "string"}},
             "required": ["resource", "delta", "reason"]}}
         required.append("resource_changes")
+    if systems:  # the card's own sheet kept by the app (app/systems.py)
+        props["system_changes"] = {"type": "array", "items": {"type": "object", "properties": {
+            "stat": {"type": "string"}, "delta": {"type": "integer"}, "value": {"type": "string"}}, "required": ["stat"]}}
+        required.append("system_changes")
     return {"type": "object", "properties": props, "required": required}
 
 
