@@ -310,6 +310,9 @@ The Muse and your games share the model, so one waits for the other.
 ### Character pictures and moods
 People tab or card editor → *🖼 Pictures and moods*: a main picture plus Standard, Happy, Sad, Angry, Disgusted, Blushing, and up to 12 moods of your own. Each comes from your PC (⬆) or a link (🔗).
 - The Aedo narrates first, then shows the character's picture **right before they speak**. When their mood changes later in the reply, the picture appears again with the new mood. (The app moves a misplaced picture to just before the character's line.)
+- If the Aedo forgets to say the mood, the app reads the next lines: *she smiles* shows Happy, *he glares* shows Angry, *she blushes* shows Blushing.
+- Pictures added to a character in the **card editor** also reach the games already started with that card (unless you changed that character's pictures inside the game).
+- **Click any picture in the story** to see it big (Esc closes).
 - **Your own picture**: click the circle beside your name on the Sheet.
 
 ### Scene pictures and the map bag (optional, needs internet)
@@ -524,3 +527,5 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.24.1 | ↺ Restart: start a game over from the card's opening with the same character (full HP), keeping or deleting the old run |
 | 2.25 | Fights by the rules: faster enemies act at once, typed attacks (and /attack, /dodge) are rolled by the app and update the fight, you move on your own turn by clicking the lit squares, checks show their DC before the roll, one roll per reply and one check per round, adventure fights start by themselves |
 | 2.25.1 | The start screen's AC counts armour and shield (chain mail + shield = 18, not 10 + DEX); fights wait for the ⚔ button again by default; a sword knocked away in a fight stays in the bag |
+| 2.25.2 | Enemies find their way on wide plain grids; tests skip when a test-only package is missing |
+| 2.25.3 | Click a story picture to see it big; card pictures reach running games; the face follows the text when the Aedo forgets the mood |

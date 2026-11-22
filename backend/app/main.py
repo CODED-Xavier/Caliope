@@ -269,9 +269,11 @@ async def get_scenario(scenario_id: int):
 
 @app.put("/api/scenarios/{scenario_id}")
 async def update_scenario(scenario_id: int, data: dict[str, Any] = Body(...)):
+    before = svc().scenarios.get(scenario_id)
     scenario = svc().scenarios.update(scenario_id, data)
     if not scenario:
         raise NotFound(f"Scenario {scenario_id} not found")
+    svc().conversations.sync_card_portraits(scenario_id, (before or {}).get("data", {}).get("npcs", []), scenario["data"].get("npcs", []))
     return scenario
 
 

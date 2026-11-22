@@ -198,6 +198,24 @@ class ConversationRepository:
             self.delete(conv_id)
         return new
 
+    def sync_card_portraits(self, scenario_id: int, old_npcs: list[dict], new_npcs: list[dict]) -> int:
+        """Pictures added or changed in the card reach the games already started with it. A character whose pictures
+        were changed inside a game (they differ from the card's old ones) keeps the game's pictures."""
+        old = {n["name"].lower(): normalize_portraits(n.get("portraits")) for n in old_npcs if n.get("name")}
+        new = {n["name"].lower(): normalize_portraits(n.get("portraits")) for n in new_npcs if n.get("name")}
+        changed = {k: v for k, v in new.items() if v != old.get(k) and (v["default"] or v["moods"])}
+        if not changed:
+            return 0
+        done = 0
+        for row in self.db.query("SELECT id FROM conversations WHERE scenario_id = ?", (scenario_id,)):
+            for npc in self.list_npcs(row["id"]):
+                key = npc["name"].lower()
+                mine = normalize_portraits(npc.get("portraits"))
+                if key in changed and mine in (old.get(key), normalize_portraits({})) and mine != changed[key]:
+                    self.update_npc(npc["id"], portraits=changed[key])
+                    done += 1
+        return done
+
     def delete(self, conv_id: int) -> None:
         self.get(conv_id)
         self.db.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))

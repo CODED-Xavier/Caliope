@@ -42,6 +42,27 @@ MOOD_WORDS = {
     6: ("blushing", "blush", "embarrassed", "shy", "flustered", "love"),
 }
 
+# What the text says right after a portrait tag, when the model gave no mood (or just "Standard").
+FACE_WORDS = {
+    6: r"blush\w*|flush\w*|fluster\w*|cora\w*|ruboriz\w*|embarrass\w*",
+    5: r"sneer\w*|disgust\w*|scoff\w*|contempt\w*|furious|seeth\w*|nojo\w*|desprez\w*",
+    4: r"glar\w*|scowl\w*|snap\w*|snarl\w*|growl\w*|angr\w*|frown\w*|clench\w*|irrit\w*|irad\w*|carranc\w*",
+    3: r"tear\w*|sob\w*|cry\w*|cries|sad\w*|sigh\w*|trembl\w*|lágrim\w*|chor\w*|trist\w*|suspir\w*",
+    2: r"smil\w*|grin\w*|laugh\w*|beam\w*|chuckl\w*|giggl\w*|sorri\w*|ri\b|riu|risad\w*",
+}
+
+
+def face_from_text(text: str) -> str:
+    """The mood number the next lines show ("she smiles" -> 2), or "" when nothing stands out."""
+    low = (text or "").lower()[:320]
+    best, pos = "", len(low) + 1
+    for n, pat in FACE_WORDS.items():
+        m = re.search(rf"\b({pat})", low)
+        if m and m.start() < pos:
+            best, pos = str(n), m.start()
+    return best
+
+
 _SHOW = re.compile(r"\[\[\s*show\s*:\s*([^|\]\n]+?)\s*(?:\|\s*([^\]\n]*?)\s*)?\]\]", re.I)
 _IMG = re.compile(r"!\[([^\]\n]*)\]\(([^)\s]*)\)")
 _DASH = re.compile(r"\s+[-–—:|]\s+|\s*[–—|]\s*")
@@ -137,7 +158,12 @@ def resolve_portraits(text: str, npcs: list[dict], max_n: int = MAX_PER_REPLY) -
 
     def any_sub(m: re.Match) -> str:
         if m.group(1) is not None:
-            return tag(find_character(npcs, m.group(1)), m.group(2) or "")
+            mood = (m.group(2) or "").strip()
+            if not mood or _norm(mood) in ("standard", "neutral", "default", "normal"):
+                after = text[m.end():]
+                nxt = combined.search(after)
+                mood = face_from_text(after[: nxt.start() if nxt else None]) or mood  # the face the next lines describe
+            return tag(find_character(npcs, m.group(1)), mood)
         return img_sub(_IMG.match(m.group(0)))
 
     out = combined.sub(any_sub, text or "")

@@ -1532,7 +1532,8 @@
 "squares": "quadrados",
 "You already made a check this round (one reaction per round). It comes back next round.": "Você já fez um teste nesta rodada (uma reação por rodada). Ela volta na próxima rodada.",
 "You cannot stand there.": "Você não pode ficar ali.",
-"You are unconscious.": "Você está inconsciente."
+"You are unconscious.": "Você está inconsciente.",
+"Close (Esc)": "Fechar (Esc)"
 },
 "patterns": [
 [

@@ -10,6 +10,7 @@ import SkillsModal from "./components/SkillsModal.jsx";
 import RulebooksModal from "./components/RulebooksModal.jsx";
 import ModelsModal, { FirstModel } from "./components/ModelsModal.jsx";
 import BestiaryModal from "./components/BestiaryModal.jsx";
+import Lightbox from "./components/Lightbox.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import MainMenu from "./components/MainMenu.jsx";
 import MuseModal from "./components/MuseModal.jsx";
@@ -560,6 +561,7 @@ export default function App() {
       {modal === "muse" && <MuseModal onClose={() => setModal(null)} />}
       {modal === "models" && <ModelsModal initialTab={modelsInit.tab} initialQuery={modelsInit.query} onClose={() => { setModal(null); refreshHealth(); }} />}
       <DialogHost />
+      <Lightbox />
       {tour && <Tour hidden={!!modal} onDone={endTour} onGetModel={(q) => openModels(q)} />}
       {modal === "new" && <ScenarioModal initial={menuInit} onClose={() => { setModal(null); setMenuKey((k) => k + 1); }} onStart={startGame} />}
       {modal === "settings" && <SettingsModal onClose={() => setModal(null)} onSaved={() => { refreshHealth(); loadSettingsFlags(); }} onTour={() => { setModal(null); setTour(true); }} />}
