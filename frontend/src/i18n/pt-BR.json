@@ -1743,7 +1743,14 @@
 "Interact with an object": "Interagir com um objeto",
 "Martial Arts strike": "Golpe de Artes Marciais",
 " · used": " · usada",
-" · used this round": " · usada nesta rodada"
+" · used this round": " · usada nesta rodada",
+"Hidden entries leave the builder and the lists; a sheet that already uses one keeps it": "Entradas ocultas saem do criador e das listas; uma ficha que já usa uma continua com ela",
+"👁 Show it again": "👁 Mostrar de novo",
+"🙈 Hide from the lists": "🙈 Ocultar das listas",
+"Books and rules": "Livros e regras",
+"Which rules list each book's races, feats and items appear in. The 2014 and 2024 core books are fixed; the rest follows the book's own marks unless you choose.": "Em qual lista de regras aparecem as raças, talentos e itens de cada livro. Os livros básicos de 2014 e 2024 são fixos; os outros seguem as marcas do próprio livro, a menos que você escolha.",
+"as marked": "como marcado",
+"both": "ambas"
 },
 "patterns": [
 [
@@ -2317,6 +2324,10 @@
 [
 ", {0} heals",
 ", {0} curas"
+],
+[
+" Show hidden ({0})",
+" Mostrar ocultas ({0})"
 ]
 ]
 }

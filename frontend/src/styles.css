@@ -862,3 +862,7 @@ button.s5-ability:hover:not(:disabled) { border-color: var(--accent); }
 .opt.feature { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
 .opt.spell { border-color: color-mix(in srgb, var(--accent-2) 55%, var(--border)); }
 .opt-tip { padding: 4px 2px; }
+.lib-item.is-hidden { opacity: .5; }
+.lib-books { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; margin-top: 6px; }
+.lib-book { display: flex; align-items: center; gap: 6px; }
+.lib-book .mono { min-width: 54px; }

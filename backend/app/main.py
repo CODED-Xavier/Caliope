@@ -291,9 +291,23 @@ def library5e():
 
 
 @app.get("/api/library/5e")
-async def library_search(type: str = Query("spell"), q: str = Query(""), edition: str = Query("2014"), limit: int = Query(60), category: str = Query("")):
+async def library_search(type: str = Query("spell"), q: str = Query(""), edition: str = Query("2014"), limit: int = Query(60), category: str = Query(""),
+                         hidden: bool = Query(False)):
     lib = await asyncio.to_thread(library5e)
-    return {"results": lib.search(type, q, "2024" if edition == "2024" else "2014", max(1, min(500, limit)), category)}
+    return {"results": lib.search(type, q, "2024" if edition == "2024" else "2014", max(1, min(500, limit)), category, include_hidden=hidden)}
+
+
+@app.get("/api/library/5e/choices")
+async def library_choices():
+    """Your Library choices: hidden entries (kind|name|source) and the rules list of each book (2014, 2024 or both)."""
+    lib = await asyncio.to_thread(library5e)
+    return {**lib.choices, "books": lib.info.get("books", [])}
+
+
+@app.put("/api/library/5e/choices")
+async def library_save_choices(body: dict[str, Any] = Body(...)):
+    lib = await asyncio.to_thread(library5e)
+    return {**await asyncio.to_thread(lib.save_choices, body), "books": lib.info.get("books", [])}
 
 
 @app.get("/api/library/5e/details")

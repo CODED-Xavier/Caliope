@@ -16,11 +16,20 @@ export default function Library({ onClose }) {
   const [open, setOpen] = useState(null);
   const [status, setStatus] = useState(null);
   const [error, setError] = useState("");
-  useEffect(() => { api.libraryStatus().then(setStatus).catch((e) => setError(e.message)); }, []);
+  const [choices, setChoices] = useState(null);
+  const [showHidden, setShowHidden] = useState(false);
+  const [booksOpen, setBooksOpen] = useState(false);
+  const [tick, setTick] = useState(0);
+  useEffect(() => { api.libraryStatus().then(setStatus).catch((e) => setError(e.message)); api.libraryChoices().then(setChoices).catch(() => {}); }, []);
   useEffect(() => {
-    const t = setTimeout(() => { api.librarySearch(type, q, edition).then((r) => setResults(r?.results || [])).catch((e) => setError(e.message)); }, 200);
+    const t = setTimeout(() => { api.librarySearch(type, q, edition, "", showHidden).then((r) => setResults(r?.results || [])).catch((e) => setError(e.message)); }, 200);
     return () => clearTimeout(t);
-  }, [type, q, edition]);
+  }, [type, q, edition, showHidden, tick]);
+  // your choices: an entry hidden from the builder and the lists (sheets that use it keep working), a book's rules list
+  const saveChoices = async (next) => { try { setChoices(await api.saveLibraryChoices(next)); setTick((x) => x + 1); } catch (e) { setError(e.message); } };
+  const keyOf = (r) => `${r.type || type}|${r.name}|${r.source}`;
+  const isHidden = (r) => (choices?.hidden || []).includes(keyOf(r));
+  const toggleHidden = (r) => saveChoices({ ...choices, hidden: isHidden(r) ? choices.hidden.filter((h) => h !== keyOf(r)) : [...(choices?.hidden || []), keyOf(r)] });
   const show = async (r) => { try { setOpen(await api.libraryEntry(r.type, r.source, r.name)); } catch (e) { setError(e.message); } };
   const reload = async () => { try { setStatus(await api.libraryReload()); setQ((x) => x); } catch (e) { setError(e.message); } };
 
@@ -45,7 +54,7 @@ export default function Library({ onClose }) {
           <div className="library-list">
             {results.length === 0 && <div className="muted small pad">Nothing found.</div>}
             {results.map((r) => (
-              <button key={`${r.source}-${r.name}-${r.class || ""}`} type="button" className={`lib-item ${open && open.name === r.name && open.source === r.source ? "on" : ""}`} onClick={() => show(r)}>
+              <button key={`${r.source}-${r.name}-${r.class || ""}`} type="button" className={`lib-item ${open && open.name === r.name && open.source === r.source ? "on" : ""} ${r.hidden ? "is-hidden" : ""}`} onClick={() => show(r)}>
                 <div className="lib-name">{r.name}<span className="lib-src">{r.source}{r.srd ? " · SRD" : ""}</span></div>
                 <div className="lib-meta">{[r.class, r.level !== undefined && r.level !== null ? `level ${r.level}` : "", r.race].filter(Boolean).join(" · ")}</div>
                 <div className="lib-sum">{r.summary}</div>
@@ -55,7 +64,11 @@ export default function Library({ onClose }) {
           <div className="library-entry">
             {open ? (
               <>
-                <h3 className="lib-title">{open.title}</h3>
+                <div className="row gap center">
+                  <h3 className="lib-title grow">{open.title}</h3>
+                  {choices && <button type="button" className="btn small" onClick={() => toggleHidden({ ...open, type })}
+                    title="Hidden entries leave the builder and the lists; a sheet that already uses one keeps it">{isHidden({ ...open, type }) ? "👁 Show it again" : "🙈 Hide from the lists"}</button>}
+                </div>
                 <div className="muted small">{`${open.source}${open.level !== undefined ? ` · level ${open.level}` : ""}`}</div>
                 <div className="lib-text">{open.text}</div>
               </>
@@ -66,6 +79,23 @@ export default function Library({ onClose }) {
           {status && `${status.entries} entries · ${status.files} files`}{status?.errors?.length ? ` · ${status.errors.length} files could not be read` : ""}
           {" · Your files: "}<span className="mono">{status?.folder}</span>
           {" "}<button type="button" className="link-btn" onClick={reload}>Reload</button>
+          {" · "}<label className="tiny"><input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} />{` Show hidden (${(choices?.hidden || []).length})`}</label>
+          {" · "}<button type="button" className="link-btn" onClick={() => setBooksOpen((v) => !v)}>Books and rules</button>
+          {booksOpen && choices && (
+            <div className="lib-books">
+              <div className="muted tiny">Which rules list each book's races, feats and items appear in. The 2014 and 2024 core books are fixed; the rest follows the book's own marks unless you choose.</div>
+              {(choices.books || []).map((b) => (
+                <label key={b} className="lib-book"><span className="mono">{b}</span>
+                  <select className="field" value={(choices.editions || {})[b] || ""} onChange={(e) => {
+                    const ed = { ...(choices.editions || {}) }; if (e.target.value) ed[b] = e.target.value; else delete ed[b];
+                    saveChoices({ ...choices, editions: ed });
+                  }}>
+                    <option value="">as marked</option><option value="2014">5e 2014</option><option value="2024">5e 2024</option><option value="both">both</option>
+                  </select>
+                </label>
+              ))}
+            </div>
+          )}
           <div>{"Contains material from the System Reference Document 5.1 and 5.2 by Wizards of the Coast (CC-BY-4.0). Everything else comes from your own files and stays on your PC."}</div>
         </div>
       </div>

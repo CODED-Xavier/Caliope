@@ -21,9 +21,24 @@ CREDIT = ("Contains material from the System Reference Document 5.1 and 5.2 by W
           "available under the Creative Commons Attribution 4.0 International License.")
 
 
+CHOICES_FILE = "calliope-choices.json"  # in your Library folder: hidden entries, and which rules list a book belongs to
+BOOK_EDITIONS: dict[str, str] = {}  # source -> "2014" | "2024" | "both", from your choices
+
+
 def edition_of(entry: dict) -> str:
-    """"2024" for the 2024 rules (XPHB and friends), else "2014"."""
+    """"2024" for the 2024 rules (XPHB and friends, or a book you put there), else "2014"."""
+    chosen = BOOK_EDITIONS.get(entry.get("source"))
+    if chosen in ("2014", "2024"):
+        return chosen
     return "2024" if entry.get("source") in NEW_BOOKS or entry.get("edition") == "one" else "2014"
+
+
+def editions_of(entry: dict) -> set:
+    return {"2014", "2024"} if BOOK_EDITIONS.get(entry.get("source")) == "both" else {edition_of(entry)}
+
+
+def _key(kind: str, e: dict) -> str:
+    return f"{kind}|{e['name']}|{e['source']}"
 
 
 def _summary(entry: dict) -> str:
@@ -37,6 +52,29 @@ class Library:
         self.folders = [Path(f) for f in folders]
         self.items: dict[tuple, dict] = {}
         self.info: dict = {"entries": 0, "files": 0, "errors": []}
+        self.choices: dict = {"hidden": [], "editions": {}}
+
+    def _choices_path(self) -> Path | None:
+        return next((f / CHOICES_FILE for f in self.folders if f.is_dir()), None)
+
+    def _apply_choices(self, raw) -> None:
+        raw = raw if isinstance(raw, dict) else {}
+        hidden = [str(h) for h in raw.get("hidden") or [] if isinstance(h, str) and h.count("|") == 2]
+        editions = {str(k): v for k, v in (raw.get("editions") or {}).items() if v in ("2014", "2024", "both")}
+        self.choices = {"hidden": sorted(set(hidden)), "editions": editions}
+        self._hidden = set(self.choices["hidden"])
+        BOOK_EDITIONS.clear()
+        BOOK_EDITIONS.update(editions)
+
+    def save_choices(self, raw) -> dict:
+        """Keep your choices (hidden entries, book rules lists) in your Library folder; they apply at once."""
+        self._apply_choices(raw)
+        path = self._choices_path()
+        if path is None:
+            raise ValueError("There is no Library folder to keep your choices in.")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.choices, indent=1, ensure_ascii=False), encoding="utf-8")
+        return self.choices
 
     def _files(self) -> list[Path]:
         out: list[Path] = []
@@ -44,11 +82,16 @@ class Library:
             if f.is_file():
                 out.append(f)
             elif f.is_dir():
-                out += sorted(p for p in f.rglob("*.json") if p.is_file())
+                out += sorted(p for p in f.rglob("*.json") if p.is_file() and p.name != CHOICES_FILE)
         return out
 
     def load(self) -> dict:
         self.items = {}
+        path = self._choices_path()
+        try:
+            self._apply_choices(json.loads(path.read_text(encoding="utf-8")) if path and path.is_file() else {})
+        except (OSError, ValueError):
+            self._apply_choices({})
         errors, files = [], 0
         for path in self._files():
             try:
@@ -62,9 +105,13 @@ class Library:
             files += 1
             for kind in TYPES:
                 for e in data.get(kind) or []:
-                    if isinstance(e, dict) and e.get("name") and e.get("source"):
-                        self.items[(kind, str(e["name"]).lower(), str(e["source"]).upper())] = e
-        self.info = {"entries": len(self.items), "files": files, "errors": errors}
+                    if not (isinstance(e, dict) and e.get("name") and e.get("source")):
+                        continue
+                    if kind == "class" and "_copy" in e:  # a book's placeholder for its subclasses, not a class of its own
+                        continue
+                    self.items[(kind, str(e["name"]).lower(), str(e["source"]).upper())] = e
+        books = sorted({e["source"] for e in self.items.values()} - {"PHB", "XPHB", "DMG", "XDMG", "MM", "XMM"})
+        self.info = {"entries": len(self.items), "files": files, "errors": errors, "books": books}
         return self.info
 
     def _card(self, kind: str, e: dict) -> dict:
@@ -84,17 +131,18 @@ class Library:
             card["category"] = item_category(e)
         return card
 
-    def search(self, kind: str, q: str = "", edition: str = "2014", limit: int = 60, category: str = "") -> list[dict]:
+    def search(self, kind: str, q: str = "", edition: str = "2014", limit: int = 60, category: str = "", include_hidden: bool = False) -> list[dict]:
         q = (q or "").lower().strip()
         out = []
         for (k, name, _), e in self.items.items():
-            if k != kind or edition_of(e) != edition:
+            hidden = _key(kind, e) in getattr(self, "_hidden", ())
+            if k != kind or edition not in editions_of(e) or (hidden and not include_hidden):
                 continue
             if category and item_category(e) != category:
                 continue
             if q and q not in name and q not in str(e.get("className", "")).lower():
                 continue
-            out.append(self._card(kind, e))
+            out.append({**self._card(kind, e), **({"hidden": True} if hidden else {})})
             if len(out) >= limit:
                 break
         return out
