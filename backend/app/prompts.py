@@ -368,6 +368,10 @@ class PromptBuilder:
         sheet_used = sheet_used_section((last_user_msg or {}).get("meta", {}).get("sheet_uses") or [])
         if sheet_used:
             extra = sheet_used + ("\n\n" + extra if extra else "")
+        redo = (last_user_msg or {}).get("meta", {}).get("redo")
+        if redo:  # /correction: this reply is the corrected version of the one the player rejected
+            from .aedo_desk import REDO_NOTE
+            extra = REDO_NOTE.format(text=redo) + ("\n\n" + extra if extra else "")
         fixed = [f for f in state.get("corrections") or [] if f]
         if fixed:  # /fix: the player corrected the story; these win over anything said earlier
             extra = ("## Story facts the player fixed (always true, even where earlier messages said otherwise)\n"

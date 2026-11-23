@@ -11,16 +11,22 @@ const roll4d6 = () => { const d = Array.from({ length: 4 }, () => 1 + Math.floor
 
 const CLASS_EMBLEMS = ["artificer", "barbarian", "bard", "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"];
 // race slugs with an emblem in /emblems/race-<slug>.png (most specific first: "half-orc" before "orc")
-const RACE_EMBLEMS = ["custom-lineage", "shadar-kai", "half-orc", "dragonborn", "tiefling", "aasimar", "warforged", "autognome", "lizardfolk", "shifter", "triton",
+const RACE_EMBLEMS = ["custom-lineage", "shadar-kai", "half-orc", "half-elf", "dragonborn", "tiefling", "aasimar", "warforged", "autognome", "lizardfolk", "shifter", "triton",
   "goblin", "gnome", "dwarf", "human", "fairy", "faerie", "drow", "eladrin", "goliath", "halfling", "minotaur", "boggart", "kobold", "kender", "lupin",
   "merfolk", "vampire", "dhampir", "satyr", "skeleton", "elf", "orc"];
+// races without their own emblem borrow a kin's (a duergar is a dwarf, a hobgoblin a goblinoid, a firbolg giant-kin…)
+const RACE_KIN = { duergar: "dwarf", hobgoblin: "goblin", bugbear: "goblin", kithkin: "halfling", khoravar: "half-elf", firbolg: "goliath", gnoll: "lupin" };
 const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** The emblem shown on a class (or race) card; classes without their own get the generic one. */
 export function emblemFor(type, name) {
   const n = slug(name);
   if (type === "class") return `/emblems/${CLASS_EMBLEMS.includes(n) ? n : "class"}.png`;
-  if (type === "race") { const r = RACE_EMBLEMS.find((x) => n === x || n.startsWith(`${x}-`) || n.endsWith(`-${x}`)); return r ? `/emblems/race-${r}.png` : ""; }
+  if (type === "race") {
+    const kin = Object.keys(RACE_KIN).find((x) => n === x || n.startsWith(`${x}-`) || n.endsWith(`-${x}`));
+    const r = kin ? RACE_KIN[kin] : RACE_EMBLEMS.find((x) => n === x || n.startsWith(`${x}-`) || n.endsWith(`-${x}`));
+    return r ? `/emblems/race-${r}.png` : "";
+  }
   return "";
 }
 

@@ -190,6 +190,12 @@ class ChatEngine:
             yield {"type": "error", "message": "This conversation is still busy with the previous turn."}
             return
         async with lock:
+            redo = aedo_desk.CORRECTION.match(text) if prepare is None else None
+            if redo:
+                async with aclosing(self._correction(conv_id, redo.group(1))) as turn:
+                    async for event in turn:
+                        yield event
+                return
             if text.lower().startswith("/roll"):
                 try:
                     rolled = self.dice.roll(text[5:].strip() or "1d20")
@@ -370,6 +376,31 @@ class ChatEngine:
             return st, note
 
         return prepare, ("" if text.lower().startswith("/wait") else text)
+
+    async def _correction(self, conv_id: int, text: str) -> AsyncIterator[dict]:
+        """/correction: the last story reply is dropped and written again with the player's fix, which is also kept as
+        a story fact. Runs inside the turn lock."""
+        messages = self.repo.list_messages(conv_id)
+        last = messages[-1] if messages else None
+        if not last or last["role"] != "assistant" or last["meta"].get("ooc") or last["meta"].get("opening"):
+            yield {"type": "error", "message": "There is no story reply to correct yet. Use /fix to keep a fact."}
+            return
+        self._rollback_message(conv_id, last)
+        user = self.repo.last_message(conv_id)
+        if not user or user["role"] != "user":
+            yield {"type": "error", "message": "There is no story reply to correct yet. Use /fix to keep a fact."}
+            return
+        st = self.repo.get_state(conv_id)
+        fact = aedo_desk.save_fact(st, text)
+        self.repo.save_state(conv_id, st)
+        self.repo.update_message_meta(user["id"], {"redo": fact})
+        yield {"type": "rolled_back", "last_message_id": user["id"]}
+        try:
+            async with aclosing(self._reply(conv_id, self.repo.get_message(user["id"]))) as turn:
+                async for event in turn:
+                    yield event
+        finally:
+            self.repo.update_message_meta(user["id"], {}, drop=("redo",))  # one reply only; the fact stays
 
     async def regenerate(self, conv_id: int) -> AsyncIterator[dict]:
         try:

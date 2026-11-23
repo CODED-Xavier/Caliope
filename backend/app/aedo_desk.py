@@ -32,6 +32,11 @@ The player asked you a question or gave you an instruction about the game. Rules
 
 
 FIX = re.compile(r"^/\s*(?:fix|correct|corrigir|corrija)\b[:\s]*(.+)$", re.I | re.S)
+# "/correction Isabel is the Empire's princess": the last story reply is written again with that fixed, then goes on
+CORRECTION = re.compile(r"^/\s*(?:correction|correção|correcao|redo|refazer)\b[:\s]*(.+)$", re.I | re.S)
+REDO_NOTE = ("## Rewrite: the player corrected your previous version of this reply\n"
+             "Correction: {text}\nWrite this reply again from the player's last message with that corrected (it is true from now "
+             "on), keep what was right, and carry the story forward. Do not mention the correction or apologise.")
 FACT = re.compile(r"^\s*FACT\s*:\s*(.+?)\s*$", re.I | re.M)
 
 

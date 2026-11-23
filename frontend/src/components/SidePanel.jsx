@@ -243,7 +243,7 @@ function FixedFacts({ facts, onPatch, busy }) {
             onClick={() => onPatch({ corrections: facts.filter((_, j) => j !== i) })}>✕</button>
         </div>
       ))}
-      <div className="muted tiny">Add more by writing /fix and the fact in the chat.</div>
+      <div className="muted tiny">Add more by writing /fix and the fact in the chat. /correction and the fact also rewrites the Aedo's last reply with it.</div>
     </>
   );
 }

@@ -59,5 +59,38 @@ class FixTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Aria is the Saintess, not Anastasia", prompt)
 
 
+    async def test_correction_redoes_the_last_reply_with_the_fact(self):
+        llm = FakeLLM()
+        s = make_services(llm)
+        cid = new_game(s)
+        llm.reply = '"Isabel, Second Princess of House Valenheart," she says.'
+        await collect(s.engine.send(cid, "And your name is?"))
+        before = s.conversations.list_messages(cid)
+        llm.reply = '"Isabel, Second Princess of the Empire," she says. Anastasia is her older sister.'
+        events = await collect(s.engine.send(cid, "/correction Isabel is the Second Princess of the Empire, not a Valenheart"))
+        after = s.conversations.list_messages(cid)
+        self.assertEqual(len(after), len(before))  # the wrong reply was replaced, nothing added
+        self.assertEqual(after[-2]["content"], "And your name is?")  # the player's line stays
+        self.assertIn("Second Princess of the Empire", after[-1]["content"])
+        self.assertNotIn("Valenheart,", after[-1]["content"])
+        self.assertTrue(any(e.get("type") == "rolled_back" for e in events))
+        prompt = "\n".join(m["content"] for m in llm.stream_calls[-1])
+        self.assertIn("Isabel is the Second Princess of the Empire, not a Valenheart", prompt)
+        self.assertIn("Rewrite", prompt)
+        st = s.conversations.get_state(cid)
+        self.assertIn("Isabel is the Second Princess of the Empire, not a Valenheart", st["corrections"])
+        llm.reply = "Later."
+        await collect(s.engine.send(cid, "I bow."))
+        prompt = "\n".join(m["content"] for m in llm.stream_calls[-1])
+        self.assertNotIn("Rewrite", prompt)  # the redo note is for one reply only; the fact stays
+        self.assertIn("not a Valenheart", prompt)
+
+    async def test_correction_with_nothing_to_redo(self):
+        s = make_services(FakeLLM())
+        cid = new_game(s)
+        events = await collect(s.engine.send(cid, "/correction Nothing yet"))
+        self.assertTrue(any(e.get("type") == "error" for e in events))
+
+
 if __name__ == "__main__":
     unittest.main()

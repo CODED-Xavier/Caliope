@@ -2122,7 +2122,9 @@
 "· placed (click it again to lift it)": "· colocada (clique de novo para tirar)",
 ": cantrips only for now": ": por enquanto só truques",
 "Choose the message to start the new game from.": "Escolha a mensagem de onde começa o novo jogo.",
-"Cast it anyway": "Lançar mesmo assim"
+"Cast it anyway": "Lançar mesmo assim",
+"Add more by writing /fix and the fact in the chat. /correction and the fact also rewrites the Aedo's last reply with it.": "Adicione mais escrevendo /fix e o fato no chat. /correction (ou /correção) e o fato também reescreve a última resposta do Aedo com ele.",
+"There is no story reply to correct yet. Use /fix to keep a fact.": "Ainda não há resposta da história para corrigir. Use /fix para guardar um fato."
 },
 "patterns": [
 [
