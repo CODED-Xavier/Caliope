@@ -73,7 +73,7 @@ export default function Home({ view, onView, menuKey, onPlay, onEdit, onCreate, 
           <div className="hub-row">
             <Tile art="/emblems/wizard.png" title="Compendium" text="Classes, races, spells, items, feats…" onClick={() => onLibrary()} />
             <Tile art="/emblems/race-goblin.png" title="Bestiary" text="Monster sheets for fights" onClick={onBestiary} />
-            <Tile art="/emblems/cleric.png" title="Compendium" text="Rule sets and rulebooks the Aedo reads" onClick={onRulebooks} />
+            <Tile art="/emblems/cleric.png" title="Rules" text="Rule sets and rulebooks the Aedo reads" onClick={onRulebooks} />
           </div>
           <h4 className="hub-sub">Compendium folders</h4>
           <div className="folder-grid">
@@ -89,9 +89,9 @@ export default function Home({ view, onView, menuKey, onPlay, onEdit, onCreate, 
             <img className="hub-art small" src="/emblems/class.png" alt="" />
             <div className="grow">
               <h3>Other systems</h3>
-              <div className="muted small">Tormenta20, Vampire, Call of Cthulhu… their rulebooks and sheets live in Rulebooks for now.</div>
+              <div className="muted small">Tormenta20, Vampire, Call of Cthulhu… their rulebooks and rule sets live in the 📚 Compendium for now.</div>
             </div>
-            <button type="button" className="btn small" onClick={onRulebooks}>Open Rulebooks</button>
+            <button type="button" className="btn small" onClick={onRulebooks}>Open the Compendium</button>
           </div>
         </section>
       </div>

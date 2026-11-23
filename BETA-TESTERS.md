@@ -177,3 +177,5 @@ Thank you, and have fun!
 **Map tools in fights:** above the battle map, **📏 Measure** shows distances (5 ft per square), **🔥 Area** shows where a spell like Fireball lands and who's inside, and **🗺 Big map** opens the map large in the middle of the screen.
 
 **5e character builder:** the Equipment step now gives your class's and background's starting packages (choose a or b), or the starting gold and a shop. The Spells step only shows your class's spells.
+
+**New look:** the home screen, its doors and the loading window were redecorated (stars, glows, ornaments, a bar with its percentage). If something looks off on your screen, send a screenshot.

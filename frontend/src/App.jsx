@@ -566,6 +566,7 @@ export default function App() {
               <div className="grow"><h1 className="brand-name">Calíope</h1>
                 <p className="muted small">Roleplay and tabletop adventures that run entirely on your PC. No tokens, no limits, and it remembers everything.</p></div>
             </div>
+            <div className="welcome-rule" aria-hidden="true"><span>✦</span></div>
             {!online && <FirstModel onOpen={(init) => { setModelsInit({ tab: init.tab, query: init.query || "" }); setModal("models"); }} />}
             {error && <p className="error-text small">{error}</p>}
             <Home view={homeView} onView={setHomeView} menuKey={menuKey}
