@@ -273,6 +273,15 @@ class ChatEngine:
         conv = self.repo.get(conv_id)
         scenario = conv["scenario"]
         language = scenario.get("language") or settings.get("response_language", "en")
+        fix = aedo_desk.FIX.match(user_msg["content"].strip())
+        if fix:  # "/fix Aria is the Saintess": kept as a story fact, no model needed
+            st = self.repo.get_state(conv_id)
+            fact = aedo_desk.save_fact(st, fix.group(1))
+            self.repo.save_state(conv_id, st)
+            msg = self.repo.add_message(conv_id, "assistant", f"📌 Kept as a story fact: {fact}", {"ooc": True})
+            yield {"type": "state", "state": st, "npcs": self.repo.list_npcs(conv_id), "changes": []}
+            yield {"type": "assistant_message", "message": self.repo.get_message(msg["id"])}
+            return
         messages = aedo_desk.build_messages(
             scenario=scenario, state=self.repo.get_state(conv_id), npcs=self.repo.list_npcs(conv_id),
             summary=conv["summary"], history=self.repo.list_messages(conv_id, after_id=conv["summary_upto"])[:-1],
@@ -292,6 +301,13 @@ class ChatEngine:
         if not reply:
             yield {"type": "error", "message": "The model returned nothing. Try again."}
             return
+        reply, facts = aedo_desk.take_facts(reply)
+        if facts:  # the Aedo agreed to a correction: the fixed fact is kept for the story
+            st = self.repo.get_state(conv_id)
+            kept = [aedo_desk.save_fact(st, f) for f in facts]
+            self.repo.save_state(conv_id, st)
+            reply = (reply + "\n\n" + "\n".join(f"📌 Kept as a story fact: {k}" for k in kept if k)).strip()
+            yield {"type": "state", "state": st, "npcs": self.repo.list_npcs(conv_id), "changes": []}
         meta: dict = {"ooc": True}
         if settings.get("show_timing", True):
             meta["timing"] = {"first_word_s": round((t_first or time.perf_counter()) - t_start, 1),

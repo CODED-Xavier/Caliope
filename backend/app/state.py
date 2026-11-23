@@ -120,6 +120,8 @@ def _calendar_part(merged: dict) -> dict:
             "wishes": truncate(str(merged.get("wishes") or ""), 600),          # the player's hints for the Aedo
             "finished": bool(merged.get("finished")),                           # the card's ending was reached
             "sheet_from_chat": bool(merged.get("sheet_from_chat")),
+            "corrections": [truncate(" ".join(str(c).split()), 200) for c in (merged.get("corrections") or [])
+                            if isinstance(c, str) and c.strip()][-20:],  # story facts the player fixed (/fix)
             "systems": _systems_part(merged.get("systems"))} | _story_part(merged)
 
 

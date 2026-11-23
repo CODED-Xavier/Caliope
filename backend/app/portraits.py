@@ -48,7 +48,7 @@ FACE_WORDS = {
     5: r"sneer\w*|disgust\w*|scoff\w*|contempt\w*|furious|seeth\w*|nojo\w*|desprez\w*",
     4: r"glar\w*|scowl\w*|snap\w*|snarl\w*|growl\w*|angr\w*|frown\w*|clench\w*|irrit\w*|irad\w*|carranc\w*",
     3: r"tear\w*|sob\w*|cry\w*|cries|sad\w*|sigh\w*|trembl\w*|lágrim\w*|chor\w*|trist\w*|suspir\w*",
-    2: r"smil\w*|grin\w*|laugh\w*|beam\w*|chuckl\w*|giggl\w*|sorri\w*|ri\b|riu|risad\w*",
+    2: r"smil\w*|smirk\w*|grin\w*|laugh\w*|beam\w*|chuckl\w*|giggl\w*|sorri\w*|ri\b|riu|risad\w*",
 }
 
 
@@ -269,6 +269,32 @@ def _interacts(npc: dict, text: str) -> bool:
     return False
 
 
+def auto_portraits(story: str, npcs: list[dict], max_n: int = MAX_PER_REPLY) -> tuple[str, dict[str, str]]:
+    """Pictures for a reply the model didn't tag: the first characters (with pictures) who speak or act in it, each
+    shown before the paragraph where they first appear, with the mood that paragraph shows (smirks -> Happy)."""
+    paras = re.split(r"(\n\s*\n)", story)
+    found: list[tuple[int, dict]] = []
+    for n in npcs:
+        if not n.get("portraits") or not (n["portraits"].get("default") or n["portraits"].get("moods")):
+            continue
+        # in the scene: named twice, or named in a paragraph where someone speaks ("You think of Lyra" is not)
+        if _mentions(n, story) < 2 and not any(_mentions(n, p) and re.search(r"[\"\u201c\u201d]|^\s*\[", p) for p in paras[::2]):
+            continue
+        first = next((i for i in range(0, len(paras), 2) if _mentions(n, paras[i])), None)
+        if first is not None:
+            found.append((first, n))
+    found.sort(key=lambda x: (x[0], story.lower().find(x[1]["name"].lower().split()[0])))
+    shown: dict[str, str] = {}
+    for idx, n in found[:max_n]:
+        mood = face_from_text(paras[idx][max(0, paras[idx].lower().find(n["name"].lower().split()[-1]) - 5):]) or ""
+        label, url = pick_mood(n["portraits"], mood)
+        if not url:
+            continue
+        shown[f"{n['name']}|{label}"] = url
+        paras[idx] = f"[[show: {n['name']} | {label}]]\n" + paras[idx]
+    return "".join(paras), shown
+
+
 def process_reply(text: str, npcs: list[dict]) -> tuple[str, dict, list[int]]:
     """Finish a reply from the model: take out the INFO block, clean the portrait tags, and find the
     characters the player meets for the first time. Returns (story text, meta to store, ids now met)."""
@@ -276,6 +302,8 @@ def process_reply(text: str, npcs: list[dict]) -> tuple[str, dict, list[int]]:
 
     story, block = split_status(text)
     story, shown = resolve_portraits(story, npcs)
+    if not shown:  # the model forgot the tags: the characters who speak or act get their picture anyway
+        story, shown = auto_portraits(story, npcs)
     meta: dict = {}
     if block:
         meta["status"] = block

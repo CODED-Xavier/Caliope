@@ -7,6 +7,8 @@ These exchanges are kept in the chat but left out of the story the model reads l
 """
 from __future__ import annotations
 
+import re
+
 from .util import truncate
 from .writing import gm_question, is_gm_message
 
@@ -23,7 +25,29 @@ The player asked you a question or gave you an instruction about the game. Rules
   and common knowledge of the world. Other characters' private lives, hidden motives and the story's secrets are not
   handed out here: say plainly that the character doesn't know that yet and could find out in the story (ask someone,
   search, investigate). Never invent facts to fill the gap.
+- If the player corrects a fact of the story (a wrong name, who someone is, something that didn't happen that way),
+  agree, say it is fixed from now on, and end with one line: FACT: <the corrected fact, one short sentence>.
+- Pictures, buttons and settings belong to the app, not to you: if asked about them, say the app handles them.
 - Keep it short unless the player asks for everything. {lang}"""
+
+
+FIX = re.compile(r"^/\s*(?:fix|correct|corrigir|corrija)\b[:\s]*(.+)$", re.I | re.S)
+FACT = re.compile(r"^\s*FACT\s*:\s*(.+?)\s*$", re.I | re.M)
+
+
+def save_fact(state: dict, fact: str) -> str:
+    """A story fact the player fixed: kept in front of the story from now on. Returns the saved text."""
+    fact = truncate(" ".join(str(fact or "").split()).strip(" ."), 200)
+    if fact:
+        facts = [f for f in state.get("corrections") or [] if f.lower() != fact.lower()]
+        state["corrections"] = (facts + [fact])[-20:]
+    return fact
+
+
+def take_facts(reply: str) -> tuple[str, list[str]]:
+    """The Aedo's 'FACT: …' lines: taken out of his answer, to be kept."""
+    facts = [m.group(1) for m in FACT.finditer(reply or "")]
+    return FACT.sub("", reply or "").strip(), facts
 
 
 def without_ooc(history: list[dict]) -> list[dict]:

@@ -161,3 +161,5 @@ Things that are especially useful to test:
 - The **Muse**, narration voice and scene pictures
 
 Thank you, and have fun!
+
+**Fixing the story:** if the Aedo mixes something up (a wrong name, who someone is), write **/fix** and the right fact, like *"/fix Aria is the Saintess, not Anastasia"*. Calíope keeps it for the rest of the game (📌 in the Sheet tab).

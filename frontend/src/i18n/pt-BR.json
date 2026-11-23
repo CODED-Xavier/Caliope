@@ -1902,7 +1902,10 @@
 "🔍 Find systems": "🔍 Encontrar sistemas",
 "✎ Edit as JSON": "✎ Editar como JSON",
 "Check the numbers against the card (the reader never invents them; empty means the card didn't say). Then apply, and save the card.": "Confira os números com o card (o leitor nunca os inventa; vazio quer dizer que o card não disse). Depois aplique e salve o card.",
-"Loadout": "Equipamento"
+"Loadout": "Equipamento",
+"📌 Story facts you fixed": "📌 Fatos da história que você corrigiu",
+"Forget this fact": "Esquecer este fato",
+"Add more by writing /fix and the fact in the chat.": "Adicione mais escrevendo /fix e o fato no chat."
 },
 "patterns": [
 [
@@ -2980,6 +2983,10 @@
 [
 "{0} (level up!)",
 "{0} (subiu de nível!)"
+],
+[
+"📌 Kept as a story fact: {0}",
+"📌 Guardado como fato da história: {0}"
 ]
 ]
 }

@@ -230,6 +230,24 @@ function Convert5e({ convId, state, busy, onState, openBuilder, onBuilderShown }
   );
 }
 
+/** Story facts the player fixed with "/fix …" (or by correcting the Aedo): kept in front of the story every turn. */
+function FixedFacts({ facts, onPatch, busy }) {
+  if (!facts?.length) return null;
+  return (
+    <>
+      <div className="section-title">📌 Story facts you fixed</div>
+      {facts.map((f, i) => (
+        <div className="row gap center fixed-fact" key={`${i}-${f}`}>
+          <span className="grow small">{f}</span>
+          <button type="button" className="icon-btn" title="Forget this fact" disabled={busy}
+            onClick={() => onPatch({ corrections: facts.filter((_, j) => j !== i) })}>✕</button>
+        </div>
+      ))}
+      <div className="muted tiny">Add more by writing /fix and the fact in the chat.</div>
+    </>
+  );
+}
+
 /** The card's own sheet in play (Black Sheep's stats and loadout): changes go through the app's rules. */
 function CardSystems({ view, convId, onReload, busy }) {
   const [error, setError] = useState("");
@@ -270,6 +288,7 @@ function SheetTab({ state, onPatch, mode, kind, onPower, onRest, busy, convId, o
       {picOpen && <MoodEditor portraits={p.portraits} mainOnly onChange={(v) => onPatch({ player: { portraits: v } })} />}
       {cardStatus}
       {systemsView && <CardSystems view={systemsView} convId={convId} onReload={onReload} busy={busy} />}
+      <FixedFacts facts={state.corrections} onPatch={onPatch} busy={busy} />
       <SkillsBox state={state} onPatch={onPatch} onPower={onPower} busy={busy} kind={kind} />
       {cardStatus && <button type="button" className="section-title link-btn" onClick={() => setAbout((v) => !v)}>{about ? "▾ About you" : "▸ About you"}</button>}
       {about && <>
