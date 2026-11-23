@@ -2129,7 +2129,9 @@
 "every route": "todas as rotas",
 "the default start only": "só no início padrão",
 "A character of one route only (like the cult's students) never shows up in the card's other routes": "Um personagem de uma rota só (como os alunos do culto) nunca aparece nas outras rotas do card",
-"Rainy (four seasons, rain much more often)": "Chuvoso (quatro estações, chuva bem mais frequente)"
+"Rainy (four seasons, rain much more often)": "Chuvoso (quatro estações, chuva bem mais frequente)",
+"Update from the card (new characters, lore and rules; the story stays)": "Atualizar pelo card (novos personagens, lore e regras; a história continua)",
+"⟳ Update": "⟳ Atualizar"
 },
 "patterns": [
 [
@@ -3855,6 +3857,34 @@
 [
 "{0} only",
 "só em {0}"
+],
+[
+"Update \"{0}\" from its card? New characters, lore, rules and the calendar join this game. The story, relationships, notes, gold and your sheet stay. Characters the story has changed keep their changes.",
+"Atualizar \"{0}\" pelo card? Novos personagens, lore, regras e o calendário entram neste jogo. A história, as relações, as anotações, o ouro e a sua ficha continuam. Personagens que a história mudou mantêm as mudanças."
+],
+[
+"Updated from the card. {0}",
+"Atualizado pelo card. {0}"
+],
+[
+"New characters: {0}. {1}",
+"Novos personagens: {0}. {1}"
+],
+[
+"Updated: {0}. {1}",
+"Atualizados: {0}. {1}"
+],
+[
+"Put aside (they belong to another route now): {0}. {1}",
+"Deixados de lado (agora pertencem a outra rota): {0}. {1}"
+],
+[
+"Lore entries: {0}.",
+"Entradas de lore: {0}."
+],
+[
+"This game's card no longer exists.",
+"O card deste jogo não existe mais."
 ]
 ]
 }

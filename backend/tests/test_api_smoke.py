@@ -56,7 +56,8 @@ class ApiSmokeTests(unittest.IsolatedAsyncioTestCase):
         paths = {getattr(r, "path", "") for r in self.main.app.routes}
         for p in ("/api/health", "/api/conversations/{conv_id}/character", "/api/conversations/{conv_id}/character/levels",
                   "/api/conversations/{conv_id}/character/levelup", "/api/conversations/{conv_id}/combat/options",
-                  "/api/conversations/{conv_id}/character/use", "/api/conversations/{conv_id}/systems"):
+                  "/api/conversations/{conv_id}/character/use", "/api/conversations/{conv_id}/systems",
+                  "/api/conversations/{conv_id}/refresh-card"):
             self.assertIn(p, paths)
 
     async def test_only_this_pc(self):

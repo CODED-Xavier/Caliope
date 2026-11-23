@@ -145,6 +145,7 @@ The message box checks your spelling as you type (red underline; right-click for
 ### At the top of the chat
 - **📜 Recap**: "Previously, in…", written only when you ask and never added to the story.
 - **↺ Restart** (also ↺ next to the game in the left list): the same card from its opening, with the same character at full HP; the story, items, gold, fights and scenes start over. Keep the old run (renamed *… (old run)*) or delete it.
+- **⟳ Update from the card** (⟳ next to the game in the left list): after you edit a card, a game already running takes its new version: new characters join (not met yet), lore, rules, calendar and the card's sheet arrive. The story, relationships, notes, gold and your sheet's values stay, and characters the story has changed keep their changes. A character the card moved to another route is put aside if you haven't met them.
 - **🎵 Music**, **🔍 search** (Ctrl+F), **⤓ export** to Markdown.
 - **Aa**: text size, wider column, compact mode, story colours (grey narration, bright speech, coloured thoughts), character picture size, follow the text as it is written.
 - The **date and hour** of the story.
@@ -595,6 +596,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.29.0 | Your turn by the 5e rules (action, bonus action, movement, reaction, End turn) with the option list sorted by cost; companions with 5e sheets built by the system around your hero or step by step; class and race emblems; ▸ details on classes, races and backgrounds; equipment categories; one Sheet tab (Status merged into it); the sheet owns gear and notes; fight damage reaches the sheet; the Aedo no longer acts for you when the app starts a fight; personas bring their world additions |
 | 2.29.1 | A book's placeholder classes are left out of the builder; hide repeated entries and choose each book's rules list (2014, 2024 or both) in the Library |
 | 2.30.0 | 📦 Export on every card tile and in the card editor; "Want to describe it?" after each part of your turn; the round card told by turns with your words and companion flavour; portrait tokens on the battle map; companion pictures on their sheets; 18 more race emblems (Goliath, Halfling, Minotaur, Kobold, Lizardfolk, Satyr, Vampire…) |
+| 2.42.0 | ⟳ Update from the card: a running game takes the card's new characters, lore, rules, calendar and sheet, keeping its story, relationships and changes |
 | 2.41.2 | 12 more race emblems: gnoll, grimlock, hadozee, harengon, hexblood, hobgoblin, kalashtar, kenku, khenra, khoravar, reborn, firbolg |
 | 2.41.1 | New PixelLab emblems: 16 more races (aarakocra, aetherborn, aven, bugbear, bullywug, centaur, changeling, duergar, genasi, flamekin, giff, gith, githyanki, githzerai, grung, kithkin, half-elf) and 9 background types (acolyte, criminal, noble, sage, soldier, sailor, outlander, artisan, hermit) shown in the character builder |
 | 2.41.0 | Characters of one route: a card character can be set to appear only in one start (the cult's Seminary students stay out of the academy route); a Rainy climate (four seasons, rain and fog much more often) |

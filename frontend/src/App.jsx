@@ -475,6 +475,21 @@ export default function App() {
       refreshConvs();
     } catch (e) { setError(e.message); }
   };
+  const refreshConv = async (c) => { // ⟳ the card's current version joins this game; the story stays
+    if (!await ask.confirm(`Update "${c.title}" from its card? New characters, lore, rules and the calendar join this game. The story, relationships, notes, gold and your sheet stay. Characters the story has changed keep their changes.`, { ok: "⟳ Update" })) return;
+    try {
+      const data = await api.refreshFromCard(c.id);
+      const r = data.refreshed || {};
+      const parts = [];
+      if (r.added?.length) parts.push(`New characters: ${r.added.join(", ")}.`);
+      if (r.updated?.length) parts.push(`Updated: ${r.updated.join(", ")}.`);
+      if (r.aside?.length) parts.push(`Put aside (they belong to another route now): ${r.aside.join(", ")}.`);
+      parts.push(`Lore entries: ${r.lore ?? 0}.`);
+      if (c.id === activeId) { setGame(data); setLastContext(null); }
+      refreshConvs();
+      await ask.alert(`Updated from the card. ${parts.join(" ")}`);
+    } catch (e) { setError(e.message); }
+  };
   const deleteConv = async (c) => {
     if (!await ask.confirm(`Delete "${c.title}" permanently? Its memories are deleted too.`)) return;
     await api.deleteConversation(c.id).catch((e) => setError(e.message));
@@ -505,7 +520,7 @@ export default function App() {
         convs={convs} activeId={activeId} onSelect={(id) => !busy && openConversation(id)} onNew={() => { setMenuInit(null); setModal("new"); }}
         onHome={() => goHome("hub")} onGames={() => goHome("games")} onLibraryHome={() => goHome("library")}
         lastGame={convs[0]} onContinue={() => convs[0] && !busy && openConversation(convs[0].id)}
-        onRename={renameConv} onRestart={restartConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onBestiary={() => setModal("bestiary")} onLibrary={() => setModal("library")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
+        onRename={renameConv} onRestart={restartConv} onRefresh={refreshConv} onDelete={deleteConv} onSkills={() => setModal("skills")} onRulebooks={() => setModal("rulebooks")} onBestiary={() => setModal("bestiary")} onLibrary={() => setModal("library")} onModels={() => openModels()} onMuse={() => setModal("muse")} onSettings={() => setModal("settings")}
         health={health} theme={theme} onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         collapsed={view.sideCollapsed} onCollapse={setSideCollapsed}
       />

@@ -244,6 +244,90 @@ class ConversationRepository:
             self.delete(conv_id)
         return new
 
+    def refresh_from_card(self, conv_id: int, card: dict) -> dict:
+        """⟳ Update a running game from its card's current version: the card's text, lore, rules, calendar and sheet
+        become this game's; new characters join (not yet met); characters the game hasn't changed get the card's new
+        text and pictures. The story, relationships, notes, met/unmet, the route, gold and the sheet's values stay.
+        A character the card moved to another route is put aside if the player hasn't met them yet."""
+        conv = self.get(conv_id)
+        old = conv["scenario"]
+        data = card["data"]
+        snap = {**data, "name": card["name"]}
+        for key in ("sheet_template", "adventure"):  # this game's own choices and copies
+            if key in old:
+                snap[key] = old[key]
+        route_id = str((old.get("route") or {}).get("id") or "")
+        try:
+            route = routes.resolve(data, route_id)
+        except ValueError:
+            route = None
+        if route:
+            snap["route"] = {k: route[k] for k in ("id", "name", "setting", "focus", "scenes")}
+        elif old.get("route"):
+            snap["route"] = old["route"]  # the card no longer has this start: keep the game's copy
+        old_npcs = {n["name"].lower(): n for n in old.get("npcs") or [] if n.get("name")}
+        if any(n.get("companion") for n in old_npcs.values()):  # companions set up on the start screen keep their edits
+            snap["npcs"] = [old_npcs.get(n["name"].lower(), n) if n.get("companion") else n for n in data.get("npcs") or []]
+        state = self.get_state(conv_id)
+        solo = state.get("party_mode") == "solo"
+        here = route_id or "default"
+        mine = {n["name"].lower(): n for n in self.list_npcs(conv_id)}
+        added, updated, aside = [], [], []
+        with self.db.transaction():
+            for npc in data.get("npcs") or []:
+                name = str(npc.get("name") or "").strip()
+                if not name or (solo and npc.get("companion")):
+                    continue
+                elsewhere = npc.get("route") and npc["route"] != here
+                have = mine.get(name.lower())
+                if have is None:
+                    if elsewhere:
+                        continue
+                    self.add_npc(conv_id, name, description=npc.get("description", ""), personality=npc.get("personality", ""),
+                                 speech_style=npc.get("speech_style", ""), appearance=npc.get("appearance"),
+                                 portraits=npc.get("portraits"), in_prompt=npc.get("in_prompt", True), met=False,
+                                 relationship=npc.get("relationship", 0))
+                    added.append(name)
+                    continue
+                if elsewhere:
+                    if not have["met"] and have["active"]:
+                        self.update_npc(have["id"], active=False)
+                        aside.append(name)
+                    continue
+                was = old_npcs.get(name.lower()) or {}
+                change = {}
+                for key in ("description", "personality", "speech_style"):
+                    new = str(npc.get(key) or "")
+                    if new != have[key] and have[key] == str(was.get(key) or ""):  # the game never changed it
+                        change[key] = new
+                if normalize_appearance(npc.get("appearance")) != have["appearance"] \
+                        and have["appearance"] == normalize_appearance(was.get("appearance")):
+                    change["appearance"] = npc.get("appearance")
+                pics = normalize_portraits(npc.get("portraits"))
+                if pics != have["portraits"] and (pics["default"] or pics["moods"]) \
+                        and have["portraits"] in (normalize_portraits(was.get("portraits")), normalize_portraits({})):
+                    change["portraits"] = pics
+                if change:
+                    self.update_npc(have["id"], **change)
+                    updated.append(name)
+            if data.get("systems"):  # the card's sheet: new stats and parts join, the game's values stay
+                from .systems import merge_state, normalize_state
+                state["systems"] = normalize_state(data["systems"], state["systems"]) if state.get("systems") else merge_state(data["systems"], None)
+            if data.get("resources") and not state.get("resources"):
+                state["resources"] = start_pools(data["resources"])
+            cal = data.get("calendar") or {}
+            if cal.get("enabled") and cal.get("months") and not state.get("clock"):  # the card's calendar starts now
+                state["clock"] = {"minutes": 0, "seed": random.randrange(1, 1_000_000)}
+                state["time"] = time_label(cal, 0)
+                if cal.get("climate", "temperate") != "none":
+                    state["weather"] = weather_on(cal, 0, state["clock"]["seed"])
+                state["date_label"] = format_now(cal, 0)
+            self.save_state(conv_id, state)
+            self.db.execute("UPDATE conversations SET scenario_snapshot = ?, updated_at = ? WHERE id = ?",
+                            (json.dumps(snap, ensure_ascii=False), now(), conv_id))
+        return {"added": added, "updated": updated, "aside": aside,
+                "lore": len(((data.get("lorebook") or {}).get("entries")) or [])}
+
     def sync_card_portraits(self, scenario_id: int, old_npcs: list[dict], new_npcs: list[dict]) -> int:
         """Pictures added or changed in the card reach the games already started with it. A character whose pictures
         were changed inside a game (they differ from the card's old ones) keeps the game's pictures."""

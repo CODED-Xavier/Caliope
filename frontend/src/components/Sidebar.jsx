@@ -40,7 +40,7 @@ function RailButton({ icon, label, onClick, on = false, tour, title }) {
  * The slim icon rail on the left (always there) and, beside it, the drawer with your games
  * (opened with Games; it closes itself when you pick one on a narrow window).
  */
-export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onGames, onLibraryHome, lastGame, onContinue, onRename, onRestart, onDelete,
+export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onGames, onLibraryHome, lastGame, onContinue, onRename, onRestart, onRefresh, onDelete,
   onModels, onMuse, onSettings, health, theme, onToggleTheme, collapsed, onCollapse }) {
   const online = health?.llm?.ok;
   const [filter, setFilter] = useState("");
@@ -86,6 +86,7 @@ export default function Sidebar({ convs, activeId, onSelect, onNew, onHome, onGa
                 <div className="conv-actions">
                   <button className="icon-btn" title="Rename" onClick={(e) => { e.stopPropagation(); onRename(c); }}>✎</button>
                   <button className="icon-btn" title="Restart from the beginning" onClick={(e) => { e.stopPropagation(); onRestart(c); }}>↺</button>
+                  {c.scenario_id && onRefresh && <button className="icon-btn" title="Update from the card (new characters, lore and rules; the story stays)" onClick={(e) => { e.stopPropagation(); onRefresh(c); }}>⟳</button>}
                   <button className="icon-btn" title="Delete" onClick={(e) => { e.stopPropagation(); onDelete(c); }}>✕</button>
                 </div>
               </div>

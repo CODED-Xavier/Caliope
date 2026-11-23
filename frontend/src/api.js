@@ -242,6 +242,7 @@ export const api = {
   combatAuto: (id, key, on) => request("POST", `/api/conversations/${id}/combat`, { action: "auto", key, on }),
   convertCharacter5e: (id) => request("POST", `/api/conversations/${id}/character/convert`, {}),
   restartConversation: (id, keep) => request("POST", `/api/conversations/${id}/restart`, { keep }),
+  refreshFromCard: (id) => request("POST", `/api/conversations/${id}/refresh-card`, {}),
   undo: (id) => request("POST", `/api/conversations/${id}/undo`),
   editMessage: (messageId, content) => request("PATCH", `/api/messages/${messageId}`, { content }),
   rewind: (id, messageId, inclusive) => request("POST", `/api/conversations/${id}/rewind`, { message_id: messageId, inclusive }),

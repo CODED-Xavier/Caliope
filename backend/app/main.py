@@ -1903,6 +1903,19 @@ async def restart_conversation(conv_id: int, body: dict[str, Any] = Body(default
     return full_conversation(new["id"])
 
 
+@app.post("/api/conversations/{conv_id}/refresh-card")
+async def refresh_from_card(conv_id: int):
+    """⟳ This game takes its card's current version (new characters, lore, rules); the story and relationships stay."""
+    s = svc()
+    not_busy(conv_id)
+    conv = s.conversations.get(conv_id)
+    card = s.scenarios.get(conv["scenario_id"]) if conv.get("scenario_id") else None
+    if not card:
+        raise HTTPException(404, "This game's card no longer exists.")
+    done = s.conversations.refresh_from_card(conv_id, card)
+    return {**full_conversation(conv_id), "refreshed": done}
+
+
 def _card_has_resources(conv_id: int) -> bool:
     sid = svc().conversations.get(conv_id)["scenario_id"]
     card = svc().scenarios.get(sid) if sid else None
