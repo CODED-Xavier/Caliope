@@ -17,7 +17,13 @@ async function request(method, path, body) {
     headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error(await errorMessage(res));
+  if (!res.ok) {
+    if (res.status === 409) { // the server asks first ("Cast it anyway?"): the caller sees `confirm` and can send it again
+      const data = await res.clone().json().catch(() => null);
+      if (data?.confirm) throw Object.assign(new Error(data.detail || "Are you sure?"), { confirm: data.confirm, who: data.who || [] });
+    }
+    throw new Error(await errorMessage(res));
+  }
   return res.json();
 }
 

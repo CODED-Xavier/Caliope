@@ -2121,7 +2121,8 @@
 "Only classes, races and backgrounds have details.": "Só classes, raças e antecedentes têm detalhes.",
 "· placed (click it again to lift it)": "· colocada (clique de novo para tirar)",
 ": cantrips only for now": ": por enquanto só truques",
-"Choose the message to start the new game from.": "Escolha a mensagem de onde começa o novo jogo."
+"Choose the message to start the new game from.": "Escolha a mensagem de onde começa o novo jogo.",
+"Cast it anyway": "Lançar mesmo assim"
 },
 "patterns": [
 [
@@ -3817,12 +3818,32 @@
 "{0} já está na ficha."
 ],
 [
-"You would be inside {0}'s area ({1} ft around {2}). Aim at someone farther away, or move first.",
-"Você ficaria dentro da área de {0} ({1} ft em volta de {2}). Mire em alguém mais longe, ou mova-se antes."
-],
-[
 "{0} is out of your reach: an opportunity attack hits someone leaving your reach.",
 "{0} está fora do seu alcance: um ataque de oportunidade acerta quem sai do seu alcance."
+],
+[
+"You would be inside {0}'s area ({1} ft around {2}). Cast it anyway?",
+"Você ficaria dentro da área de {0} ({1} ft em volta de {2}). Lançar mesmo assim?"
+],
+[
+"You and {0} would be inside {1}'s area ({2} ft around {3}). Cast it anyway?",
+"Você e {0} ficariam dentro da área de {1} ({2} ft em volta de {3}). Lançar mesmo assim?"
+],
+[
+"{0} and {1} would be inside {2}'s area ({3} ft around {4}). Cast it anyway?",
+"{0} e {1} ficariam dentro da área de {2} ({3} ft em volta de {4}). Lançar mesmo assim?"
+],
+[
+"{0} would be inside {1}'s area ({2} ft around {3}). Cast it anyway?",
+"{0} ficaria dentro da área de {1} ({2} ft em volta de {3}). Lançar mesmo assim?"
+],
+[
+"{0} is spared (Sculpt Spells)",
+"{0} é poupado (Esculpir Magias)"
+],
+[
+"- {0}: ✨ spared, the spell bends around them (Sculpt Spells) → no damage",
+"- {0}: ✨ poupado, a magia se curva em volta (Esculpir Magias) → sem dano"
 ]
 ]
 }

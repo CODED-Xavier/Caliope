@@ -56,6 +56,14 @@ class CombatError(ValueError):
     pass
 
 
+class AreaRisk(CombatError):
+    """The area would catch you or an ally: the player is asked first and may cast anyway (`risk`)."""
+
+    def __init__(self, message: str, who: list[str]):
+        super().__init__(message)
+        self.who = who
+
+
 def ability_mod(score) -> int:
     return (as_int(score, 10) - 10) // 2
 
@@ -448,12 +456,19 @@ class CombatEngine:
             if who["hp"] > 0 and who.get("dying"):
                 who.update(dying=False, stable=False, death={"ok": 0, "fail": 0})
             return f"{head}\n💚 +{who['hp'] - before} HP ({info['dice']}) → {who['name']} {who['hp']}/{who['max_hp']} HP"
+        sculpted: list[dict] = []
         if kind == "save":
             if info.get("area") and target:
                 hit = self._area_targets(combat, me, target, info["area"])
-                if me in hit and info["area"].get("origin") != "self":  # the blast would catch the caster too
-                    raise CombatError(f"You would be inside {name}'s area ({info['area'].get('size', 5)} ft around {target['name']}). "
-                                      "Aim at someone farther away, or move first.")
+                friends = [c for c in hit if c is me or c["side"] in ("player", "ally")]
+                # Sculpt Spells (Evocation): 1 + the spell's level of them pass the save and take no damage, you first
+                sculpted = friends[: max(0, as_int(info.get("sculpt"), 0))]
+                exposed = [c for c in friends if c not in sculpted]
+                if exposed and not info.get("risk"):
+                    names = ["you" if c is me else c["name"] for c in exposed]
+                    who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+                    raise AreaRisk(f"{who[0].upper() + who[1:]} would be inside {name}'s area ({info['area'].get('size', 5)} ft around "
+                                   f"{target['name']}). Cast it anyway?", [c["name"] for c in exposed])
             elif target:
                 hit = [target]
             else:
@@ -461,6 +476,9 @@ class CombatEngine:
             if not info.get("dice"):  # a save with no damage (Hold Person, Sleep…): who resists, who is affected
                 outcome = []
                 for c in hit:
+                    if c in sculpted:
+                        outcome.append(f"{c['name']} is spared (Sculpt Spells)")
+                        continue
                     bonus = (c.get("saves") or {}).get(info["save"], 0)
                     sv = self.dice.roll(f"1d20{bonus:+d}" if bonus else "1d20")
                     outcome.append(f"{c['name']} {'resists' if sv.total >= info['dc'] else 'is affected'} ({sv.total})")
@@ -468,6 +486,9 @@ class CombatEngine:
             r = self.dice.roll(info["dice"])
             lines = [f"{head}\n💥 {r.total} {info.get('dtype') or ''} damage ({info['dice']}) · DC {info['dc']} {info['save'].upper()} save:".replace("  ", " ")]
             for c in hit or []:
+                if c in sculpted:
+                    lines.append(f"- {c['name']}: ✨ spared, the spell bends around them (Sculpt Spells) → no damage")
+                    continue
                 bonus = (c.get("saves") or {}).get(info["save"], 0)
                 sv = self.dice.roll(f"1d20{bonus:+d}" if bonus else "1d20")
                 ok = sv.total >= info["dc"]

@@ -469,7 +469,14 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, o
   // one part of your turn (attack, bonus strike, dodge): rolled at once, your turn goes on until you end it
   const step = async (body) => {
     setStepping(true); setStepError("");
-    try { const r = await api.combatStep(convId, body); setStepLine(r.line); onState(r.state); setDescribing(true); } catch (e) { setStepError(e.message); } finally { setStepping(false); }
+    try { const r = await api.combatStep(convId, body); setStepLine(r.line); onState(r.state); setDescribing(true); } catch (e) {
+      if (e.confirm === "risk") { // the area would catch you or an ally: your call
+        setStepping(false);
+        if (await ask.confirm(e.message, { ok: "Cast it anyway", danger: true })) await step({ ...body, risk: true });
+        return;
+      }
+      setStepError(e.message);
+    } finally { setStepping(false); }
   };
   useEffect(() => { if (!enemies.some((e) => e.id === target)) setTarget(enemies[0]?.id || ""); }, [combat]); // eslint-disable-line
   const current = people[combat.turn % people.length];

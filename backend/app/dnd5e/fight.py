@@ -41,7 +41,7 @@ def auto_reactions(state: dict, lib) -> None:
 
 
 def cast_in_fight(engine, state: dict, lib, option_id: str, target: str, advantage: str, slot: int | None = None,
-                   amount: int | None = None):
+                   amount: int | None = None, risk: bool = False):
     """An option from the 5e list in a fight: features with uses, spells (slot spent, attack or saves rolled, damage
     or healing applied, areas hit everyone inside) and Divine Smite after a hit."""
     char = state.get("character5e")
@@ -74,8 +74,11 @@ def cast_in_fight(engine, state: dict, lib, option_id: str, target: str, advanta
                 store.put_char(state, "", char, lib)
             ab = sheet.get("spell_ability") or "int"
             roll = magic.spell_roll(e or {}, sheet["level"], used or int(option.get("level") or 0), sheet["abilities"][ab]["mod"])
+            sculpt = 0  # Sculpt Spells: an Evocation wizard spares 1 + the spell's level of the creatures in the area
+            if (e or {}).get("school") == "V" and any(f["name"] == "Sculpt Spells" for f in sheet["features"]):
+                sculpt = 1 + (used or int(option.get("level") or 0))
             option = {**option, "cast": {**roll, "slot": used, "dc": sheet.get("spell_dc", 10), "attack": sheet.get("spell_attack", 2),
-                                         "area": option.get("area")}}
+                                         "area": option.get("area"), "risk": bool(risk), "sculpt": sculpt}}
         elif option["kind"] == "smite":
             last = (state.get("combat") or {}).get("last_hit")
             if not last or not last.get("melee"):

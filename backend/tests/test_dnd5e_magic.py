@@ -107,19 +107,35 @@ class FightTests(unittest.TestCase):
         self.assertEqual(state["character5e"]["slots_used"], {"3": 1})
         self.assertTrue(all(x["hp"] < 40 for x in z))
 
-    def test_a_blast_that_would_hit_you_is_refused(self):
-        from app.combat import CombatError
+    def test_a_blast_that_would_hit_you_asks_first_and_you_may_take_the_risk(self):
+        from app.combat import AreaRisk
         from app.dnd5e.fight import cast_in_fight
         char = hero("Wizard", 5, {"int": 18}, ["Fireball"])
         eng, state, z = self.fight(char)  # both zombies right next to the caster
-        with self.assertRaises(CombatError) as got:
+        with self.assertRaises(AreaRisk) as got:
             cast_in_fight(eng, state, LIB, "spell:Fireball", z[0]["id"], "", None)
-        self.assertIn("inside", str(got.exception))
-        self.assertNotIn("slots_used", state["character5e"])  # nothing spent
+        self.assertIn("You would be inside Fireball's area", str(got.exception))
+        self.assertEqual(got.exception.who, ["Aster"])
+        self.assertNotIn("slots_used", state["character5e"])  # asking spends nothing
+        self.assertFalse(state["combat"]["spent"].get("action"))
+        state, line = cast_in_fight(eng, state, LIB, "spell:Fireball", z[0]["id"], "", None, risk=True)
+        self.assertIn("- Aster:", line)  # the caster rolls a save like everyone inside
+        self.assertEqual(state["character5e"]["slots_used"], {"3": 1})
+
+    def test_sculpt_spells_spares_you_and_your_allies(self):
+        from app.dnd5e.fight import cast_in_fight
+        c = new_character("2024")
+        c["cls"] = {"name": "Wizard", "source": "XPHB"}
+        c["subclass"] = {"name": "Evoker", "source": "XPHB"}
+        c["level"] = 6
+        c["scores"] = {**c["scores"], "int": 18}
+        c["spells"] = [{"type": "spell", "name": "Fireball", "source": "PHB"}]
+        eng, state, z = self.fight(c)
+        state, line = cast_in_fight(eng, state, LIB, "spell:Fireball", z[0]["id"], "", None)  # no question: you are spared
+        self.assertIn("- Aster: ✨ spared", line)
         me = next(x for x in state["combat"]["combatants"] if x["side"] == "player")
-        z[0]["x"], z[0]["y"] = me["x"] + 6, me["y"]  # 30 ft away: the caster is outside the 20 ft blast
-        state, line = cast_in_fight(eng, state, LIB, "spell:Fireball", z[0]["id"], "", None)
-        self.assertNotIn(f"- {me['name']}:", line)
+        self.assertEqual(me["hp"], me["max_hp"])
+        self.assertIn("- Zombie", line)
 
     def test_opportunity_attack_needs_reach_and_keeps_the_reaction_when_refused(self):
         from app.combat import CombatError

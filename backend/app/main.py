@@ -20,7 +20,7 @@ from .config import APP_HOME, DB_PATH, FRONTEND_DIST
 from .conversations import NotFound
 from .drafts import draft_card_field, draft_player
 from .exporting import export_markdown
-from .combat import CombatError, bonus_intent, combat_intent, end_intent, find_target, player_defaults, split_turn, suggest_fight
+from .combat import AreaRisk, CombatError, bonus_intent, combat_intent, end_intent, find_target, player_defaults, split_turn, suggest_fight
 from .combat import _picture_geometry as combat_geometry
 from .dnd5e import fight as fight5e
 from .maps import FEATURES as MAP_FEATURES
@@ -624,7 +624,7 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
         if body.get("move") == "use":  # an option from the 5e list (Dash, Grapple, Second Wind, a spell…)
             state, line = await asyncio.to_thread(_use_option, s, state, str(body.get("option", "")), str(body.get("target", "")),
                                                   str(body.get("advantage", "")), as_int(body.get("slot"), 0) or None,
-                                                  as_int(body.get("amount"), 0) or None)
+                                                  as_int(body.get("amount"), 0) or None, body.get("risk") is True)
         else:
             state, line = s.combat.player_step(state, str(body.get("move", "attack")), str(body.get("target", "")),
                                                str(body.get("advantage", "")), str(body.get("ability", "")))
@@ -660,8 +660,9 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
     return stream_response(s.engine.send(conv_id, str(body.get("text", "")), prepare=prepare))
 
 
-def _use_option(s, state: dict, option_id: str, target: str, advantage: str, slot: int | None = None, amount: int | None = None):
-    return fight5e.cast_in_fight(s.combat, state, library5e(), option_id, target, advantage, slot, amount)
+def _use_option(s, state: dict, option_id: str, target: str, advantage: str, slot: int | None = None, amount: int | None = None,
+                risk: bool = False):
+    return fight5e.cast_in_fight(s.combat, state, library5e(), option_id, target, advantage, slot, amount, risk)
 
 
 @app.get("/api/conversations/{conv_id}/combat/options")
@@ -895,6 +896,12 @@ async def delete_map(map_id: int):
 @app.exception_handler(CombatError)
 async def _combat_error(_: Request, exc: CombatError):
     return JSONResponse({"detail": str(exc)}, status_code=400)
+
+
+@app.exception_handler(AreaRisk)
+async def _area_risk(_: Request, exc: AreaRisk):
+    """The spell's area would catch the caster or an ally: the page asks, then sends it again with `risk`."""
+    return JSONResponse({"detail": str(exc), "confirm": "risk", "who": exc.who}, status_code=409)
 
 
 # ------------------------------------------------------------------ rulebooks

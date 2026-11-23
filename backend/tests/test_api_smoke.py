@@ -104,6 +104,14 @@ class ApiSmokeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(names.count("Divine Smite"), 1)
         self.assertFalse(opts["can_smite"])
 
+    async def test_a_risky_blast_asks_first(self):
+        from app.combat import AreaRisk
+        exc = AreaRisk("You would be inside Fireball's area (20 ft around Orc). Cast it anyway?", ["Aster"])
+        handler = self.main.app.exception_handlers[AreaRisk]
+        res = await handler(None, exc)
+        self.assertEqual(res.status_code, 409)
+        self.assertEqual(json.loads(res.body)["confirm"], "risk")
+
 
 if __name__ == "__main__":
     unittest.main()
