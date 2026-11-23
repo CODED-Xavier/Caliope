@@ -534,6 +534,30 @@ export default function ScenarioModal({ onClose, onStart, initial }) {
   };
   const start = () => { if (sel) setView("setup"); };
 
+  const [jobs, setJobs] = useState({}); // 🌐 card translations running: {card id: {done, total, status, new_id}}
+  useEffect(() => {
+    const running = Object.entries(jobs).filter(([, j]) => j.status === "running");
+    if (!running.length) return undefined;
+    const t = setTimeout(async () => {
+      const next = { ...jobs };
+      for (const [id] of running) {
+        try {
+          next[id] = await api.translateProgress(id);
+          if (next[id].status === "done") load(next[id].new_id);
+        } catch { /* try again on the next tick */ }
+      }
+      setJobs(next);
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [jobs]); // eslint-disable-line
+  useEffect(() => { // a translation started earlier (the window was closed meanwhile) shows its progress again
+    list.forEach((s) => api.translateProgress(s.id).then((j) => { if (j.status === "running") setJobs((x) => ({ ...x, [s.id]: j })); }).catch(() => {}));
+  }, [list.length]); // eslint-disable-line
+  const translateCard = async (s) => {
+    if (!await ask.confirm(`Make a Portuguese copy of "${s.name}"? The story model translates every story text of the card (descriptions, lore, characters, openings, scenes) while you keep using Calíope. A big card or adventure can take from several minutes to an hour. The original card stays as it is; names, pictures and the card's sheet are kept.`, { ok: "🌐 Translate" })) return;
+    try { const j = await api.translateCard(s.id, "pt-BR"); setJobs((x) => ({ ...x, [s.id]: j })); } catch (e) { setError(e.message); }
+  };
+
   if (view === "setup" && sel) {
     return (
       <Modal title="New game" onClose={onClose} wide>
@@ -581,6 +605,7 @@ export default function ScenarioModal({ onClose, onStart, initial }) {
               <button className="icon-btn" title="Characters" onClick={(e) => { e.stopPropagation(); api.scenario(s.id).then((full) => { setCast({ name: s.name, npcs: full.data.npcs }); setView("cast"); }).catch((er) => setError(er.message)); }}>👥</button>
               <a className="icon-btn" title="Share as a .caliope file (the card with all its pictures)" href={`/api/scenarios/${s.id}/export.caliope`} download onClick={(e) => e.stopPropagation()}>📦</a>
               <a className="icon-btn" title="Export as a character card (JSON)" href={api.exportCardUrl(s.id)} download onClick={(e) => e.stopPropagation()}>⤓</a>
+              <button className="icon-btn" title="Translate: a copy of this card in Portuguese" onClick={(e) => { e.stopPropagation(); translateCard(s); }}>🌐</button>
               <button className="icon-btn" title="Edit" onClick={(e) => { e.stopPropagation(); edit(s.id); }}>✎</button>
               <button className="icon-btn" title="Delete" onClick={async (e) => { e.stopPropagation(); if (await ask.confirm(`Delete card "${s.name}"? Your saved games stay.`)) api.deleteScenario(s.id).then(() => load()).catch((er) => setError(er.message)); }}>🗑</button>
             </div>
@@ -589,6 +614,7 @@ export default function ScenarioModal({ onClose, onStart, initial }) {
                 {s.covers.map((u, k) => <img key={k} src={portraitSrc(u)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />)}
               </div>
             )}
+            {jobs[s.id] && <TranslateBar job={jobs[s.id]} onCancel={() => api.cancelTranslate(s.id)} />}
             <div><span className={`tag kind-${s.kind}`}>{KIND_LABELS[s.kind] || "Adventure"}</span><span className="tag">{MODE_LABELS[s.mode]}</span></div>
             <div className="muted small">{s.description}</div>
           </div>
@@ -605,5 +631,19 @@ export default function ScenarioModal({ onClose, onStart, initial }) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+
+/** 🌐 A card being translated: progress, cancel, and the result. */
+function TranslateBar({ job, onCancel }) {
+  const pct = job.total ? Math.round((100 * job.done) / job.total) : 0;
+  return (
+    <div className="translate-bar small" onClick={(e) => e.stopPropagation()}>
+      {job.status === "running" && <><span>🌐 Translating… {pct}%</span><progress max={100} value={pct} /><button className="btn small ghost" onClick={onCancel}>Stop</button></>}
+      {job.status === "done" && <span>🌐 Done: a Portuguese copy is in your cards.</span>}
+      {job.status === "cancelled" && <span className="muted">🌐 Translation stopped.</span>}
+      {job.status === "error" && <span className="error-text">🌐 {job.error || "The translation failed."}</span>}
+    </div>
   );
 }

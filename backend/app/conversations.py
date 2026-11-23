@@ -61,7 +61,7 @@ class ConversationRepository:
     def create(self, scenario: dict | None = None, title: str = "", player_name: str | None = None,
                player: dict | None = None, setup: str = "", player_lore: list | None = None, start: str = "",
                party_mode: str = "", card_status: dict | None = None, companions: list | None = None,
-               abilities: list | None = None, systems_state: dict | None = None) -> dict:
+               abilities: list | None = None, systems_state: dict | None = None, language: str = "") -> dict:
         """`player` comes from the start screen and is laid over the card's starting sheet.
         `card_status`: the card's own sheet (Tier, Attributes, Stats...) filled on the start screen.
         `setup` is "app" (made on the start screen), "card" (the card asks in the story) or ""."""
@@ -71,6 +71,8 @@ class ConversationRepository:
             from .party import apply_companion_edits
             data = {**data, "npcs": apply_companion_edits(data.get("npcs") or [], companions)}
         snapshot = {**data, "name": scenario["name"] if scenario else data["name"]}
+        if language in ("en", "pt-BR"):  # "play this card in Portuguese": this game's story language
+            snapshot["language"] = language
         route = routes.resolve(data, start)  # None: the card's default start
         if route:
             snapshot["route"] = {k: route[k] for k in ("id", "name", "setting", "focus", "scenes")}
@@ -236,7 +238,7 @@ class ConversationRepository:
             player["hp"] = {**hp, "current": hp["max"]}
         new = self.create(scenario, title=scenario["name"], player=player, setup=str(state.get("setup") or ""),
                           player_lore=conv.get("player_lore") or [], start=str((conv["scenario"].get("route") or {}).get("id") or ""),
-                          party_mode=str(state.get("party_mode") or ""))
+                          party_mode=str(state.get("party_mode") or ""), language=str(conv["scenario"].get("language") or ""))
         if keep:
             title = re.sub(r"\s*\(old run\)$", "", conv["title"] or scenario["name"])[:100]
             self.rename(conv_id, f"{title} (old run)")
@@ -253,7 +255,7 @@ class ConversationRepository:
         old = conv["scenario"]
         data = card["data"]
         snap = {**data, "name": card["name"]}
-        for key in ("sheet_template", "adventure"):  # this game's own choices and copies
+        for key in ("sheet_template", "adventure", "language"):  # this game's own choices and copies
             if key in old:
                 snap[key] = old[key]
         route_id = str((old.get("route") or {}).get("id") or "")

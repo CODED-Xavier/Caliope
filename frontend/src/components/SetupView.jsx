@@ -58,6 +58,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
   const [lore, setLore] = useState([]);
   const [loreKey, setLoreKey] = useState(0); // a loaded persona redraws the world additions box with its entries
   const [startId, setStartId] = useState("default");
+  const [lang, setLang] = useState(""); // this game's story language ("" = the one in Settings)
   const [showCast, setShowCast] = useState(false);
   const [sheet, setSheet] = useState(null); // the card's own sheet (Lumencia: Tier, Attributes, Stats with EXP)
   const [sheetValues, setSheetValues] = useState({});
@@ -145,10 +146,10 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
     setBusy(true); setError("");
     try {
       if (way === "card") {
-        await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", ...teamOpts() });
+        await onStart(scenarioId, { setup: "card", player_name: p.name.trim() || undefined, player_lore: lore, start: startId, ...(lang ? { language: lang } : {}), party: hasTeam ? partyMode : "solo", ...teamOpts() });
       } else if (way === "builder") {
         if (!p.name.trim()) { setError("Give your character a name."); setBusy(false); return; }
-        await onStart(scenarioId, { setup: "app", player: { ...p, name: p.name.trim() }, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", open_builder: true, ...teamOpts() });
+        await onStart(scenarioId, { setup: "app", player: { ...p, name: p.name.trim() }, player_lore: lore, start: startId, ...(lang ? { language: lang } : {}), party: hasTeam ? partyMode : "solo", open_builder: true, ...teamOpts() });
       } else {
         if (!p.name.trim()) { setError("Give your character a name."); setBusy(false); return; }
         const player = { ...p, name: p.name.trim() };
@@ -157,7 +158,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
         // only what you filled: an empty box or a stat without a grade ("- [0/100]") keeps the card's own value
         const own = sheet ? Object.fromEntries(Object.entries(sheetValues).filter(([, v]) => { const t = String(v || "").trim(); return t && !/^-?\s*\[\d+\/\d+\]$/.test(t); })) : null;
         const mySkills = skills.filter((k) => String(k.name || "").trim());
-        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId, party: hasTeam ? partyMode : "solo", ...(own ? { card_status: own } : {}),
+        await onStart(scenarioId, { setup: "app", player, player_lore: lore, start: startId, ...(lang ? { language: lang } : {}), party: hasTeam ? partyMode : "solo", ...(own ? { card_status: own } : {}),
           ...(mySkills.length ? { abilities: mySkills } : {}), ...(sys?.state ? { systems_state: sys.state } : {}), ...teamOpts() });
       }
     } catch (e) { setError(e.message); setBusy(false); }
@@ -169,6 +170,15 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
         {(card.npcs || []).length > 0 && <button type="button" className="btn small ghost" style={{ marginLeft: 8 }} onClick={() => setShowCast((v) => !v)}>👥 {showCast ? "Hide characters" : "Characters"}</button>}</h3>
       {showCast && <CharacterPreview npcs={card.npcs} />}
       <StartPicker card={card} value={startId} onChange={setStartId} />
+      <div className="row gap story-lang">
+        <span className="small">Language of this story</span>
+        <select className="field" value={lang} onChange={(e) => setLang(e.target.value)}>
+          <option value="">As in Settings</option>
+          <option value="en">English</option>
+          <option value="pt-BR">Português (Brasil)</option>
+        </select>
+        {lang === "pt-BR" && (card.language || "en") !== "pt-BR" && <span className="muted tiny">The opening is translated when the story starts (about half a minute).</span>}
+      </div>
 
       <div className="section-title">Your character</div>
       <PersonaBar player={p} lore={lore} onLoad={(persona) => {
@@ -319,7 +329,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
       {error && <div className="error-text small">{error}</div>}
       <div className="row gap end">
         <button className="btn" onClick={onBack}>Back</button>
-        <button className="btn primary" onClick={start} disabled={busy}>{busy ? "Starting…" : "Start the story"}</button>
+        <button className="btn primary" onClick={start} disabled={busy}>{busy ? (lang === "pt-BR" && (card.language || "en") !== "pt-BR" ? "Translating the opening…" : "Starting…") : "Start the story"}</button>
       </div>
     </div>
   );

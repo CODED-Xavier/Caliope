@@ -97,3 +97,18 @@ class RefreshTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StartByChoiceTests(unittest.TestCase):
+    SYS = {"stats": [{"key": "Origin", "kind": "choice", "options": ["Commoner", "Minor noble", "High noble", "Foreign scholarship"], "start": "Commoner"},
+                     {"key": "Gold", "kind": "number", "min": 0, "start": 30,
+                      "start_by": {"stat": "Origin", "values": {"Commoner": 30, "Minor noble": 150, "High noble": 500, "Foreign scholarship": 30}}}]}
+
+    def test_the_origin_sets_the_starting_gold(self):
+        from app.systems import merge_state, normalize as normalize_systems
+        sys = normalize_systems(self.SYS)
+        self.assertEqual(merge_state(sys, {"values": {"Origin": "High noble"}})["values"]["Gold"], 500)
+        self.assertEqual(merge_state(sys, {"values": {"Origin": "Minor noble", "Gold": 30}})["values"]["Gold"], 150)
+        self.assertEqual(merge_state(sys, {"values": {"Origin": "Foreign scholarship"}})["values"]["Gold"], 30)
+        self.assertEqual(merge_state(sys, {"values": {"Origin": "High noble", "Gold": 77}})["values"]["Gold"], 77)  # typed by hand
+        self.assertEqual(merge_state(sys, None)["values"]["Gold"], 30)

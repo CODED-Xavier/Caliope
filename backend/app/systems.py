@@ -53,6 +53,10 @@ def normalize(raw) -> dict:
         if kind == "number":
             stat |= {"min": as_int(s.get("min"), 0) if s.get("min") not in (None, "") else None,
                      "max": as_int(s.get("max")) if s.get("max") not in (None, "") else None, "start": as_int(s.get("start"))}
+            by = s.get("start_by")  # the start depends on a choice: {"stat": "Origin", "values": {"High noble": 500}}
+            if isinstance(by, dict) and _s(by.get("stat")) and isinstance(by.get("values"), dict):
+                stat["start_by"] = {"stat": _s(by["stat"], 30),
+                                    "values": {_s(k, 30): as_int(v) for k, v in list(by["values"].items())[:12] if _s(k)}}
         elif kind == "choice":
             opts = [_s(o, 30) for o in s.get("options") or [] if _s(o)][:12]
             stat |= {"options": opts, "start": _s(s.get("start"), 30) if _s(s.get("start"), 30) in opts else (opts[0] if opts else "")}
@@ -341,6 +345,12 @@ def merge_state(sys: dict, raw) -> dict:
         stat = _stat(sys, k)
         if stat:
             _set_value(sys, st, stat, v, maxes)
+    for stat in sys.get("stats") or []:  # "Origin: High noble" sets the starting gold, unless the player typed another
+        by = stat.get("start_by")
+        if by and str(raw.get("values", {}).get(stat["key"], stat.get("start")) if isinstance(raw.get("values"), dict) else stat.get("start")) == str(stat.get("start")):
+            pick = str(st["values"].get(by["stat"], ""))
+            if pick in by["values"]:
+                _set_value(sys, st, stat, by["values"][pick], maxes)
     _level_up(sys, st)
     for slot, name in (raw.get("loadout") or {}).items() if isinstance(raw.get("loadout"), dict) else []:
         if name and name != st["loadout"].get(slot) and _item(sys, name):

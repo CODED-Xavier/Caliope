@@ -2146,7 +2146,17 @@
 "Forget this technique": "Esquecer esta técnica",
 "Times used": "Vezes usada",
 "A technique needs its owner and a name.": "Uma técnica precisa de dono e de nome.",
-"A technique needs a name.": "Uma técnica precisa de nome."
+"A technique needs a name.": "Uma técnica precisa de nome.",
+"Language of this story": "Idioma desta história",
+"As in Settings": "Como nas Configurações",
+"The opening is translated when the story starts (about half a minute).": "A abertura é traduzida quando a história começa (cerca de meio minuto).",
+"Translating the opening…": "Traduzindo a abertura…",
+"Translate: a copy of this card in Portuguese": "Traduzir: uma cópia deste card em português",
+"🌐 Translate": "🌐 Traduzir",
+"🌐 Done: a Portuguese copy is in your cards.": "🌐 Pronto: uma cópia em português está nos seus cards.",
+"🌐 Translation stopped.": "🌐 Tradução interrompida.",
+"The translation failed.": "A tradução falhou.",
+"Unknown language.": "Idioma desconhecido."
 },
 "patterns": [
 [
@@ -3920,6 +3930,14 @@
 [
 "{0} has no technique called {1}.",
 "{0} não tem uma técnica chamada {1}."
+],
+[
+"Translating… {0}%",
+"Traduzindo… {0}%"
+],
+[
+"Make a Portuguese copy of \"{0}\"? The story model translates every story text of the card (descriptions, lore, characters, openings, scenes) while you keep using Calíope. A big card or adventure can take from several minutes to an hour. The original card stays as it is; names, pictures and the card's sheet are kept.",
+"Fazer uma cópia em português de \"{0}\"? O modelo da história traduz todos os textos do card (descrições, lore, personagens, aberturas, cenas) enquanto você continua usando o Calíope. Um card ou aventura grande pode levar de alguns minutos a uma hora. O card original fica como está; nomes, imagens e a ficha do card são mantidos."
 ]
 ]
 }

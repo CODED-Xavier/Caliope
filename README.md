@@ -384,6 +384,10 @@ Settings > *Scene pictures*. When a scene starts (a new place, a fight), the Aed
 - Only the description of the place leaves your PC: names are removed and your messages are never sent.
 - **🎒 Map bag** (Map tab): the first picture of each place is kept on its own, and **📌** keeps any other. Each shows the place, in-game date and Canto.
 
+### 🌐 Playing in Portuguese and translating cards
+- **Language of this story** (start screen, under the starts): *As in Settings*, *English* or *Português (Brasil)*, for this game only. Choosing Portuguese for an English card also translates the card's opening when the story starts (about half a minute); the Aedo then writes the whole story in Portuguese. Restart and ⟳ Update from the card keep the game's language.
+- **🌐 Translate a card** (New game > 🌐 on a card): a Portuguese copy of the whole card, made by the story model in the background while you keep playing: descriptions, lore (its trigger words get Portuguese ones too), characters' texts, openings, starts, scenes and adventure parts. Names, pictures, the card's sheet and its INFO block stay as they are. Progress shows on the card (**Stop** cancels); the copy appears as *"<card> (Português)"*. A big adventure like Phandelver can take an hour. The original card is never changed.
+
 ### ✴ Arsenal: named techniques and spells
 On role-play cards Calíope keeps every character's named techniques, shounen style.
 - **Yours:** write the technique's name in [brackets] in your message, e.g. `*I raise my katana to my chin.* [Chou no Mai - Manabiki] *I vanish into a single piercing thrust.*` The app keeps it with what your message showed (✴ under the message). Commands like `[Override: …]` and dice are not techniques.
@@ -605,6 +609,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.29.0 | Your turn by the 5e rules (action, bonus action, movement, reaction, End turn) with the option list sorted by cost; companions with 5e sheets built by the system around your hero or step by step; class and race emblems; ▸ details on classes, races and backgrounds; equipment categories; one Sheet tab (Status merged into it); the sheet owns gear and notes; fight damage reaches the sheet; the Aedo no longer acts for you when the app starts a fight; personas bring their world additions |
 | 2.29.1 | A book's placeholder classes are left out of the builder; hide repeated entries and choose each book's rules list (2014, 2024 or both) in the Library |
 | 2.30.0 | 📦 Export on every card tile and in the card editor; "Want to describe it?" after each part of your turn; the round card told by turns with your words and companion flavour; portrait tokens on the battle map; companion pictures on their sheets; 18 more race emblems (Goliath, Halfling, Minotaur, Kobold, Lizardfolk, Satyr, Vampire…) |
+| 2.45.0 | 🌐 The story language per game (an English card played in Portuguese, its opening translated) and Portuguese copies of whole cards and adventures; a card's number can start from a choice (Lumencia's gold by origin) |
 | 2.44.0 | ✴ Arsenal: named techniques and spells of the player and the characters are kept (your [brackets], the Aedo's call-outs), reused with the same name and look, their power following the user's tier; an Arsenal tab to edit them |
 | 2.43.1 | Pictures follow the feeling: shown before a character's first line and again only when their mood changes (back to Standard too), never repeated in the same mood; up to six characters per reply instead of two |
 | 2.43.0 | The card's default start can have its own name, framing and fixed scenes, like the other starts; characters keep longer texts (description 1500 characters, looks 200 per field) |

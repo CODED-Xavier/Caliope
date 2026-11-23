@@ -250,6 +250,9 @@ export const api = {
   setPinned: (id, text) => request("PUT", `/api/conversations/${id}/pinned`, { text }),
 
   patchState: (id, patch) => request("PATCH", `/api/conversations/${id}/state`, patch),
+  translateCard: (id, language) => request("POST", `/api/scenarios/${id}/translate`, { language }),
+  translateProgress: (id) => request("GET", `/api/scenarios/${id}/translate`),
+  cancelTranslate: (id) => request("DELETE", `/api/scenarios/${id}/translate`),
   editArsenal: (id, change) => request("PATCH", `/api/conversations/${id}/arsenal`, change),
   state: (id) => request("GET", `/api/conversations/${id}/state`),
   addNpc: (id, body) => request("POST", `/api/conversations/${id}/npcs`, body),

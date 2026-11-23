@@ -1888,8 +1888,61 @@ async def create_conversation(body: dict[str, Any] = Body(default={})):
                                       companions=body.get("companions") if isinstance(body.get("companions"), list) else None,
                                       abilities=body.get("abilities") if isinstance(body.get("abilities"), list) else None,
                                       systems_state=body.get("systems_state") if isinstance(body.get("systems_state"), dict) else None,
-                                      player_lore=body.get("player_lore") if isinstance(body.get("player_lore"), list) else None)
+                                      player_lore=body.get("player_lore") if isinstance(body.get("player_lore"), list) else None,
+                                      language=str(body.get("language") or ""))
+    card_lang = (scenario or {}).get("data", {}).get("language") or "en"
+    if body.get("language") == "pt-BR" and card_lang != "pt-BR":  # "play this card in Portuguese": the opening too
+        await _translate_opening(conv["id"], "pt-BR")
     return full_conversation(conv["id"])
+
+
+async def _translate_opening(conv_id: int, lang: str) -> None:
+    from .translate import translate
+    s = svc()
+    opening = next((m for m in s.conversations.list_messages(conv_id) if m["role"] == "assistant" and m["meta"].get("opening")), None)
+    if not opening:
+        return
+    try:
+        text = await translate(s.llm, opening["content"], lang)
+    except Exception:  # noqa: BLE001 - the game still starts, with the card's own opening
+        logging.getLogger("rpg").exception("could not translate the opening")
+        return
+    if text.strip() and text != opening["content"]:
+        s.conversations.update_message(opening["id"], text)
+        s.conversations.update_message_meta(opening["id"], {"translated": lang})
+
+
+@app.post("/api/scenarios/{scenario_id}/translate")
+async def translate_card_start(scenario_id: int, body: dict[str, Any] = Body(default={})):
+    """🌐 A translated copy of a card (all its story texts, by the story model, in the background)."""
+    from .translate import JOBS, LANGS, translate_card
+    if not svc().scenarios.get(scenario_id):
+        raise NotFound("Scenario not found")
+    lang = str(body.get("language") or "pt-BR")
+    if lang not in LANGS:
+        raise HTTPException(400, "Unknown language.")
+    job = JOBS.get(scenario_id)
+    if job and job["status"] == "running":
+        return job | {"cancel": None}
+    JOBS[scenario_id] = {"status": "running", "done": 0, "total": 0, "new_id": None, "error": "", "language": lang}
+    task = asyncio.create_task(translate_card(svc(), scenario_id, lang))
+    app.state.tasks.add(task)
+    task.add_done_callback(app.state.tasks.discard)
+    return JOBS[scenario_id]
+
+
+@app.get("/api/scenarios/{scenario_id}/translate")
+async def translate_card_progress(scenario_id: int):
+    from .translate import JOBS
+    return {k: v for k, v in (JOBS.get(scenario_id) or {"status": "none"}).items() if k != "cancel"}
+
+
+@app.delete("/api/scenarios/{scenario_id}/translate")
+async def translate_card_cancel(scenario_id: int):
+    from .translate import JOBS
+    if scenario_id in JOBS:
+        JOBS[scenario_id]["cancel"] = True
+    return {"ok": True}
 
 
 @app.post("/api/conversations/{conv_id}/restart")

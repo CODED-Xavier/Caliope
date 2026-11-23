@@ -1022,3 +1022,5 @@ button.s5-ability:hover:not(:disabled) { border-color: var(--accent); }
 .arsenal .arsenal-owner { margin-top: 10px; }
 .arsenal .arsenal-move { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
 .arsenal .move-name { color: var(--accent); letter-spacing: 0.02em; }
+.translate-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.translate-bar progress { flex: 1; height: 6px; }
