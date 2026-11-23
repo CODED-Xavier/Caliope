@@ -24,6 +24,10 @@ class CalendarTests(unittest.TestCase):
         self.assertEqual(broken["start"]["month"], 1)
         self.assertEqual(broken["start"]["hour"], 23)
         self.assertEqual(len(broken["weekdays"]), 7)
+        for odd in (5, True, 2.5, "Moon"):  # a hand-edited card with a number where a list goes
+            got = wt.normalize_calendar({"months": odd, "weekdays": odd})
+            self.assertEqual(len(got["weekdays"]), 7)
+            self.assertEqual(len(got["months"]), 12)
 
     def test_week_ahead_counts_days(self):
         text = wt.week_ahead(FANTASY, 0)

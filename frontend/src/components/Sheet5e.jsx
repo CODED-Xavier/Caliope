@@ -154,7 +154,7 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
                     <input type="checkbox" checked={s.prepared !== false} disabled={disabled} title="Prepared today (unticked: only in your spellbook)"
                       onChange={(e) => change({ op: "prepare", index: i, on: e.target.checked })} />
                   )}
-                  <div className="grow">{s.name}{s.homebrew && <span className="pill small">house rule</span>}</div>
+                  <div className="grow"><span className="no-tr">{s.name}</span>{s.homebrew && <span className="pill small">house rule</span>}</div>
                   <button type="button" className="icon-btn" disabled={disabled} onClick={() => change({ op: "remove", slot: "spells", index: i })} title="Remove">✕</button>
                 </div>
               ))}

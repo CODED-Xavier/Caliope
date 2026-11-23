@@ -98,11 +98,37 @@ class FightTests(unittest.TestCase):
         from app.dnd5e.fight import cast_in_fight as _cast_in_fight  # the glue: sheet + fight
         char = hero("Wizard", 5, {"int": 18}, ["Fireball"])
         eng, state, z = self.fight(char)
+        me = next(x for x in state["combat"]["combatants"] if x["side"] == "player")
+        z[0]["x"], z[0]["y"] = me["x"] + 5, me["y"]  # 25 ft away, the second zombie beside it
+        z[1]["x"], z[1]["y"] = me["x"] + 5, me["y"] + 1
         state, line = _cast_in_fight(eng, state, LIB, "spell:Fireball", z[0]["id"], "", None)
         self.assertIn("Fireball", line)
         self.assertIn("DEX save", line)
         self.assertEqual(state["character5e"]["slots_used"], {"3": 1})
         self.assertTrue(all(x["hp"] < 40 for x in z))
+
+    def test_a_blast_that_would_hit_you_is_refused(self):
+        from app.combat import CombatError
+        from app.dnd5e.fight import cast_in_fight
+        char = hero("Wizard", 5, {"int": 18}, ["Fireball"])
+        eng, state, z = self.fight(char)  # both zombies right next to the caster
+        with self.assertRaises(CombatError) as got:
+            cast_in_fight(eng, state, LIB, "spell:Fireball", z[0]["id"], "", None)
+        self.assertIn("inside", str(got.exception))
+        self.assertNotIn("slots_used", state["character5e"])  # nothing spent
+        me = next(x for x in state["combat"]["combatants"] if x["side"] == "player")
+        z[0]["x"], z[0]["y"] = me["x"] + 6, me["y"]  # 30 ft away: the caster is outside the 20 ft blast
+        state, line = cast_in_fight(eng, state, LIB, "spell:Fireball", z[0]["id"], "", None)
+        self.assertNotIn(f"- {me['name']}:", line)
+
+    def test_opportunity_attack_needs_reach_and_keeps_the_reaction_when_refused(self):
+        from app.combat import CombatError
+        eng, state, z = self.fight(hero("Fighter", 3, {"str": 16}))
+        me = next(x for x in state["combat"]["combatants"] if x["side"] == "player")
+        z[0]["x"], z[0]["y"] = me["x"] + 5, me["y"]
+        with self.assertRaises(CombatError):
+            eng.use_option(state, {"kind": "opportunity", "cost": "reaction", "name": "Opportunity Attack"}, z[0]["id"], "")
+        self.assertNotEqual(state["combat"].get("reaction_round"), state["combat"]["round"])
 
     def test_divine_smite_listed_once(self):
         from app.dnd5e import actions

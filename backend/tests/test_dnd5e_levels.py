@@ -74,6 +74,26 @@ class TableTests(unittest.TestCase):
         self.assertNotIn("Cantrips Known", cols)  # counted by the app itself (its own row)
         self.assertFalse(any(c.startswith("1st") or c == "Slot Level" for c in cols))  # slots have their own column
 
+    def test_odd_tables_are_skipped(self):
+        for bad in (None, 3, [1, "x", None], [{"colLabels": "x", "rows": 5}], [{"colLabels": ["A"], "rows": [[{"type": "dice"}], 7]}]):
+            levels.table_columns({"classTableGroups": bad})
+        cols = levels.table_columns({"classTableGroups": [{"colLabels": ["A"], "rows": [[{"type": "dice"}], 7]}]})
+        self.assertEqual(cols[0]["values"][:3], ["–", "–", "–"])
+
+    def test_odd_spell_tables_do_not_break_the_sheet(self):
+        cls = {"name": "Odd", "casterProgression": "full", "cantripProgression": ["x", None, 3],
+               "spellsKnownProgression": "nope", "preparedSpells": "<$level$> + <$cha_mod$> + __import__", "spellsKnownProgressionFixedByLevel": {"a": 1, "2": {"6": "y"}, "3": {"6": 1}}}
+        got = levels.counts({"spells": []}, cls, None, 1, {"cha": 2}, True, LIB)
+        self.assertEqual(got["cantrips"], 0)
+        self.assertEqual(got["prepared"], 1)  # a formula with anything but numbers is not run (at least 1)
+        self.assertEqual(got["arcanum"], {3: {6: 1}})
+
+    def test_formula_is_arithmetic_only(self):
+        self.assertEqual(levels._formula("<$level$> / 2 + <$cha_mod$>", 5, {"cha": 2}), 4)
+        self.assertEqual(levels._formula("(<$level$> + 1) * 2 - <$wis_mod$>", 3, {"wis": -1}), 9)
+        for bad in ("9**9**9**9", "<$level$> ** 99", "__import__('os')", "1 if 1 else 2", "[1]*999999999", "1/0"):
+            self.assertEqual(levels._formula(bad, 5, {}), 0, bad)
+
     def test_progression_rows(self):
         rows = levels.progression(hero("Paladin", 5, {"cha": 14}), LIB)
         self.assertEqual(len(rows["levels"]), 20)

@@ -1869,7 +1869,7 @@ async def list_conversations():
 async def create_conversation(body: dict[str, Any] = Body(default={})):
     scenario = None
     if body.get("scenario_id") is not None:
-        scenario = svc().scenarios.get(int(body["scenario_id"]))
+        scenario = svc().scenarios.get(as_int(body["scenario_id"], 0))
         if not scenario:
             raise NotFound("Scenario not found")
     player = body.get("player") if isinstance(body.get("player"), dict) else None
@@ -2090,7 +2090,7 @@ async def pay_someone(conv_id: int, body: dict[str, Any] = Body(...)):
     """Pay someone from the Bag tab: the app takes the money and tells the GM."""
     s = svc()
     currency = s.conversations.get(conv_id)["scenario"].get("currency") or "gold"
-    args = (int(body.get("amount", 0) or 0), str(body.get("to", "")), str(body.get("why", "")), currency)
+    args = (as_int(body.get("amount", 0), 0), str(body.get("to", "")), str(body.get("why", "")), currency)
     shop.pay(s.conversations.get_state(conv_id), *args)
     return stream_response(s.engine.send(conv_id, "", prepare=lambda st: shop.pay(st, *args), kind="trade"))
 
@@ -2178,7 +2178,9 @@ async def scene_picture(conv_id: int, message_id: int, body: dict[str, Any] = Bo
 @app.post("/api/conversations/{conv_id}/fork")
 async def fork_conversation(conv_id: int, body: dict[str, Any] = Body(...)):
     """Save point: copy the game up to a message into a new game."""
-    return full_conversation(svc().engine.fork(conv_id, int(body["message_id"])))
+    if not as_int(body.get("message_id"), 0):
+        raise ValueError("Choose the message to start the new game from.")
+    return full_conversation(svc().engine.fork(conv_id, as_int(body["message_id"], 0)))
 
 
 @app.get("/api/conversations/{conv_id}/export")

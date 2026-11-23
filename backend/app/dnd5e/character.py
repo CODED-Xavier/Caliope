@@ -37,10 +37,6 @@ def mod(score: int) -> int:
     return (int(score) - 10) // 2
 
 
-def level_for_xp(xp: int) -> int:
-    return max(i + 1 for i, t in enumerate(XP_LEVELS) if xp >= t)
-
-
 def _sig(n: int) -> str:
     return f"+{n}" if n >= 0 else str(n)
 

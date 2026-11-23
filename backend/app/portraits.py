@@ -241,11 +241,6 @@ def portrait_instructions(npcs: list[dict], mode: str = "gm_world") -> str:
     )
 
 
-def _mentioned(npc: dict, text: str) -> bool:
-    """Whole-word mention of the name (or its first long word), so "Pria" is not found inside "appropriate"."""
-    return _mentions(npc, text) > 0
-
-
 def _name_patterns(npc: dict) -> list[str]:
     name = npc["name"].lower()
     words = [w for w in re.findall(r"[^\W_]+", name) if len(w) >= 4 and w not in ("professor", "lady", "lord", "sister")]

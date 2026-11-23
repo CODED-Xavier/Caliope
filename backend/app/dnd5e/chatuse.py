@@ -43,18 +43,38 @@ AS_VERB = {"rage": r"\b(i|he|she|we)\s+(rage|go into a rage|enter (?:a|my) rage|
 SMITE = r"\b(divine smite|smite|smites|smiting|destrui[çc][ãa]o divina|golpe divino)\b"
 
 
+NOT = r"not|don't|dont|do not|won't|wont|will not|never|can't|cannot|without|não|nao|nunca|sem"
+IF = r"if|when|whether|should|could|can|would|may|might|se|quando|caso|posso|devo|deveria|poderia"
+NEAR = 6  # the verb comes at most this many words before the name ("I quickly cast a Cure Wounds")
+
+
 def _sentences(text: str) -> list[str]:
-    return [s for s in re.split(r"(?<=[.!?;\n])\s+|\n+", text) if s.strip()]
+    """Sentences that say something happens: questions and "if…" sentences spend nothing."""
+    out = []
+    for s in re.findall(r"[^.!?;\n]+[.!?;]?", text):
+        s = s.strip()
+        if not s or s.endswith("?") or re.match(rf"(?:{IF})\b", s, re.I):
+            continue
+        out.append(s)
+    return out
 
 
 def _has(pattern: str, text: str) -> bool:
     return bool(re.search(rf"\b(?:{pattern})\b", text, re.I))
 
 
-def _named(name: str, sentence: str) -> bool:
-    keys = [name.lower()] + PT_NAMES.get(name.lower(), [])
+def _keys(name: str) -> list[str]:
+    return [name.lower()] + PT_NAMES.get(name.lower(), [])
+
+
+def _used(verbs: str, name: str, sentence: str) -> bool:
+    """A verb for using it shortly before the name, and no "not" just before the verb."""
     low = sentence.lower()
-    return any(re.search(rf"(?<![\w']){re.escape(k)}(?![\w'])", low) for k in keys)
+    for k in _keys(name):
+        m = re.search(rf"\b(?:{verbs})\b((?:\W+[\w'’]+){{0,{NEAR}}}?)\W+{re.escape(k)}(?![\w'])", low)
+        if m and not re.search(rf"\b(?:{NOT})\b(?:\W+[\w'’]+){{0,2}}\W*$", low[: m.start()]):
+            return True
+    return False
 
 
 def _slot_level(sentence: str) -> int | None:
@@ -85,19 +105,21 @@ def found_in_text(text: str, char: dict, lib) -> list[dict]:
         if e and int(e.get("level", 0)) > 0:
             spells.append((e["name"], int(e["level"])))
     for s in _sentences(text):
+        negated = _has(NOT, s)
         for f in feats:
-            if any(x.get("name") == f["name"] for x in out) or not _named(f["name"], s) and not re.search(AS_VERB.get(f["name"].lower(), r"$^"), s, re.I):
+            if any(x.get("name") == f["name"] for x in out):
                 continue
-            if _has(USE, s) or re.search(AS_VERB.get(f["name"].lower(), r"$^"), s, re.I):
+            as_verb = not negated and re.search(AS_VERB.get(f["name"].lower(), r"$^"), s, re.I)
+            if _used(USE, f["name"], s) or as_verb:
                 item = {"kind": "feature", "name": f["name"], "amount": None}
                 if f["name"].lower() in store.POOLS:
                     item["amount"] = _amount(s)
                 out.append(item)
         for name, level in spells:
-            if _named(name, s) and _has(CAST + "|" + USE, s) and not any(x.get("name") == name for x in out):
+            if _used(CAST + "|" + USE, name, s) and not any(x.get("name") == name for x in out):
                 out.append({"kind": "spell", "name": name, "spell_level": level, "slot": _slot_level(s),
                             "self": bool(re.search(SELF, s, re.I))})
-        if (sheet["class"] == "Paladin" and sheet["level"] >= 2 and re.search(SMITE, s, re.I)
+        if (sheet["class"] == "Paladin" and sheet["level"] >= 2 and re.search(SMITE, s, re.I) and not negated
                 and not any(x["kind"] == "smite" for x in out)):
             out.append({"kind": "smite", "slot": _slot_level(s)})
     return out[:4]

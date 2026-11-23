@@ -281,22 +281,11 @@ def clean_values(template: str, values: dict) -> dict[str, str]:
     """A sheet sent by the start screen: only the card's own fields, no empty or rule-text values."""
     allowed = set(custom_fields(template))
     out = {}
-    for k, v in (values or {}).items():
+    for k, v in (values if isinstance(values, dict) else {}).items():
         k, v = str(k).strip(), truncate(str(v or "").strip(), 160)
         if k in allowed and v and not RULE_TEXT.match(v):
             out[k] = bump_progress(v)
     return out
-
-
-def latest_block(messages: list[dict]) -> str | None:
-    for m in reversed(messages):
-        if m.get("meta", {}).get("status"):
-            return m["meta"]["status"]
-    return None
-
-
-def strip_block(text: str) -> str:
-    return split_status(text)[0]
 
 
 CREATION = re.compile(r"^.*(character creation|create your character|build your character|cria[cç][aã]o de personagem|crie seu personagem|ficha).*$", re.I | re.M)

@@ -163,11 +163,10 @@ def level_up_plan(char: dict, lib) -> dict:
         if key and (ac.get(key) or 0) > (bc.get(key) or 0):
             choices.append({"id": "spells", "kind": "spells", "count": ac[key] - (bc.get(key) or 0), "list": casting,
                             "max_level": top, "spellbook": key == "spellbook"})
-        arcanum = next((v for k, v in ((cls.get("spellsKnownProgressionFixedByLevel") or {}).items()) if int(k) == to), None)
-        if isinstance(arcanum, dict):
-            for spell_level, n in arcanum.items():
-                choices.append({"id": "arcanum", "kind": "spells", "count": int(n), "list": casting,
-                                "exact_level": int(spell_level), "max_level": int(spell_level)})
+        from .levels import arcanum_at
+        for spell_level, n in arcanum_at(cls).get(to, {}).items():
+            choices.append({"id": "arcanum", "kind": "spells", "count": n, "list": casting,
+                            "exact_level": spell_level, "max_level": spell_level})
     return {"to_level": to, "hit_die": f"d{faces}", "hp_average": faces // 2 + 1, "gains": gains, "choices": choices,
             "changes": table, "spell_mode": (ac or {}).get("mode")}
 

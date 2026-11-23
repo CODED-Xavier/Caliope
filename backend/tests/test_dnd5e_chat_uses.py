@@ -39,6 +39,17 @@ class FindTests(unittest.TestCase):
         self.assertEqual(chatuse.found_in_text("Entro em fúria e avanço.", barb, LIB)[0]["name"], "Rage")
         self.assertEqual(chatuse.found_in_text("The orc's rage is clear.", barb, LIB), [])
 
+    def test_questions_ifs_and_negations_spend_nothing(self):
+        pal = hero("Paladin", 3, {"cha": 14})
+        for text in ("Should I use Lay on Hands now?", "If I use Lay on Hands, will she trust me.",
+                     "I don't use Lay on Hands yet.", "Não uso Imposição das Mãos ainda.",
+                     "I use my sword and my shield while the priest speaks of the old rite of lay on hands to the crowd."):
+            self.assertEqual(chatuse.found_in_text(text, pal, LIB), [], text)
+        cle = hero("Cleric", 3, {"wis": 16}, ["Cure Wounds"])
+        self.assertEqual(chatuse.found_in_text("Can I cast Cure Wounds on her?", cle, LIB), [])
+        self.assertEqual(chatuse.found_in_text("I won't cast Cure Wounds.", cle, LIB), [])
+        self.assertEqual(len(chatuse.found_in_text("I quickly cast a Cure Wounds on Lyra.", cle, LIB)), 1)
+
     def test_spells_need_cast_and_take_the_slot_level(self):
         cle = hero("Cleric", 3, {"wis": 16}, ["Cure Wounds", "Sacred Flame"])
         self.assertEqual(chatuse.found_in_text("I cast Cure Wounds at 2nd level on Lyra.", cle, LIB),

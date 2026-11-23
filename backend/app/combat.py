@@ -84,7 +84,8 @@ def player_defaults(state: dict, system: str) -> dict:
         att = (melee or sheet.get("attacks") or [None])[0]
         out = {"ac": as_int(sheet.get("ac", 10), 10), "init_bonus": as_int(sheet.get("initiative", 0), 0), "hp": as_int(p["hp"]["max"], 10)}
         if sheet.get("class") == "Rogue":  # Sneak Attack: once a turn, with advantage or an ally next to the target
-            out["sneak"] = f"{(as_int(sheet.get('level', 1), 1) + 1) // 2}d6"
+            from .dnd5e.magic import sneak_dice
+            out["sneak"] = sneak_dice(as_int(sheet.get("level", 1), 1))
         if att:
             out.update(attack_bonus=att["bonus"], damage=att["damage"], weapon=att["name"])
         else:
@@ -450,6 +451,9 @@ class CombatEngine:
         if kind == "save":
             if info.get("area") and target:
                 hit = self._area_targets(combat, me, target, info["area"])
+                if me in hit and info["area"].get("origin") != "self":  # the blast would catch the caster too
+                    raise CombatError(f"You would be inside {name}'s area ({info['area'].get('size', 5)} ft around {target['name']}). "
+                                      "Aim at someone farther away, or move first.")
             elif target:
                 hit = [target]
             else:
@@ -673,45 +677,54 @@ class CombatEngine:
         combat = state.get("combat") or {}
         if not combat.get("active"):
             raise CombatError("There is no fight going on.")
-        if cost == "reaction":  # a reaction can come on someone else's turn: once per round
-            me = next(c for c in combat["combatants"] if c["side"] == "player")
-            if me["hp"] <= 0:
-                raise CombatError("You are unconscious.")
-            if combat.get("reaction_round") == combat["round"]:
-                raise CombatError("You already used your reaction this round. It comes back at the start of your next turn.")
-            combat["reaction_round"] = combat["round"]
-            combat.setdefault("turn_lines", [])
-        else:
-            combat, me = self._check_my_turn(state)
-            if cost == "action":
-                self._spend_action(combat)
-            elif cost == "bonus":
-                if combat["spent"]["bonus"]:
-                    raise CombatError("You already used your bonus action this turn.")
-                combat["spent"]["bonus"] = True
-        label = {"action": "action", "bonus": "bonus action", "reaction": "reaction", "free": "no action"}.get(cost, cost)
-        if option.get("grants") == "action":
-            combat["extra_actions"] = combat.get("extra_actions", 0) + 1
-        if kind in ("grapple", "shove"):
-            target = self._get(combat, target_id)
-            if target["hp"] <= 0:
-                raise CombatError(f"{target['name']} is already down.")
-            combat["spent"]["attacked"] = True  # it replaces one attack of the Attack action
-            line = self._contest(state, me, target, kind)
-        elif kind == "opportunity":
-            target = self._get(combat, target_id)
-            line = self._attack(combat, me, target, "", head=f"**{me['name']} makes an opportunity attack on {target['name']} (reaction)**")
-        elif option.get("cast"):
-            line = self._cast(combat, me, target_id, name, option["cast"])
-        elif kind == "smite":
-            line = self._smite(combat, me, option["smite"])
-        elif kind == "dash":
-            combat["moved"] = combat.get("moved", 0) - me.get("speed", 6)
-            line = f"**{me['name']} dashes** ({label})\n🏃 +{me.get('speed', 6) * 5} ft of movement this turn."
-        else:
-            line = f"**{me['name']} uses {name}** ({label})" + (f"\n{option['result']}" if option.get("result") else "")
-            if kind == "disengage":
-                line += "\n🛡 Moving away provokes no opportunity attacks this turn."
+        kept = {"spent": dict(combat.get("spent") or {}), "reaction_round": combat.get("reaction_round"),
+                "extra_actions": combat.get("extra_actions", 0), "moved": combat.get("moved", 0)}
+        try:
+            if cost == "reaction":  # a reaction can come on someone else's turn: once per round
+                me = next(c for c in combat["combatants"] if c["side"] == "player")
+                if me["hp"] <= 0:
+                    raise CombatError("You are unconscious.")
+                if combat.get("reaction_round") == combat["round"]:
+                    raise CombatError("You already used your reaction this round. It comes back at the start of your next turn.")
+                combat["reaction_round"] = combat["round"]
+                combat.setdefault("turn_lines", [])
+            else:
+                combat, me = self._check_my_turn(state)
+                if cost == "action":
+                    self._spend_action(combat)
+                elif cost == "bonus":
+                    if combat["spent"]["bonus"]:
+                        raise CombatError("You already used your bonus action this turn.")
+                    combat["spent"]["bonus"] = True
+            label = {"action": "action", "bonus": "bonus action", "reaction": "reaction", "free": "no action"}.get(cost, cost)
+            if option.get("grants") == "action":
+                combat["extra_actions"] = combat.get("extra_actions", 0) + 1
+            if kind in ("grapple", "shove"):
+                target = self._get(combat, target_id)
+                if target["hp"] <= 0:
+                    raise CombatError(f"{target['name']} is already down.")
+                combat["spent"]["attacked"] = True  # it replaces one attack of the Attack action
+                line = self._contest(state, me, target, kind)
+            elif kind == "opportunity":
+                target = self._get(combat, target_id)
+                reach = me.get("range", 1) if me.get("range", 1) <= 2 else 1  # melee only: a bow's range is not reach
+                if distance(me["x"], me["y"], target["x"], target["y"]) > reach:
+                    raise CombatError(f"{target['name']} is out of your reach: an opportunity attack hits someone leaving your reach.")
+                line = self._attack(combat, me, target, "", head=f"**{me['name']} makes an opportunity attack on {target['name']} (reaction)**")
+            elif option.get("cast"):
+                line = self._cast(combat, me, target_id, name, option["cast"])
+            elif kind == "smite":
+                line = self._smite(combat, me, option["smite"])
+            elif kind == "dash":
+                combat["moved"] = combat.get("moved", 0) - me.get("speed", 6)
+                line = f"**{me['name']} dashes** ({label})\n🏃 +{me.get('speed', 6) * 5} ft of movement this turn."
+            else:
+                line = f"**{me['name']} uses {name}** ({label})" + (f"\n{option['result']}" if option.get("result") else "")
+                if kind == "disengage":
+                    line += "\n🛡 Moving away provokes no opportunity attacks this turn."
+        except CombatError:  # refused (no target, out of range, the caster inside the blast…): the action is not spent
+            combat.update(kept)
+            raise
         if option.get("hp") is not None:  # a feature that healed (Second Wind): the fight's HP follows the sheet
             me["hp"] = int(clamp(as_int(option["hp"], me["hp"]), 0, me["max_hp"]))
         combat["turn_lines"].append(line)

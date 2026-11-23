@@ -47,6 +47,8 @@ def cast_in_fight(engine, state: dict, lib, option_id: str, target: str, advanta
     char = state.get("character5e")
     if not char:
         raise CombatError("The action list needs a 5e sheet.")
+    import copy
+    before = copy.deepcopy({k: state.get(k) for k in ("character5e", "character5e_sheet", "player")})
     option = actions.find(char, lib, option_id)
     if not option:
         raise CombatError("That is not one of your options.")
@@ -85,6 +87,10 @@ def cast_in_fight(engine, state: dict, lib, option_id: str, target: str, advanta
             option = {**option, "smite": {"slot": used, "dice": magic.smite_dice(used, foe.get("name", ""))}}
     except ValueError as exc:
         raise CombatError(str(exc)) from exc
-    state, line = engine.use_option(state, option, target, advantage)
+    try:
+        state, line = engine.use_option(state, option, target, advantage)
+    except CombatError:
+        state.update(before)  # refused (out of range, no target, the caster in the blast…): nothing was spent
+        raise
     auto_reactions(state, lib)
     return state, line

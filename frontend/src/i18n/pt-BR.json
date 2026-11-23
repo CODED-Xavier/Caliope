@@ -2021,7 +2021,107 @@
 "Invocations Known": "Invocações Conhecidas",
 "That spell is not on the sheet.": "Essa magia não está na ficha.",
 "This sheet is not a 5e sheet yet.": "Esta ficha ainda não é uma ficha 5e.",
-"Choose a class first.": "Escolha uma classe primeiro."
+"Choose a class first.": "Escolha uma classe primeiro.",
+"The wiki redirected too many times.": "A wiki redirecionou vezes demais.",
+"That entry is not in the library.": "Essa entrada não está na biblioteca.",
+"This game is played solo.": "Este jogo é solo.",
+"Build your own hero first: the companions are chosen around your class.": "Monte seu herói primeiro: os companheiros são escolhidos em volta da sua classe.",
+"The model did not write usable companions. Try again.": "O modelo não escreveu companheiros utilizáveis. Tente de novo.",
+"Wait for the current reply to finish.": "Espere a resposta atual terminar.",
+"The file is empty.": "O arquivo está vazio.",
+"That message has no scene picture.": "Essa mensagem não tem imagem de cena.",
+"Card not found": "Card não encontrado",
+"Lore entry not found": "Entrada de lore não encontrada",
+"Give a folder path, GitHub link or .zip link.": "Informe uma pasta, um link do GitHub ou um link .zip.",
+"This game has no 5e sheet.": "Este jogo não tem ficha 5e.",
+"Scenario not found": "Card não encontrado",
+"Not found": "Não encontrado",
+"Unknown combat action.": "Ação de combate desconhecida.",
+"The model did not suggest any resources. Add them yourself.": "O modelo não sugeriu recursos. Adicione você mesmo.",
+"picture_service must be 'pollinations' or 'pixai'": "picture_service precisa ser 'pollinations' ou 'pixai'",
+"ui_language must be 'en' or 'pt-BR'": "ui_language precisa ser 'en' ou 'pt-BR'",
+"ai_engine must be 'lmstudio' or 'builtin'": "ai_engine precisa ser 'lmstudio' ou 'builtin'",
+"The engine port must be between 1024 and 65000": "A porta do motor precisa estar entre 1024 e 65000",
+"GPU layers must be auto, all or a number": "As camadas na GPU precisam ser auto, all ou um número",
+"The model server reports no models. Load a model in LM Studio first.": "O servidor do modelo não tem modelos. Carregue um modelo no LM Studio primeiro.",
+"Unexpected response format from the model server.": "Resposta em formato inesperado do servidor do modelo.",
+"No wiki was found for that name. Paste the wiki's address (for example https://jujutsu-kaisen.fandom.com).": "Nenhuma wiki encontrada com esse nome. Cole o endereço da wiki (por exemplo https://jujutsu-kaisen.fandom.com).",
+"Write the name of the work, or paste its wiki's address.": "Escreva o nome da obra ou cole o endereço da wiki dela.",
+"Tick at least one character or lore page.": "Marque pelo menos um personagem ou página de lore.",
+"That wiki address could not be read.": "Não foi possível ler esse endereço de wiki.",
+"The built-in engine download is for Windows. On other systems install llama.cpp yourself and put llama-server in the engine folder.": "O download do motor embutido é para Windows. Em outros sistemas instale o llama.cpp você mesmo e coloque o llama-server na pasta do motor.",
+"The download does not contain llama-server.": "O download não contém o llama-server.",
+"The download is unexpectedly large.": "O download está grande demais.",
+"The download contains unsafe paths.": "O download contém caminhos inseguros.",
+"The map is empty.": "O mapa está vazio.",
+"Too many redirects.": "Redirecionamentos demais.",
+"Only http(s) image links are allowed.": "Só links de imagem http(s) são permitidos.",
+"That link is not a PNG, JPEG, WebP or GIF image.": "Esse link não é uma imagem PNG, JPEG, WebP ou GIF.",
+"The image is larger than 8 MB.": "A imagem tem mais de 8 MB.",
+"That file is not a PNG, JPEG, WebP or GIF image.": "Esse arquivo não é uma imagem PNG, JPEG, WebP ou GIF.",
+"Links that point inside your own network are not allowed.": "Links que apontam para dentro da sua própria rede não são permitidos.",
+"Wait for the current reply to finish before editing.": "Espere a resposta atual terminar antes de editar.",
+"Wait for the current reply to finish before making a save point.": "Espere a resposta atual terminar antes de criar um ponto de salvamento.",
+"Wait for the current reply to finish before rewinding.": "Espere a resposta atual terminar antes de voltar.",
+"Only the GM's replies can be painted.": "Só as respostas do Aedo podem ser pintadas.",
+"The model could not describe this scene. Is LM Studio running?": "O modelo não conseguiu descrever esta cena. O LM Studio está aberto?",
+"Download a voice first (Settings > Narration voice).": "Baixe uma voz primeiro (Configurações > Voz de narração).",
+"The voice program is missing: download a voice again in Settings.": "O programa de voz está faltando: baixe uma voz de novo nas Configurações.",
+"Nothing to read in this message.": "Nada para ler nesta mensagem.",
+"The download does not contain Piper.": "O download não contém o Piper.",
+"The voice took too long.": "A voz demorou demais.",
+"The voice program download is for Windows.": "O download do programa de voz é para Windows.",
+"The voice download is incomplete.": "O download da voz está incompleto.",
+"The file must contain a JSON object.": "O arquivo precisa conter um objeto JSON.",
+"This does not look like a character card (no name, description or first message).": "Isto não parece um card de personagem (sem nome, descrição ou primeira mensagem).",
+"That talk with the Muse no longer exists.": "Essa conversa com a Musa não existe mais.",
+"Add your PixAI API key in Settings > Scene pictures.": "Adicione sua chave de API do PixAI em Configurações > Imagens de cena.",
+"Add the PixAI model version ID in Settings > Scene pictures (from the model's page on PixAI).": "Adicione o ID da versão do modelo do PixAI em Configurações > Imagens de cena (da página do modelo no PixAI).",
+"PixAI did not return a task.": "O PixAI não devolveu uma tarefa.",
+"PixAI finished but sent no picture link.": "O PixAI terminou mas não mandou o link da imagem.",
+"PixAI took too long.": "O PixAI demorou demais.",
+"frontmatter is not a mapping": "o cabeçalho (frontmatter) não é um mapeamento",
+"Give a skill folder or a .zip file.": "Informe uma pasta de skill ou um arquivo .zip.",
+"No SKILL.md file was found there.": "Nenhum arquivo SKILL.md foi encontrado ali.",
+"That is not a valid zip file.": "Isso não é um arquivo zip válido.",
+"Use a GitHub link (repo or /tree/branch/folder), a direct .zip link, or a local path.": "Use um link do GitHub (repositório ou /tree/branch/pasta), um link direto .zip ou uma pasta local.",
+"Zip is too large (limit 100 MB).": "O zip é grande demais (limite de 100 MB).",
+"Unsafe path inside zip file.": "Caminho inseguro dentro do zip.",
+"The song is larger than 40 MB.": "A música tem mais de 40 MB.",
+"That file is not MP3, OGG, WAV, FLAC, M4A or WebM audio.": "Esse arquivo não é áudio MP3, OGG, WAV, FLAC, M4A ou WebM.",
+"YouTube, Spotify and SoundCloud pages cannot be played here. Use a direct link to an audio file (ending in .mp3 or .ogg), or download the song and add the file.": "Páginas do YouTube, Spotify e SoundCloud não tocam aqui. Use um link direto para um arquivo de áudio (terminando em .mp3 ou .ogg), ou baixe a música e adicione o arquivo.",
+"The file picker is not available here. Paste the folder's address instead.": "O seletor de arquivos não está disponível aqui. Cole o endereço da pasta.",
+"Pick the folder that has your models, not a whole drive or your user folder (searching it would be very slow).": "Escolha a pasta que tem seus modelos, não um disco inteiro nem sua pasta de usuário (a busca seria muito lenta).",
+"Only .gguf files inside the model folders can be deleted here.": "Só arquivos .gguf dentro das pastas de modelos podem ser apagados aqui.",
+"Not a valid Hugging Face repository name (author/name).": "Nome de repositório do Hugging Face inválido (autor/nome).",
+"Not a valid model file.": "Arquivo de modelo inválido.",
+"The download stopped early. Press Download again to resume.": "O download parou antes. Aperte Baixar de novo para continuar.",
+"The file is damaged (checksum mismatch). Download it again.": "O arquivo está danificado (checksum diferente). Baixe de novo.",
+"Model file not found.": "Arquivo de modelo não encontrado.",
+"This repository needs a Hugging Face login (gated). Choose another one.": "Este repositório precisa de login no Hugging Face (restrito). Escolha outro.",
+"Not found on Hugging Face.": "Não encontrado no Hugging Face.",
+"That file is no longer in the repository.": "Esse arquivo não está mais no repositório.",
+"This model needs a Hugging Face login (gated). Choose another one.": "Este modelo precisa de login no Hugging Face (restrito). Escolha outro.",
+"The server cannot resume this download. Delete it and start again.": "O servidor não consegue continuar este download. Apague e comece de novo.",
+"The server sent more data than expected.": "O servidor mandou mais dados que o esperado.",
+"The PDF reader is not installed. Run Play.bat again to install it.": "O leitor de PDF não está instalado. Rode o Play.bat de novo para instalar.",
+"The file is larger than 120 MB.": "O arquivo tem mais de 120 MB.",
+"This picture is in your private R2 bucket: add the R2 keys in Settings > Pictures in the cloud.": "Esta imagem está no seu bucket R2 privado: adicione as chaves do R2 em Configurações > Imagens na nuvem.",
+"Add the R2 account ID, bucket and keys in Settings first.": "Adicione o ID da conta, o bucket e as chaves do R2 nas Configurações primeiro.",
+"A monster needs a name.": "Um monstro precisa de um nome.",
+"This class has no starting gold to take instead; pick a package.": "Esta classe não tem ouro inicial no lugar; escolha um pacote.",
+"There is no Library folder to keep your choices in.": "Não há pasta da Biblioteca para guardar suas escolhas.",
+"An Ability Score Improvement is +2 to one score or +1 to two.": "Um Aumento de Atributo é +2 em um valor ou +1 em dois.",
+"Can't remove that.": "Não dá para tirar isso.",
+"Nothing there to remove.": "Não há nada ali para tirar.",
+"No such item.": "Esse item não existe.",
+"Unknown field.": "Campo desconhecido.",
+"Unknown change.": "Mudança desconhecida.",
+"Unknown choice.": "Escolha desconhecida.",
+"Only classes, races and backgrounds have details.": "Só classes, raças e antecedentes têm detalhes.",
+"· placed (click it again to lift it)": "· colocada (clique de novo para tirar)",
+": cantrips only for now": ": por enquanto só truques",
+"Choose the message to start the new game from.": "Escolha a mensagem de onde começa o novo jogo."
 },
 "patterns": [
 [
@@ -3575,6 +3675,154 @@
 [
 "HP · {0}",
 "PV · {0}"
+],
+[
+"Dice out of range (max {0} dice, d2 to d{1}).",
+"Dados fora do limite (máx. {0} dados, d2 a d{1})."
+],
+[
+"Scenario {0} not found",
+"Card {0} não encontrado"
+],
+[
+"{0} is not in your party.",
+"{0} não está no seu grupo."
+],
+[
+"Unknown setting: {0}",
+"Configuração desconhecida: {0}"
+],
+[
+"Model server returned {0}: {1}",
+"O servidor do modelo respondeu {0}: {1}"
+],
+[
+"The page '{0}' could not be read.",
+"Não foi possível ler a página '{0}'."
+],
+[
+"Map {0} not found.",
+"Mapa {0} não encontrado."
+],
+[
+"Cannot resolve {0}.",
+"Não foi possível encontrar {0}."
+],
+[
+"The image server answered {0}.",
+"O servidor da imagem respondeu {0}."
+],
+[
+"Message {0} not found",
+"Mensagem {0} não encontrada"
+],
+[
+"Download failed: {0}",
+"O download falhou: {0}"
+],
+[
+"Conversation {0} not found",
+"Conversa {0} não encontrada"
+],
+[
+"NPC {0} not found",
+"NPC {0} não encontrado"
+],
+[
+"State for conversation {0} not found",
+"Estado da conversa {0} não encontrado"
+],
+[
+"Message {0} is not part of this game",
+"A mensagem {0} não faz parte deste jogo"
+],
+[
+"PixAI refused the picture ({0}): {1}",
+"O PixAI recusou a imagem ({0}): {1}"
+],
+[
+"PixAI answered {0} for the finished picture.",
+"O PixAI respondeu {0} para a imagem pronta."
+],
+[
+"PixAI could not paint it ({0}).",
+"O PixAI não conseguiu pintar ({0})."
+],
+[
+"PixAI answered {0} while painting.",
+"O PixAI respondeu {0} enquanto pintava."
+],
+[
+"Could not download the skill ({0}).",
+"Não foi possível baixar a skill ({0})."
+],
+[
+"Skill '{0}' is not installed",
+"A skill '{0}' não está instalada"
+],
+[
+"Path not found: {0}",
+"Caminho não encontrado: {0}"
+],
+[
+"Folder '{0}' not found in the archive.",
+"Pasta '{0}' não encontrada no arquivo."
+],
+[
+"Song {0} not found.",
+"Música {0} não encontrada."
+],
+[
+"No .gguf model files were found in {0}.",
+"Nenhum arquivo de modelo .gguf foi encontrado em {0}."
+],
+[
+"Could not reach Hugging Face (check your internet): {0}",
+"Não foi possível acessar o Hugging Face (verifique sua internet): {0}"
+],
+[
+"This PDF could not be opened ({0}).",
+"Não foi possível abrir este PDF ({0})."
+],
+[
+"Rulebook {0} not found.",
+"Livro de regras {0} não encontrado."
+],
+[
+"R2 refused the upload ({0}): {1}",
+"O R2 recusou o envio ({0}): {1}"
+],
+[
+"{0} ({1}) is not in the library.",
+"{0} ({1}) não está na biblioteca."
+],
+[
+"{0} has no price in the Library.",
+"{0} não tem preço na Biblioteca."
+],
+[
+"A d{0} roll is between 1 and {1}.",
+"Uma rolagem de d{0} fica entre 1 e {1}."
+],
+[
+"{0} is not a choice here.",
+"{0} não é uma opção aqui."
+],
+[
+"{0} can't go on a sheet.",
+"{0} não pode ir para uma ficha."
+],
+[
+"{0} is already on the sheet.",
+"{0} já está na ficha."
+],
+[
+"You would be inside {0}'s area ({1} ft around {2}). Aim at someone farther away, or move first.",
+"Você ficaria dentro da área de {0} ({1} ft em volta de {2}). Mire em alguém mais longe, ou mova-se antes."
+],
+[
+"{0} is out of your reach: an opportunity attack hits someone leaving your reach.",
+"{0} está fora do seu alcance: um ataque de oportunidade acerta quem sai do seu alcance."
 ]
 ]
 }

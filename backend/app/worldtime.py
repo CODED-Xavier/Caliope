@@ -58,9 +58,10 @@ def normalize_calendar(raw) -> dict:
     """Card field `calendar`. Missing or broken parts fall back to the Earth calendar."""
     raw = raw if isinstance(raw, dict) else {}
     base = PRESETS.get(str(raw.get("preset") or ""), EARTH)
-    weekdays = [truncate(str(w).strip(), 24) for w in (raw.get("weekdays") or base["weekdays"]) if str(w).strip()][:14] or list(EARTH["weekdays"])
+    listed = lambda key: raw.get(key) if isinstance(raw.get(key), list) and raw.get(key) else base[key]  # noqa: E731
+    weekdays = [truncate(str(w).strip(), 24) for w in listed("weekdays") if str(w).strip()][:14] or list(EARTH["weekdays"])
     months = []
-    for m in raw.get("months") or base["months"]:
+    for m in listed("months"):
         if isinstance(m, dict) and str(m.get("name", "")).strip():
             try:
                 days = int(m.get("days", 30))

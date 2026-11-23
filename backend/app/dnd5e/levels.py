@@ -42,11 +42,13 @@ def _cell(v) -> str:
 def table_columns(cls: dict | None) -> list[dict]:
     """The class table's columns besides slots and spell counts: [{label, values: 20 strings}]."""
     out = []
-    for group in (cls or {}).get("classTableGroups") or []:
-        if "spell slots" in str(group.get("title") or "").lower():
+    groups = (cls or {}).get("classTableGroups")
+    for group in groups if isinstance(groups, list) else []:  # homebrew files can hold anything: skip what isn't a table
+        if not isinstance(group, dict) or "spell slots" in str(group.get("title") or "").lower():
             continue
-        labels = [strip_tags(x) if isinstance(x, str) else str(x) for x in group.get("colLabels") or []]
+        labels = [strip_tags(x) if isinstance(x, str) else str(x) for x in group.get("colLabels") or [] if isinstance(group.get("colLabels"), list)]
         rows = group.get("rows") or group.get("rowsSpellProgression") or []
+        rows = rows if isinstance(rows, list) else []
         for i, label in enumerate(labels):
             if label.lower() in OWN_COLUMNS:
                 continue
@@ -56,14 +58,29 @@ def table_columns(cls: dict | None) -> list[dict]:
 
 
 def _formula(text: str, level: int, mods: dict) -> int:
-    """5e.tools' "<$level$> / 2 + <$cha_mod$>"."""
-    expr = text.replace("<$level$>", str(level))
+    """5e.tools' "<$level$> / 2 + <$cha_mod$>": whole numbers with + - * / and brackets only (division rounds down)."""
+    import ast
+    expr = str(text).replace("<$level$>", str(level))
     expr = re.sub(r"<\$(\w+)_mod\$>", lambda m: f"({int(mods.get(m.group(1), 0))})", expr)
-    if not re.fullmatch(r"[\d\s+\-*/()]+", expr):
+    if len(expr) > 80 or not re.fullmatch(r"[\d\s+\-*/()]+", expr) or "**" in expr:
         return 0
+    ops = {ast.Add: lambda a, b: a + b, ast.Sub: lambda a, b: a - b, ast.Mult: lambda a, b: a * b,
+           ast.Div: lambda a, b: a // b, ast.FloorDiv: lambda a, b: a // b}
+
+    def calc(n):
+        if isinstance(n, ast.Expression):
+            return calc(n.body)
+        if isinstance(n, ast.Constant) and isinstance(n.value, int):
+            return n.value
+        if isinstance(n, ast.UnaryOp) and isinstance(n.op, (ast.USub, ast.UAdd)):
+            return -calc(n.operand) if isinstance(n.op, ast.USub) else calc(n.operand)
+        if isinstance(n, ast.BinOp) and type(n.op) in ops:
+            return ops[type(n.op)](calc(n.left), calc(n.right))
+        raise ValueError("not arithmetic")
+
     try:
-        return int(eval(expr.replace("/", "//"), {"__builtins__": {}}, {}))  # noqa: S307 - digits and + - * / only
-    except (SyntaxError, ZeroDivisionError, ValueError):
+        return int(calc(ast.parse(expr, mode="eval")))
+    except (SyntaxError, ZeroDivisionError, ValueError, RecursionError):
         return 0
 
 
@@ -76,12 +93,12 @@ def counts(char: dict, cls: dict | None, sub: dict | None, level: int, mods: dic
 
     def at(key):
         v = src.get(key)
-        return int(v[i]) if isinstance(v, list) and len(v) > i else None
+        return _int(v[i]) if isinstance(v, list) and len(v) > i else None
 
     known = at("spellsKnownProgression")
     prepared = _formula(src["preparedSpells"], level, mods) if src.get("preparedSpells") else at("preparedSpellsProgression")
     fixed = src.get("spellsKnownProgressionFixed")
-    book = sum(int(x) for x in fixed[:level]) if isinstance(fixed, list) else None
+    book = sum(_int(x) or 0 for x in fixed[:level]) if isinstance(fixed, list) else None
     if prepared is not None:
         prepared = max(1, prepared) if has_magic else 0
     if known is not None and not has_magic:
@@ -101,8 +118,26 @@ def counts(char: dict, cls: dict | None, sub: dict | None, level: int, mods: dic
     return {"mode": mode, "cantrips": at("cantripProgression") or 0, "known": known if mode == "known" else None,
             "prepared": prepared if mode != "known" else None, "spellbook": book,
             "have_cantrips": have["cantrips"], "have_spells": have["spells"], "have_prepared": have["prepared"],
-            "arcanum": {int(k): int(sum(v.values())) for k, v in (src.get("spellsKnownProgressionFixedByLevel") or {}).items()
-                        if isinstance(v, dict)}}
+            "arcanum": arcanum_at(src)}
+
+
+def arcanum_at(src: dict) -> dict[int, dict[int, int]]:
+    """A Warlock's Mystic Arcanum: {class level: {spell level: how many}} (bad entries in a homebrew file are skipped)."""
+    raw = src.get("spellsKnownProgressionFixedByLevel")
+    out: dict[int, dict[int, int]] = {}
+    for k, v in raw.items() if isinstance(raw, dict) else []:
+        if _int(k) and isinstance(v, dict):
+            got = {_int(a): _int(b) for a, b in v.items() if _int(a) and _int(b)}
+            if got:
+                out[_int(k)] = got
+    return out
+
+
+def _int(v) -> int | None:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def warnings(c: dict | None, level: int, class_name: str) -> list[str]:

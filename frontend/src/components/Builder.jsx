@@ -107,7 +107,7 @@ function OptionCards({ type, edition, onPick, picked, busy, categories, cls = ""
               <button type="button" className="option-main" disabled={busy} onClick={() => onPick({ type: r.type || type, name: r.name, source: r.source })}>
                 {img && <img className="option-emblem" src={img} alt="" />}
                 <span className="option-text">
-                  <span className="option-name">{r.name}</span>
+                  <span className={`option-name ${["spell", "baseitem", "item"].includes(r.type || type) ? "no-tr" : ""}`}>{r.name}</span>
                   <span className="option-src">{`${r.source}${r.srd ? " · SRD" : ""}${r.category ? ` · ${r.category}` : ""}${r.level !== undefined && type === "spell" ? (r.level ? ` · level ${r.level}` : " · cantrip") : ""}${buyLabel && r.value ? ` · ${money(r.value)}` : ""}`}</span>
                   {r.summary && !isOpen && <span className="option-sum">{r.summary}</span>}
                 </span>

@@ -47,6 +47,10 @@ class FormTests(unittest.TestCase):
         body = form[2]["fields"][0]
         self.assertEqual((body["key"], body["progress"], body["grade"], body["exp"], body["max"]), ("Body", True, "-", 0, 100))
 
+    def test_values_that_are_not_a_dict_are_ignored(self):
+        for odd in ("Tier: S", ["a"], 3, None):
+            self.assertEqual(sb.clean_values(LUMENCIA, odd), {})
+
     def test_bump_grades(self):
         self.assertEqual(sb.bump_progress("C- [115/100]"), "C [15/100]")
         self.assertEqual(sb.bump_progress("C+ [250/100]"), "B [50/100]")

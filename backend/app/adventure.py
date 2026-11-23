@@ -245,10 +245,6 @@ def normalize_adventure(raw) -> dict:
             "parts": parts, "scenes": scenes, "maps": maps}
 
 
-def has_adventure(data: dict) -> bool:
-    return bool(((data or {}).get("adventure") or {}).get("scenes"))
-
-
 # ------------------------------------------------------------------ splitting a book into scenes
 def _paragraphs(text: str) -> list[str]:
     """Lines of the text joined into paragraphs. Text copied from a web page has one paragraph per line; text read from

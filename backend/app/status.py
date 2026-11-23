@@ -40,15 +40,3 @@ def split_template(card_text: str) -> tuple[str, str | None]:
     return split_status(card_text)
 
 
-def keep_latest_status(history: list[dict]) -> list[dict]:
-    """Copy of `history` where only the newest assistant status block is kept."""
-    out = [dict(h) for h in history]
-    last = None
-    for i in range(len(out) - 1, -1, -1):
-        if out[i]["role"] == "assistant" and split_status(out[i]["content"])[1]:
-            last = i
-            break
-    for i, h in enumerate(out):
-        if h["role"] == "assistant" and i != last:
-            h["content"] = split_status(h["content"])[0]
-    return out

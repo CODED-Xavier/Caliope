@@ -302,12 +302,6 @@ class EngineManager:
         if self.state != "downloading":
             self._set("stopped", "")
 
-    def stop_now(self) -> None:
-        """Synchronous stop for app shutdown."""
-        for proc in (self.chat, self.embed):
-            if proc and proc.poll() is None:
-                proc.terminate()
-
     @staticmethod
     def _kill_stale() -> None:
         """An engine left over from a crash would hold the port and the video memory."""

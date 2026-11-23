@@ -15,7 +15,8 @@ Single user, localhost only, no login. The owner does not program: changes must 
   `conversations.py` + `db.py` are the SQLite store (snapshots for undo are zlib-compressed in `messages.snapshot`);
   `services.py` wires everything. Game systems done by code, not the AI: `combat.py`, `worldtime.py` (calendar),
   `resources.py`, `shop.py`, `checks.py`, `statusbook.py` (INFO block), `signals.py` (skip the tracker on quiet turns).
-- `backend/tests/`: `python -m unittest discover -s tests -t .` from `backend/`. A fake model is used; no GPU, network
+- `backend/tests/`: `python -m unittest discover -s tests -t .` from `backend/`. `tests/test_api_smoke.py` imports `main.py`
+  and calls endpoints straight through ASGI (no network); it runs wherever FastAPI is installed and is skipped elsewhere. A fake model is used; no GPU, network
   or LM Studio needed. `make_services()` in `tests/test_core.py` gives a fresh in-memory app.
 - `frontend/src/`: React (no router, no state library). API calls only in `api.js`. Help texts for `?` tips in `helpTexts.js`.
 - `backend/launcher.py` (Play.bat), `backend/desktop.py` + `build_exe.py` (Caliope.exe), `assets/` (icon).
@@ -25,7 +26,8 @@ Single user, localhost only, no login. The owner does not program: changes must 
 - Turns that change the state before the message (combat, trade, ability, rest, time skip) store a snapshot on the
   user message; undo, rewind and re-send restore it.
 - Never send names or player text to online picture services; never send anything online without a setting the user turned on.
-- Keep `local_only` (Host/Origin check) in `main.py`. Uploads have size limits (`UPLOAD_LIMITS`).
+- Keep `local_only` (Host/Origin check) in `main.py`. Never `eval`/`exec` text from cards, Library files or the model
+  (`dnd5e/levels._formula` shows a safe arithmetic reader). Uploads have size limits (`UPLOAD_LIMITS`).
 - New settings: add to `DEFAULT_SETTINGS` in `config.py` (validate in `_coerce`), a help text, and a Settings row.
 - Each feature: its own branch, tests, a README section, then a version tag (`v2.x.0`).
 - Interface text is written in English in the components. Every new visible text (labels, buttons, tooltips,

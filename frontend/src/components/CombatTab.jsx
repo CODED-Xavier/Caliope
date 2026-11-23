@@ -41,10 +41,10 @@ function StartForm({ convId, kind, busy, onStart, sceneFight, hasScene }) {
   const [battle, setBattle] = useState(null);             // the adventure scene's map: {background, name, w, h, near}
 
   useEffect(() => { api.combatDefaults(convId, system).then(setMe).catch(() => setMe({})); }, [convId, system]);
-  const loadSaved = () => api.maps().then((r) => setSaved(r.maps)).catch(() => {});
+  const loadSaved = () => api.maps().then((r) => setSaved(r?.maps || [])).catch(() => {});
   useEffect(() => { loadSaved(); }, []);
   const reroll = async (type = mapType, feats = features) => {
-    try { const r = await api.generateMap({ type, w: grid.w, h: grid.h, features: feats }); setPreview({ tiles: r.tiles, name: MAP_TYPES[type], type }); } catch (e) { setError(e.message); }
+    try { const r = await api.generateMap({ type, w: grid.w, h: grid.h, features: feats }); setPreview({ tiles: r?.tiles || [], name: MAP_TYPES[type], type }); } catch (e) { setError(e.message); }
   };
   useEffect(() => { if (mapMode === "gen") reroll(); }, [mapMode, mapType, features.join(","), grid.w, grid.h]); // eslint-disable-line
   useEffect(() => {
