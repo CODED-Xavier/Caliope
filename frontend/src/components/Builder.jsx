@@ -12,11 +12,12 @@ const roll4d6 = () => { const d = Array.from({ length: 4 }, () => 1 + Math.floor
 const CLASS_EMBLEMS = ["artificer", "barbarian", "bard", "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"];
 // race slugs with an emblem in /emblems/race-<slug>.png (most specific first: "half-orc" before "orc")
 const RACE_EMBLEMS = ["custom-lineage", "shadar-kai", "half-orc", "half-elf", "aarakocra", "aetherborn", "aven", "bugbear", "bullywug", "centaur",
-  "changeling", "duergar", "genasi", "flamekin", "giff", "githyanki", "githzerai", "gith", "grung", "kithkin", "dragonborn", "tiefling", "aasimar", "warforged", "autognome", "lizardfolk", "shifter", "triton",
+  "changeling", "duergar", "genasi", "flamekin", "giff", "githyanki", "githzerai", "gith", "grung", "kithkin", "gnoll", "grimlock", "hadozee", "harengon",
+  "hexblood", "hobgoblin", "kalashtar", "kenku", "khenra", "khoravar", "reborn", "firbolg", "dragonborn", "tiefling", "aasimar", "warforged", "autognome", "lizardfolk", "shifter", "triton",
   "goblin", "gnome", "dwarf", "human", "fairy", "faerie", "drow", "eladrin", "goliath", "halfling", "minotaur", "boggart", "kobold", "kender", "lupin",
   "merfolk", "vampire", "dhampir", "satyr", "skeleton", "elf", "orc"];
 // races without their own emblem borrow a kin's (a duergar is a dwarf, a hobgoblin a goblinoid, a firbolg giant-kin…)
-const RACE_KIN = { hobgoblin: "goblin", khoravar: "half-elf", firbolg: "goliath", gnoll: "lupin" };
+const RACE_KIN = {};
 // backgrounds share 12 emblems by type (/emblems/bg-<type>.png): the first matching word wins
 const BG_EMBLEMS = [
   ["acolyte", ["acolyte", "inquisitor", "initiate", "pilgrim", "priest", "cleric", "cloistered", "faith", "temple"]],
