@@ -426,6 +426,15 @@ function Editor({ initial, id, onCancel, onSaved }) {
           </details>
           <label className="check small"><input type="checkbox" checked={n.in_prompt !== false} onChange={(e) => setNpc(i, "in_prompt", e.target.checked)} />
             Profile always in the prompt <HelpTip id="in_prompt" /></label>
+          {(d.starts || []).length > 0 && (
+            <label className="row gap center small">Appears in
+              <select value={n.route || ""} onChange={(e) => setNpc(i, "route", e.target.value)} title="A character of one route only (like the cult's students) never shows up in the card's other routes">
+                <option value="">every route</option>
+                <option value="default">the default start only</option>
+                {d.starts.map((st) => <option key={st.id || st.name} value={st.id || st.name}>{`${st.name} only`}</option>)}
+              </select>
+            </label>
+          )}
         </div>
       ))}
       <button className="btn small" onClick={() => set("npcs", [...d.npcs, { name: "", description: "", personality: "", speech_style: "", relationship: 0, appearance: {} }])}>＋ Add character</button>

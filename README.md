@@ -179,7 +179,7 @@ chat, and the chronicles of past Cantos stay in what the Aedo always knows. Rewi
 Each card can have its own calendar (card editor > Calendar). **The app keeps the clock, not the AI.**
 - Scenes move the clock by minutes or hours. **Days pass only when you choose** (`/wait`, or "I sleep until morning").
 - Appointments ("the festival is on Sunday") land on the exact day.
-- The weather comes from the season and the card's climate.
+- The weather comes from the season and the card's climate (**Rainy**: four seasons, but rain, drizzle and fog much more often).
 
 ### The Bestiary (monster sheets)
 **🐉 Bestiary** (left column, bottom) keeps monster sheets in `backend\data\bestiary`, one file per monster, in a folder per book (`bestiary\Lost Mine of Phandelver\goblin.json`; the ones you make yourself sit at the top, as *My monsters*): AC, HP,
@@ -277,6 +277,8 @@ A card can be entered in different ways. In the card editor, under *Opening mess
 - **how the world is on this route** (the Aedo reads it every turn)
 - **who the story starts with**: everyone else is met in the story
 - **fixed scenes**, played one per reply in order and adapted to what you do (separate them with a line of `---`)
+
+A character in the card's list can be set to **Appears in: <a start> only**: they exist only in games begun from that start (the cult's Seminary students never walk into the academy route).
 
 ### Facts, secrets and the ending
 In the card editor, **Facts, secrets and the ending** (all optional):
@@ -593,6 +595,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.29.0 | Your turn by the 5e rules (action, bonus action, movement, reaction, End turn) with the option list sorted by cost; companions with 5e sheets built by the system around your hero or step by step; class and race emblems; ▸ details on classes, races and backgrounds; equipment categories; one Sheet tab (Status merged into it); the sheet owns gear and notes; fight damage reaches the sheet; the Aedo no longer acts for you when the app starts a fight; personas bring their world additions |
 | 2.29.1 | A book's placeholder classes are left out of the builder; hide repeated entries and choose each book's rules list (2014, 2024 or both) in the Library |
 | 2.30.0 | 📦 Export on every card tile and in the card editor; "Want to describe it?" after each part of your turn; the round card told by turns with your words and companion flavour; portrait tokens on the battle map; companion pictures on their sheets; 18 more race emblems (Goliath, Halfling, Minotaur, Kobold, Lizardfolk, Satyr, Vampire…) |
+| 2.41.0 | Characters of one route: a card character can be set to appear only in one start (the cult's Seminary students stay out of the academy route); a Rainy climate (four seasons, rain and fog much more often) |
 | 2.40.3 | `/correction <fact>` (or `/correção`): the Aedo's last story reply is written again with your fix, the story goes on from there, and the fix is kept as a story fact; a half-elf emblem, and related races borrow a kin's emblem |
 | 2.40.2 | Risky blasts: a spell area that would catch you or an ally asks "Cast it anyway?" instead of refusing; Sculpt Spells (Evocation) spares you and your allies |
 | 2.40.1 | Code audit: a refused spell or option no longer spends your action or slot; opportunity attacks need reach; the chat reader ignores questions, "if…" sentences and "I don't use…"; spell names aren't translated; spell-count formulas from homebrew files are read safely; odd class tables and calendars no longer break a sheet or card; 160 server messages now in Portuguese; dead code removed; a test that starts the web server and calls its endpoints |

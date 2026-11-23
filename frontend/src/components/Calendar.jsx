@@ -62,6 +62,7 @@ export function CalendarEditor({ value, onChange }) {
             <label className="lbl">Weather (rolled by the app)
               <select className="field" value={c.climate || "temperate"} onChange={(e) => set("climate", e.target.value)}>
                 <option value="temperate">Temperate (four seasons)</option>
+                <option value="rainy">Rainy (four seasons, rain much more often)</option>
                 <option value="cold">Cold (long winters)</option>
                 <option value="warm">Warm (mild winters)</option>
                 <option value="tropical">Tropical (hot, heavy rains)</option>

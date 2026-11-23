@@ -135,5 +135,16 @@ class GameTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("no calendar", events[0]["message"])
 
 
+class RainyTests(unittest.TestCase):
+    def test_rainy_climate_rains_more(self):
+        wet = ("rain", "drizzle", "storm", "fog", "snow", "overcast")
+        def share(climate):
+            cal = wt.normalize_calendar({"climate": climate})
+            days = [wt.weather_on(cal, d, 7) for d in range(0, 730)]
+            return sum(any(x in w for x in wet) for w in days) / len(days)
+        self.assertEqual(wt.normalize_calendar({"climate": "rainy"})["climate"], "rainy")
+        self.assertGreater(share("rainy"), share("temperate") + 0.15)
+
+
 if __name__ == "__main__":
     unittest.main()

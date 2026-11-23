@@ -146,6 +146,8 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
                 "active": bool(n.get("active", True)),
             }
         )
+        if str(n.get("route") or "").strip():  # only in this start (route) of the card, e.g. the cult's students
+            npcs[-1]["route"] = truncate(str(n["route"]).strip(), 60)
         if n.get("companion") and sum(1 for x in npcs if x.get("companion")) < 3:  # app/party.py: up to 3 companions
             from .party import normalize_sheet
             npcs[-1]["companion"] = True

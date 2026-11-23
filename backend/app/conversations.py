@@ -126,6 +126,8 @@ class ConversationRepository:
             for i, npc in enumerate(data.get("npcs", [])):
                 if solo and npc.get("companion"):
                     continue
+                if npc.get("route") and npc["route"] != ((route or {}).get("id") or "default"):
+                    continue  # this character belongs to another route of the card
                 self.add_npc(
                     conv_id,
                     npc["name"],

@@ -31,7 +31,7 @@ FANTASY = {
 }
 PRESETS = {"earth": EARTH, "fantasy": FANTASY}
 DEFAULT_START = {"year": 1, "month": 1, "day": 1, "hour": 8, "minute": 0, "weekday": 0}
-CLIMATES = ("temperate", "cold", "warm", "dry", "tropical", "none")
+CLIMATES = ("temperate", "rainy", "cold", "warm", "dry", "tropical", "none")
 MAX_TURN_MINUTES = 12 * 60
 MAX_SKIP_DAYS = 366
 MAX_EVENTS = 40
@@ -401,6 +401,9 @@ def weather_on(cal: dict, day: int, seed: int = 0) -> str:
         options = [(w, n) for w, n in options if not any(x in w for x in ("rain", "snow", "drizzle", "storm", "fog"))] or options
     if climate == "tropical":
         options = options + [("a warm downpour", 3)]
+    if climate == "rainy":  # four seasons, but rain, drizzle and fog much more often
+        wet = ("rain", "drizzle", "storm", "fog", "snow", "overcast")
+        options = [(w, n * 3 if any(x in w for x in wet) else n) for w, n in options] + [("a steady drizzle", 3)]
     return rng.choices([w for w, _ in options], weights=[n for _, n in options])[0]
 
 
