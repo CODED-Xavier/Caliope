@@ -2265,6 +2265,20 @@ async def get_state(conv_id: int):
     return svc().conversations.get_state(conv_id)
 
 
+@app.patch("/api/conversations/{conv_id}/arsenal")
+async def edit_arsenal(conv_id: int, change: dict[str, Any] = Body(...)):
+    """The Arsenal tab: add, rename, describe or forget a character's technique."""
+    from . import arsenal
+    not_busy(conv_id)
+    state = svc().conversations.get_state(conv_id)
+    try:
+        arsenal.edit(state, change)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    svc().conversations.save_state(conv_id, state)
+    return state
+
+
 @app.patch("/api/conversations/{conv_id}/state")
 async def patch_state(conv_id: int, patch: dict[str, Any] = Body(...)):
     not_busy(conv_id)  # the turn in progress would overwrite the change

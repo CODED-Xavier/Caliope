@@ -12,6 +12,7 @@ import { latestStatus, portraitSrc } from "../portraits.js";
 import SheetPicker from "./SheetPicker.jsx";
 import { GridOverlay } from "./AdventureEditor.jsx";
 import PlayerLore from "./PlayerLore.jsx";
+import ArsenalTab from "./Arsenal.jsx";
 import CardSheetForm, { startValues } from "./CardSheetForm.jsx";
 import SkillsEditor from "./SkillsEditor.jsx";
 import SystemsSheet, { SystemsPanels } from "./SystemsSheet.jsx";
@@ -885,6 +886,7 @@ export const TABS = [
   ["sheet", "🧙", "Sheet"],
   ["bag", "🎒", "Bag"],
   ["people", "👥", "People"],
+  ["arsenal", "✴", "Arsenal"],
   ["map", "🗺", "Map"],
   ["combat", "⚔", "Combat"],
   ["dice", "🎲", "Dice"],
@@ -897,6 +899,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
   const kind = game.features?.kind || (mode === "character" ? "roleplay" : "adventure");
   const allowed = [...(game.features?.panels || TABS.map(([k]) => k)), ...(state.combat?.active ? ["combat"] : []),
     "sheet",  // always: your character, and on role-play cards the card's own values (the old Status tab) too
+    ...(kind === "roleplay" ? ["arsenal"] : []),  // named techniques and spells (app/arsenal.py)
     ...((game.messages || []).some((m) => m.meta?.scene_picture) ? ["map"] : []),
     ...(conversation.scenario?.adventure?.scenes?.length ? ["adventure", "combat"] : [])];  // the map bag lives on the map tab
   const tabs = TABS.filter(([k]) => allowed.includes(k) && k !== "status");
@@ -935,6 +938,7 @@ export default function SidePanel({ game, tab, onTab, onPatch, onNpcUpdate, onNp
         {active === "bag" && <BagTab state={state} onPatch={onPatch} onPay={onPay} busy={!canRoll} currency={conversation.scenario?.currency || "gold"} />}
         {active === "people" && <PeopleTab npcs={npcs} onUpdate={onNpcUpdate} onDelete={onNpcDelete} onAdd={onNpcAdd} repLog={state.rep_log || []}
           party={state.party_mode === "companions" ? state.party || {} : {}} />}
+        {active === "arsenal" && <ArsenalTab convId={conversation.id} state={state} npcs={npcs} busy={!canRoll} onState={onStateLoaded} />}
         {active === "map" && <MapTab state={state} convId={conversation.id} refreshKey={game.messages?.length} />}
         {active === "combat" && <CombatTab game={game} busy={!canRoll} onCombat={onCombat} onCombatEdit={onCombatEdit} onState={onStateLoaded} />}
         {active === "dice" && <DiceTab onRollToChat={onRollToChat} canRoll={canRoll} />}

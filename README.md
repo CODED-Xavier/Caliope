@@ -384,6 +384,13 @@ Settings > *Scene pictures*. When a scene starts (a new place, a fight), the Aed
 - Only the description of the place leaves your PC: names are removed and your messages are never sent.
 - **🎒 Map bag** (Map tab): the first picture of each place is kept on its own, and **📌** keeps any other. Each shows the place, in-game date and Canto.
 
+### ✴ Arsenal: named techniques and spells
+On role-play cards Calíope keeps every character's named techniques, shounen style.
+- **Yours:** write the technique's name in [brackets] in your message, e.g. `*I raise my katana to my chin.* [Chou no Mai - Manabiki] *I vanish into a single piercing thrust.*` The app keeps it with what your message showed (✴ under the message). Commands like `[Override: …]` and dice are not techniques.
+- **The characters':** when Lilia uses a move in a spar, the Aedo names it and the reply shows it as a call-out (**『Crimson Fang』**). Lilia keeps it: the next time she fights, it comes back with the same name and look. The Aedo may invent new moves on the spot; each one is remembered.
+- **Power follows the user:** each technique keeps the tier it was first used at (Beginner, Expert (Mid), 4-Circle…), and its strength and flavour follow its user's current power (Circle for mages, aura tier for swordsmen, both for Dual-Pathers). The same move grows with its owner.
+- **✴ Arsenal tab:** everyone's techniques, how many times each was used; ✎ edit the name, power or description, ✕ forget, ＋ add one by hand. Undo takes back the techniques of that turn.
+
 ### Jukebox
 **🎵 Music** → add songs from your PC (or direct audio links) and tag them with moods (tavern, forest, dungeon, combat, boss, victory…).
 With **Auto**, the music follows the scene: combat music in fights, boss music for bosses, a victory song when you win.
@@ -598,6 +605,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.29.0 | Your turn by the 5e rules (action, bonus action, movement, reaction, End turn) with the option list sorted by cost; companions with 5e sheets built by the system around your hero or step by step; class and race emblems; ▸ details on classes, races and backgrounds; equipment categories; one Sheet tab (Status merged into it); the sheet owns gear and notes; fight damage reaches the sheet; the Aedo no longer acts for you when the app starts a fight; personas bring their world additions |
 | 2.29.1 | A book's placeholder classes are left out of the builder; hide repeated entries and choose each book's rules list (2014, 2024 or both) in the Library |
 | 2.30.0 | 📦 Export on every card tile and in the card editor; "Want to describe it?" after each part of your turn; the round card told by turns with your words and companion flavour; portrait tokens on the battle map; companion pictures on their sheets; 18 more race emblems (Goliath, Halfling, Minotaur, Kobold, Lizardfolk, Satyr, Vampire…) |
+| 2.44.0 | ✴ Arsenal: named techniques and spells of the player and the characters are kept (your [brackets], the Aedo's call-outs), reused with the same name and look, their power following the user's tier; an Arsenal tab to edit them |
 | 2.43.1 | Pictures follow the feeling: shown before a character's first line and again only when their mood changes (back to Standard too), never repeated in the same mood; up to six characters per reply instead of two |
 | 2.43.0 | The card's default start can have its own name, framing and fixed scenes, like the other starts; characters keep longer texts (description 1500 characters, looks 200 per field) |
 | 2.42.0 | ⟳ Update from the card: a running game takes the card's new characters, lore, rules, calendar and sheet, keeping its story, relationships and changes |

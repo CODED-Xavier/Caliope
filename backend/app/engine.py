@@ -17,7 +17,7 @@ from typing import AsyncIterator
 
 from .appearance import appearance_line, appearance_seed
 from .checks import find_checks
-from . import adventure, aedo_desk, reputation, resources, routes, sheetchat, systems
+from . import arsenal, adventure, aedo_desk, reputation, resources, routes, sheetchat, systems
 from .places import find_place, place_picture
 from .shop import find_offers, is_trade
 from . import statusbook
@@ -238,6 +238,13 @@ class ChatEngine:
                     if sheet_used:
                         meta = {**sheet_used[0], "sheet_uses": sheet_used[1]}
                         yield {"type": "state", "state": st_now, "npcs": self.repo.list_npcs(conv_id), "changes": []}
+            if text and not text.startswith("/") and self._arsenal_on(conv_id):
+                st_now = self.repo.get_state(conv_id)
+                before = (meta or {}).get("snapshot") or self.repo.capture_snapshot(conv_id)
+                moves = arsenal.note_player(st_now, text)  # "[Chou no Mai - Manabiki]": the player's technique is kept
+                if moves:
+                    self.repo.save_state(conv_id, st_now)
+                    meta = {**(meta or {}), "snapshot": before, "moves": moves}
             user_msg = self.repo.add_message(conv_id, "user", text, meta)
             self._auto_title(conv_id, text)
             yield {"type": "user_message", "message": user_msg}
@@ -245,6 +252,10 @@ class ChatEngine:
                 async for event in turn:
                     yield event
         self._warm_later(conv_id)  # the new reply joins the story's memory while the player reads it
+
+    def _arsenal_on(self, conv_id: int) -> bool:
+        """Named techniques are kept on role-play cards (adventure cards have their system's spells and features)."""
+        return resolve_features(self.repo.get(conv_id)["scenario"])["kind"] == "roleplay"
 
     def _sheet_uses(self, conv_id: int, state: dict, text: str):
         """5e features and spells named in the message are spent on the sheet (the Aedo hears what was spent)."""
@@ -806,8 +817,19 @@ class ChatEngine:
             st = self.repo.get_state(conv_id)
             statusbook.harvest(st, tpl, extra.pop("status"))
             self.repo.save_state(conv_id, st)
+        found_moves: list = []
+        if self._arsenal_on(conv_id):  # [[move: Lilia | Crimson Fang]] becomes a call-out, and Lilia keeps the move
+            reply, found_moves = arsenal.take_from_reply(reply, npcs, state["player"].get("name") or "")
         snapshot = self.repo.capture_snapshot(conv_id)
         meta = {"snapshot": snapshot, **extra}
+        if found_moves:
+            st = self.repo.get_state(conv_id)
+            by_name = {n["name"]: n for n in npcs}
+            kept = [m for m in (arsenal.record(st, owner, name, desc, arsenal.tier_in((by_name.get(owner) or {}).get("description") or ""))
+                                for owner, name, desc in found_moves) if m]
+            if kept:
+                self.repo.save_state(conv_id, st)
+                meta["moves"] = kept
         asked = find_checks(reply)  # "Make a DEX (Stealth) check, DC 13" becomes a roll button
         fight_now = (self.repo.get_state(conv_id).get("combat") or {})
         if asked and fight_now.get("active") and fight_now.get("reaction_round") == fight_now.get("round"):

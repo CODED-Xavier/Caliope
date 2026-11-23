@@ -2133,7 +2133,20 @@
 "Update from the card (new characters, lore and rules; the story stays)": "Atualizar pelo card (novos personagens, lore e regras; a história continua)",
 "⟳ Update": "⟳ Atualizar",
 "Name on the start screen (e.g. Light route)": "Nome na tela de início (ex.: Rota da luz)",
-"(the card's opening message)": "(a mensagem de abertura do card)"
+"(the card's opening message)": "(a mensagem de abertura do card)",
+"Arsenal": "Arsenal",
+"you": "você",
+"No techniques yet.": "Nenhuma técnica ainda.",
+"Named techniques and spells. Name yours in [brackets] in a message, like ": "Técnicas e magias com nome. Dê nome às suas entre [colchetes] numa mensagem, como ",
+"; the characters' own moves are kept when the Aedo names them. Their strength follows each one's current power.": "; os golpes dos personagens são guardados quando o Aedo os nomeia. A força de cada um segue o poder atual de quem usa.",
+"Power when learned (Expert (Low), 3-Circle…)": "Poder quando aprendeu (Expert (Low), 3 Círculos…)",
+"What it looks like, what it does": "Como é, o que faz",
+"Technique or spell name": "Nome da técnica ou magia",
+"＋ Add a technique": "＋ Adicionar técnica",
+"Forget this technique": "Esquecer esta técnica",
+"Times used": "Vezes usada",
+"A technique needs its owner and a name.": "Uma técnica precisa de dono e de nome.",
+"A technique needs a name.": "Uma técnica precisa de nome."
 },
 "patterns": [
 [
@@ -3891,6 +3904,22 @@
 [
 "(the card's opening message · {0} scenes)",
 "(a mensagem de abertura do card · {0} cenas)"
+],
+[
+"Forget {0}?",
+"Esquecer {0}?"
+],
+[
+"New technique: {0} · 『{1}』",
+"Nova técnica: {0} · 『{1}』"
+],
+[
+"{0} · 『{1}』 ({2}×)",
+"{0} · 『{1}』 ({2}×)"
+],
+[
+"{0} has no technique called {1}.",
+"{0} não tem uma técnica chamada {1}."
 ]
 ]
 }

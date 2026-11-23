@@ -168,6 +168,9 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
               <div className={`bubble ${isDice ? "dice" : ""} ${isCombat ? "combat-card" : ""} ${isCombat || isDice || m.meta?.app_line || (m.content.startsWith("\u2728") || m.content.startsWith("\u{1F4CC}")) ? "app-text" : ""}`}>
                 {isCombat ? <CombatText text={m.content} npcs={npcs} /> : <Markdown text={showThoughts(m.content)} story={!isDice} />}
               </div>
+              {(m.meta?.moves || []).length > 0 && (
+                <div className="sheet-uses app-text">{moveLines(m.meta.moves).map((line, i) => <div key={i}>{line}</div>)}</div>
+              )}
               {(m.meta?.sheet_uses || []).length > 0 && (
                 <div className="sheet-uses app-text">{m.meta.sheet_uses.map((u, i) => <div key={i} className={u.ok ? "" : "warn-text"}>{u.line}</div>)}</div>
               )}
@@ -192,7 +195,7 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
     );
   }
 
-  const changes = [...(m.meta?.scene ? [`📍 Scene: ${m.meta.scene}`] : []), ...(m.meta?.changes || [])];  // the adventure moved on
+  const changes = [...(m.meta?.scene ? [`📍 Scene: ${m.meta.scene}`] : []), ...moveLines(m.meta?.moves), ...(m.meta?.changes || [])];  // the adventure moved on
   const av = portraitStyle !== "off" ? speakerAvatar(m.content, speaker) : null;
   return (
     <div className={`msg assistant ${hit || ""} ${av?.url ? `with-avatar ${portraitStyle}` : ""}`} data-mid={m.id}>
@@ -253,7 +256,13 @@ const showThoughts = (t) => (t.trimStart().startsWith("/") && !/^\s*\/roll/i.tes
   : t.split(/("[^"\n]*")/).map((part, i) => (i % 2 ? part : part.replace(THOUGHT, (_, x) => `*(💭 ${x})*`))).join(""));
 
 // While a reply is being written: hide the status block and any half-written portrait tag at the end.
-const liveText = (t) => hideStatus(t).replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, "");
+/** Named techniques the app kept this turn (app/arsenal.py): "✴ New technique: Lilia Valenheart · 『Crimson Fang』". */
+const moveLines = (moves) => (moves || []).map((mv) => mv.new
+  ? `✴ New technique: ${mv.owner} · 『${mv.name}』`
+  : `✴ ${mv.owner} · 『${mv.name}』 (${mv.uses}×)`);
+
+const liveText = (t) => hideStatus(t).replace(/\[\[\s*move\s*:\s*(?:[^|\]\n]*\|)?\s*([^\]\n]*?)\s*\]\]/gi, "**『$1』**")  // a technique being called out
+  .replace(/(\[\[[^\]\n]*\]?|!\[[^\n]*)$/, "");
 
 /** How a message is sent: free text (marks as you type them), or one mode for the whole message. */
 const MODES = [

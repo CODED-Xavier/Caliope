@@ -1017,3 +1017,8 @@ button.s5-ability:hover:not(:disabled) { border-color: var(--accent); }
 .gear-choice { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; padding: 4px 6px; border-radius: 8px; cursor: pointer; }
 .gear-choice.on { background: var(--bg2); }
 .gear-owned { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* ✴ Arsenal: named techniques */
+.arsenal .arsenal-owner { margin-top: 10px; }
+.arsenal .arsenal-move { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.arsenal .move-name { color: var(--accent); letter-spacing: 0.02em; }

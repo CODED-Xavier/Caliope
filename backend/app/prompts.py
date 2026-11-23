@@ -262,7 +262,7 @@ WINDOW_STEP = 6  # messages (3 rounds): see build()
 
 SECTION_ORDER = [
     "intro", "rules", "writing", "card_system", "world", "card_description", "card_personality", "card_scenario", "known_at_start", "fixed_facts", "secrets", "ending", "route", "adventure", "places",
-    "lore_always", "player_lore", "calendar", "resources", "game_rules", "house_rules", "style", "skills", "card_examples", "card_reminders", "card_overrides", "portraits", "npcs", "companions", "npc_hint",
+    "lore_always", "player_lore", "calendar", "resources", "arsenal", "game_rules", "house_rules", "style", "skills", "card_examples", "card_reminders", "card_overrides", "portraits", "npcs", "companions", "npc_hint",
     "player", "pinned", "opening", "cantos", "summary",
 ]
 
@@ -338,6 +338,9 @@ class PromptBuilder:
                 (f"{name}:\n" if len(house_rules) > 1 else "") + text for name, text in house_rules)
         kind = scenario.get("kind") or ("roleplay" if mode == "character" else "adventure")
         sections["player"] = describe_player(state, numbers=(kind == "adventure"))
+        if kind == "roleplay":
+            from .arsenal import RULES as ARSENAL_RULES
+            sections["arsenal"] = ARSENAL_RULES
         # Parts that change most often go last, so the model can reuse everything before them.
         sections = {k: sections[k] for k in sorted(sections, key=lambda k: SECTION_ORDER.index(k) if k in SECTION_ORDER else 50)}
         dropped: list[str] = []
@@ -394,6 +397,11 @@ class PromptBuilder:
                      "create chances for these to happen (a sparring partner, a shared task, a chance meeting). Never force them, never "
                      "bend the plot or break character for them, and let them go if the story or the player moves elsewhere."
                      + ("\n\n" + extra if extra else ""))
+        if kind == "roleplay":
+            from .arsenal import prompt_list
+            known_moves = prompt_list(state, [h["content"] for h in history[-4:]], (state.get("player") or {}).get("name") or "")
+            if known_moves:
+                extra = known_moves + ("\n\n" + extra if extra else "")
         notes = notes_section(npcs, [h["content"] for h in history[-4:]])
         if notes:
             extra = notes + ("\n\n" + extra if extra else "")

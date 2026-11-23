@@ -250,6 +250,7 @@ export const api = {
   setPinned: (id, text) => request("PUT", `/api/conversations/${id}/pinned`, { text }),
 
   patchState: (id, patch) => request("PATCH", `/api/conversations/${id}/state`, patch),
+  editArsenal: (id, change) => request("PATCH", `/api/conversations/${id}/arsenal`, change),
   state: (id) => request("GET", `/api/conversations/${id}/state`),
   addNpc: (id, body) => request("POST", `/api/conversations/${id}/npcs`, body),
   updateNpc: (npcId, body) => request("PATCH", `/api/npcs/${npcId}`, body),

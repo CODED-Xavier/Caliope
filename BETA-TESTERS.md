@@ -99,6 +99,7 @@ Easier: pick a mode under the text box (**🗣 Speak · ✋ Act · 💭 Think ·
 - Adventure maps: **🔍 Find the grid** lines the squares up with the map; fights happen on the map with fog of war.
 - No map for a fight? Calíope **paints one** that fits the scene (road, cave, dungeon, tavern…) with the grid lined up. **🎲 Paint another** in the Combat tab if you don't like it.
 - **↺ Restart** (top bar, or ↺ next to the game in the list) starts the game over from the opening with the same character at full HP, handy for testing a scene again.
+- **✴ Arsenal (role-play cards):** name a technique in [brackets] in your message and Calíope remembers it; characters' named moves are remembered too and come back in later fights. See the ✴ Arsenal tab.
 - **Scripted default start:** in the card editor, the default start (the opening message) can now have fixed scenes too, so a card's main route can play a planned first day.
 - **⟳ Update from the card** (⟳ next to the game in the list): after editing a card, bring its new characters, lore and rules into a game you already started, without losing the story.
 - **Click any picture in the story** to see it big. Pictures you add to a character in the card editor now also show up in games you already started.
