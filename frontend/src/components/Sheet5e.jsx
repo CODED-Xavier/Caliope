@@ -142,15 +142,7 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
             </div>
           ))}
 
-          {(Object.keys(sh.slots || {}).length > 0 || sh.pact) && (
-            <>
-              <div className="section-title">Spell slots</div>
-              <div className="chip-row tight">
-                {Object.entries(sh.slots || {}).map(([lv, n]) => <span key={lv} className="pill">{`Level ${lv}: ${n}`}</span>)}
-                {sh.pact && <span className="pill">{`Pact: ${sh.pact.count} × level ${sh.pact.level}`}</span>}
-              </div>
-            </>
-          )}
+          <Resources sh={sh} who={who} disabled={disabled} onUse={onUse} change={change} />
           {(ch.spells || []).length > 0 && (
             <>
               <div className="section-title">Spells</div>
@@ -176,15 +168,7 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
                   <button type="button" className="link-btn grow s5-feature-name" onClick={() => setOpenFeat(openFeat === f.name ? null : f.name)}>
                     {f.name} <span className="muted tiny">{f.level ? `· level ${f.level}` : f.homebrew ? "· house rule" : ""}</span>
                   </button>
-                  {f.uses_max ? (
-                    <>
-                      <span className="pips" title={f.per === "short" ? `${left} of ${f.uses_max} left · back after a short rest` : `${left} of ${f.uses_max} left · back after a long rest`}>
-                        {Array.from({ length: f.uses_max }).map((_, i) => <span key={i} className={`pip ${i < left ? "on" : ""}`} />)}
-                      </span>
-                      {!who && <button type="button" className="btn small primary" disabled={disabled || left <= 0} onClick={() => onUse?.(f.name)}
-                        title={left <= 0 ? (f.per === "short" ? "Used up: back after a short rest" : "Used up: back after a long rest") : "Use it: the app spends it and tells the Aedo"}>Use</button>}
-                    </>
-                  ) : null}
+                  {f.uses_max ? <span className="muted tiny" title="Spent from the Resources section">{`${left}/${f.uses_max}`}</span> : null}
                   {(fi >= 0 || oi >= 0 || xi >= 0) && (
                     <button type="button" className="icon-btn" disabled={disabled} title="Remove"
                       onClick={() => change({ op: "remove", slot: fi >= 0 ? "feats" : oi >= 0 ? "options" : "extras", index: fi >= 0 ? fi : oi >= 0 ? oi : xi })}>✕</button>
@@ -301,6 +285,74 @@ function Companions({ convId, state, npcs, busy, heroReady, onState, onRoll }) {
           <Sheet5e convId={convId} state={state} who={viewing} npcs={npcs} busy={busy} onRoll={onRoll} onState={onState} />
         </Modal>
       )}
+    </div>
+  );
+}
+
+const POOLS = ["lay on hands", "ki", "monk's focus", "font of magic", "sorcery points"];
+
+/** Resources: what the hero spends and gets back on rests (features with uses, pools of points, spell slots). The
+ * same things are spent when the player names them in the chat ("I use Lay on Hands for 5"). */
+function Resources({ sh, who, disabled, onUse, change }) {
+  const [amounts, setAmounts] = useState({});
+  const feats = sh.features.filter((f) => f.uses_max);
+  const levels = Object.entries(sh.slots || {});
+  const smite = sh.class === "Paladin" && sh.level >= 2 && (levels.length > 0);
+  if (!feats.length && !levels.length && !sh.pact) return null;
+  const back = (f) => (f.per === "short" ? "back after a short rest" : "back after a long rest");
+  return (
+    <div className="s5-resources">
+      <div className="section-title">Resources</div>
+      {sh.spell_dc ? <div className="muted tiny">{`Spell save DC ${sh.spell_dc} · spell attack ${sig(sh.spell_attack || 0)}`}</div> : null}
+      {feats.map((f) => {
+        const left = f.uses_max - f.used;
+        const pool = POOLS.includes(f.name.toLowerCase());
+        return (
+          <div className="s5-res-row" key={f.name}>
+            <span className="grow"><strong>{f.name}</strong> <span className="muted tiny">{back(f)}</span></span>
+            {pool || f.uses_max > 8
+              ? <span className="s5-res-count" title={`${left} of ${f.uses_max} left`}>{`${left}/${f.uses_max}`}</span>
+              : <span className="pips" title={`${left} of ${f.uses_max} left · ${back(f)}`}>{Array.from({ length: f.uses_max }).map((_, i) => <span key={i} className={`pip ${i < left ? "on" : ""}`} />)}</span>}
+            {!who && pool && (
+              <input type="number" className="s5-res-amount" min="1" max={left} value={amounts[f.name] || ""} placeholder={f.name === "Lay on Hands" ? "HP" : "1"}
+                title={f.name === "Lay on Hands" ? "How many points to spend (empty: heal what you are missing)" : "How many points to spend"}
+                onChange={(e) => setAmounts({ ...amounts, [f.name]: e.target.value })} />
+            )}
+            {!who && <button type="button" className="btn small primary" disabled={disabled || left <= 0}
+              onClick={() => { onUse?.(f.name, Number(amounts[f.name]) || undefined); setAmounts({ ...amounts, [f.name]: "" }); }}
+              title={left <= 0 ? `Used up: ${back(f)}` : "Use it: the app spends it and tells the Aedo"}>Use</button>}
+          </div>
+        );
+      })}
+      {levels.map(([lv, n]) => {
+        const left = (sh.slots_left || {})[lv] ?? n;
+        return (
+          <div className="s5-res-row" key={lv}>
+            <span className="grow"><strong>{`Level ${lv} slots`}</strong> <span className="muted tiny">back after a long rest</span></span>
+            <span className="pips" title={`${left} of ${n} left`}>{Array.from({ length: n }).map((_, i) => <span key={i} className={`pip slot ${i < left ? "on" : ""}`} />)}</span>
+            {!who && (
+              <>
+                <button type="button" className="icon-btn" disabled={disabled || left <= 0} title="Spend a slot (a spell cast in the story)" onClick={() => change({ op: "slot", level: lv, delta: 1 })}>−</button>
+                <button type="button" className="icon-btn" disabled={disabled || left >= n} title="Give a slot back" onClick={() => change({ op: "slot", level: lv, delta: -1 })}>＋</button>
+              </>
+            )}
+          </div>
+        );
+      })}
+      {sh.pact && (
+        <div className="s5-res-row">
+          <span className="grow"><strong>{`Pact slots (level ${sh.pact.level})`}</strong> <span className="muted tiny">back after a short rest</span></span>
+          <span className="pips" title={`${sh.pact_left ?? sh.pact.count} of ${sh.pact.count} left`}>{Array.from({ length: sh.pact.count }).map((_, i) => <span key={i} className={`pip slot ${i < (sh.pact_left ?? sh.pact.count) ? "on" : ""}`} />)}</span>
+          {!who && (
+            <>
+              <button type="button" className="icon-btn" disabled={disabled || !(sh.pact_left ?? sh.pact.count)} title="Spend a slot (a spell cast in the story)" onClick={() => change({ op: "slot", level: "pact", delta: 1 })}>−</button>
+              <button type="button" className="icon-btn" disabled={disabled || (sh.pact_left ?? sh.pact.count) >= sh.pact.count} title="Give a slot back" onClick={() => change({ op: "slot", level: "pact", delta: -1 })}>＋</button>
+            </>
+          )}
+        </div>
+      )}
+      {smite && <div className="muted tiny">⚡ Divine Smite: after a melee hit, spend a slot for 2d8 radiant (+1d8 per level above 1st, +1d8 against undead and fiends). In fights it is one of your options.</div>}
+      {!who && <div className="muted tiny">Say it in the chat too: “I use Lay on Hands for 5”, “I rage”, “I cast Cure Wounds at 2nd level”. The app spends it.</div>}
     </div>
   );
 }

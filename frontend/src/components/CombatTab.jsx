@@ -379,20 +379,46 @@ const COST_LABELS = [["action", "Action"], ["bonus", "Bonus action"], ["reaction
 const NEEDS_TARGET = new Set(["attack", "bonus_attack", "grapple", "shove", "opportunity"]);
 
 /** Everything you can do this turn, sorted by what it costs (read from the rules and your features' own text). */
-function OptionsList({ convId, combat, target, adv, busy, onStep }) {
+function OptionsList({ convId, combat, target, adv, busy, onStep, onState }) {
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(true);
   const [tip, setTip] = useState("");
-  useEffect(() => { api.combatOptions(convId).then(setData).catch(() => setData(null)); }, [convId, combat.round, combat.turn, JSON.stringify(combat.spent || {}), combat.extra_actions, combat.reaction_round]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [slot, setSlot] = useState(""); // "" = the lowest free slot that fits the spell
+  useEffect(() => { api.combatOptions(convId).then(setData).catch(() => setData(null)); }, [convId, combat.round, combat.turn, JSON.stringify(combat.spent || {}), combat.extra_actions, combat.reaction_round, JSON.stringify(combat.last_hit || null), (combat.turn_lines || []).length, JSON.stringify(combat.auto_reactions || {})]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!data?.groups) return null;
   const spent = combat.spent || {};
   const used = { action: spent.action && !combat.extra_actions, bonus: spent.bonus, reaction: combat.reaction_round === combat.round, free: false };
+  const slotsLeft = data.slots_left || {};
+  const levels = Object.entries(slotsLeft).filter(([, n]) => n > 0).map(([lv]) => Number(lv));
+  if (data.pact_left > 0 && data.pact_level && !levels.includes(data.pact_level)) levels.push(data.pact_level);
+  levels.sort((a, b) => a - b);
+  const anySlot = levels.length > 0;
   const use = (o) => (["attack", "dodge", "bonus_attack"].includes(o.kind)
     ? onStep({ move: o.kind, target, advantage: adv })
-    : onStep({ move: "use", option: o.id, target, advantage: adv }));
+    : onStep({ move: "use", option: o.id, target, advantage: adv, ...((o.kind === "spell" && o.level) || o.kind === "smite" ? (slot && Number(slot) >= (o.level || 1) ? { slot: Number(slot) } : {}) : {}) }));
+  const auto = data.auto || {};
+  const toggle = async (key, on) => { try { const r = await api.combatAuto(convId, key, on); onState?.(r.state); } catch { /* the toggle stays as it was */ } };
   return (
     <div className="options5e">
       <button type="button" className="section-title link-btn" onClick={() => setOpen((v) => !v)}>{open ? "▾ Your options" : "▸ Your options"}</button>
+      {open && (Object.keys(slotsLeft).length > 0 || data.pact_level > 0) && (
+        <div className="row gap center tiny">
+          <span className="muted">{`Slots left: ${[...Object.entries(slotsLeft).map(([lv, n]) => `L${lv} ${n}`), ...(data.pact_level ? [`pact L${data.pact_level} ${data.pact_left}`] : [])].join(" · ")}`}</span>
+          <label className="row gap center">Cast with
+            <select value={slot} onChange={(e) => setSlot(e.target.value)} disabled={!anySlot}>
+              <option value="">the lowest slot that fits</option>
+              {levels.map((lv) => <option key={lv} value={lv}>{`a level ${lv} slot`}</option>)}
+            </select>
+          </label>
+        </div>
+      )}
+      {open && (auto.can || []).length > 0 && (
+        <div className="auto-reactions" title="On enemy turns the app takes these reactions for you, when they help">
+          <span className="muted tiny">On enemy turns:</span>
+          {(auto.can || []).includes("shield") && <label className="row gap center"><input type="checkbox" checked={!!auto.shield} onChange={(e) => toggle("shield", e.target.checked)} />🛡 Shield (+5 AC when a hit would land; spends a level 1 slot)</label>}
+          {(auto.can || []).includes("uncanny") && <label className="row gap center"><input type="checkbox" checked={!!auto.uncanny} onChange={(e) => toggle("uncanny", e.target.checked)} />🌀 Uncanny Dodge (half damage from a hit)</label>}
+        </div>
+      )}
       {open && COST_LABELS.map(([cost, label]) => (
         <div key={cost} className={`opt-group ${used[cost] ? "spent" : ""}`}>
           <div className="opt-head"><span>{label}</span>{used[cost] && <span className="tiny muted">{cost === "reaction" ? " · used this round" : " · used"}</span>}</div>
@@ -400,10 +426,13 @@ function OptionsList({ convId, combat, target, adv, busy, onStep }) {
             {data.groups[cost].map((o) => {
               const noTarget = NEEDS_TARGET.has(o.kind) && !target;
               const empty = o.uses_left === 0;
+              const noSlot = ((o.kind === "spell" && o.level) || o.kind === "smite") && !levels.some((lv) => lv >= (o.level || 1));
+              const noHit = o.kind === "smite" && !data.can_smite;
+              const why = noSlot ? "No spell slot left for this." : noHit ? "Right after you hit with a melee weapon." : o.text;
               return (
-                <button key={o.id} type="button" className={`opt ${o.kind === "spell" ? "spell" : o.kind === "feature" ? "feature" : ""}`}
-                  disabled={busy || used[cost] || noTarget || empty || (o.kind === "bonus_attack" && !spent.attacked)}
-                  title={o.text} onMouseEnter={() => setTip(o.text)} onFocus={() => setTip(o.text)} onClick={() => use(o)}>
+                <button key={o.id} type="button" className={`opt ${o.kind === "spell" ? "spell" : o.kind === "feature" || o.kind === "smite" ? "feature" : ""}`}
+                  disabled={busy || (used[cost] && o.kind !== "smite") || noTarget || empty || noSlot || noHit || (o.kind === "bonus_attack" && !spent.attacked)}
+                  title={why} onMouseEnter={() => setTip(why)} onFocus={() => setTip(why)} onClick={() => use(o)}>
                   {o.name}{o.uses_left !== undefined ? ` (${o.uses_left})` : ""}{o.kind === "spell" ? (o.level ? ` · ${o.level}` : " · cantrip") : ""}
                 </button>
               );
@@ -532,7 +561,7 @@ function FightView({ combat, busy, onAction, onEdit, pools, abilities, convId, o
               title={spent.attacked ? "Martial Arts: an Unarmed Strike as your bonus action" : "Attack first, then strike again as a bonus action"}>👊 Bonus strike</button>
           )}
         </div>
-        {myTurn && is5e && <OptionsList convId={convId} combat={combat} target={target} adv={adv} busy={busy || stepping} onStep={step} />}
+        {myTurn && is5e && <OptionsList convId={convId} combat={combat} target={target} adv={adv} busy={busy || stepping} onStep={step} onState={onState} />}
         {stepLine && <div className="step-line small">{stepLine.split("\n").map((l, i) => <div key={i}>{l.replace(/\*\*/g, "")}</div>)}</div>}
         {stepError && <div className="error-text tiny">{stepError}</div>}
         {myTurn && (

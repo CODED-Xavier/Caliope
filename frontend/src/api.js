@@ -232,6 +232,7 @@ export const api = {
   combatOptions: (id) => request("GET", `/api/conversations/${id}/combat/options`),
   combatDescribe: (id, text) => request("POST", `/api/conversations/${id}/combat`, { action: "describe", text }),
   combatStep: (id, body) => request("POST", `/api/conversations/${id}/combat`, { action: "step", ...body }),
+  combatAuto: (id, key, on) => request("POST", `/api/conversations/${id}/combat`, { action: "auto", key, on }),
   convertCharacter5e: (id) => request("POST", `/api/conversations/${id}/character/convert`, {}),
   restartConversation: (id, keep) => request("POST", `/api/conversations/${id}/restart`, { keep }),
   undo: (id) => request("POST", `/api/conversations/${id}/undo`),

@@ -22,6 +22,7 @@ from .drafts import draft_card_field, draft_player
 from .exporting import export_markdown
 from .combat import CombatError, bonus_intent, combat_intent, end_intent, find_target, player_defaults, split_turn, suggest_fight
 from .combat import _picture_geometry as combat_geometry
+from .dnd5e import fight as fight5e
 from .maps import FEATURES as MAP_FEATURES
 from .maps import TILES as MAP_TILES
 from .maps import TYPES as MAP_TYPES
@@ -51,7 +52,7 @@ from .scenarios import generate_scenario, normalize_scenario
 from .services import Services
 from .skills import SkillError
 from .state import normalize_state
-from .util import deep_merge
+from .util import as_int, deep_merge
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
@@ -521,7 +522,8 @@ async def use_character_feature(conv_id: int, body: dict[str, Any] = Body(...)):
         if not st.get("character5e"):
             raise ValueError("This game has no 5e sheet.")
         store.pull_hp(st, "")
-        st["character5e"], line = store.use_feature(st["character5e"], str(body.get("name", "")), lib)
+        st["character5e"], line = store.use_feature(st["character5e"], str(body.get("name", "")), lib,
+                                                    amount=as_int(body.get("amount"), 0) or None)  # points from a pool (Lay on Hands, Ki)
         store.sync_player(st, lib)
         return st, line
 
@@ -598,16 +600,21 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
             if body.get("scene"):  # this scene's fight happened: the chat stops offering it
                 adv_st = new.setdefault("adventure", {"scene": "", "visited": [], "xp_given": []})
                 adv_st.setdefault("fought", []).append(str(body["scene"])[:60])
+            fight5e.auto_reactions(new, library5e())  # 🛡 Shield / 🌀 Uncanny Dodge on enemy turns, when the sheet has them
             return new, line
     elif action == "act":
-        prepare = lambda st: s.combat.player_action(st, body.get("move", "attack"), str(body.get("target", "")),  # noqa: E731
-                                                    str(body.get("advantage", "")), str(body.get("ability", "")))
+        def prepare(st):
+            out = s.combat.player_action(st, body.get("move", "attack"), str(body.get("target", "")),
+                                         str(body.get("advantage", "")), str(body.get("ability", "")))
+            fight5e.settle_auto(out[0], library5e())
+            return out
     elif action == "step":  # one part of the player's turn (attack, bonus strike, dodge…): rolled at once, no reply yet
         not_busy(conv_id)
         state = s.conversations.get_state(conv_id)
         if body.get("move") == "use":  # an option from the 5e list (Dash, Grapple, Second Wind, a spell…)
             state, line = await asyncio.to_thread(_use_option, s, state, str(body.get("option", "")), str(body.get("target", "")),
-                                                  str(body.get("advantage", "")))
+                                                  str(body.get("advantage", "")), as_int(body.get("slot"), 0) or None,
+                                                  as_int(body.get("amount"), 0) or None)
         else:
             state, line = s.combat.player_step(state, str(body.get("move", "attack")), str(body.get("target", "")),
                                                str(body.get("advantage", "")), str(body.get("ability", "")))
@@ -623,8 +630,19 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
         state = s.combat.move_player(s.conversations.get_state(conv_id), body.get("x"), body.get("y"))
         s.conversations.save_state(conv_id, state)
         return {"state": state}
+    elif action == "auto":  # turn an automatic reaction on or off (🛡 Shield, 🌀 Uncanny Dodge)
+        not_busy(conv_id)
+        state = s.conversations.get_state(conv_id)
+        auto = (state.get("combat") or {}).setdefault("auto_reactions", {})
+        if str(body.get("key")) in ("shield", "uncanny"):
+            auto[str(body["key"])] = bool(body.get("on"))
+        s.conversations.save_state(conv_id, state)
+        return {"state": state}
     elif action == "enemies":
-        prepare = s.combat.enemies_act
+        def prepare(st):
+            out = s.combat.enemies_act(st)
+            fight5e.settle_auto(out[0], library5e())
+            return out
     elif action == "end":
         prepare = lambda st: s.combat.end(st, str(body.get("reason", "")))  # noqa: E731
     else:
@@ -632,36 +650,27 @@ async def combat_action(conv_id: int, body: dict[str, Any] = Body(...)):
     return stream_response(s.engine.send(conv_id, str(body.get("text", "")), prepare=prepare))
 
 
-def _use_option(s, state: dict, option_id: str, target: str, advantage: str):
-    from .dnd5e import actions, store
-    char = state.get("character5e")
-    if not char:
-        raise CombatError("The action list needs a 5e sheet.")
-    lib = library5e()
-    option = actions.find(char, lib, option_id)
-    if not option:
-        raise CombatError("That is not one of your options.")
-    if option["kind"] == "feature" and "uses_left" in option:
-        if option["uses_left"] <= 0:
-            raise CombatError(f"{option['name']} is used up until you rest.")
-        store.pull_hp(state, "")
-        char, result = store.use_feature(char, option["name"], lib)
-        store.put_char(state, "", char, lib)
-        option = {**option, "result": result, "hp": state["player"]["hp"]["current"]}
-    return s.combat.use_option(state, option, target, advantage)
+def _use_option(s, state: dict, option_id: str, target: str, advantage: str, slot: int | None = None, amount: int | None = None):
+    return fight5e.cast_in_fight(s.combat, state, library5e(), option_id, target, advantage, slot, amount)
 
 
 @app.get("/api/conversations/{conv_id}/combat/options")
 async def combat_options(conv_id: int):
     """The 5e options for this turn, by cost (action, bonus action, reaction, free), and what is already spent."""
     from .dnd5e import actions
+    from .dnd5e.character import derive as derive5e
     state = svc().conversations.get_state(conv_id)
     char = state.get("character5e")
     if not char:
         return {"groups": None}
     combat = state.get("combat") or {}
-    return {"groups": await asyncio.to_thread(actions.options, char, library5e()), "spent": combat.get("spent") or {},
-            "extra_actions": combat.get("extra_actions", 0), "reaction_used": combat.get("reaction_round") == combat.get("round")}
+    lib = library5e()
+    sheet = await asyncio.to_thread(derive5e, char, lib)
+    return {"groups": await asyncio.to_thread(actions.options, char, lib), "spent": combat.get("spent") or {},
+            "extra_actions": combat.get("extra_actions", 0), "reaction_used": combat.get("reaction_round") == combat.get("round"),
+            "slots_left": sheet.get("slots_left", {}), "pact_left": sheet.get("pact_left", 0),
+            "pact_level": (sheet.get("pact") or {}).get("level", 0), "auto": combat.get("auto_reactions") or {},
+            "can_smite": bool((combat.get("last_hit") or {}).get("melee"))}
 
 
 def _guess_kind(tiles: list[str]) -> str:

@@ -168,6 +168,9 @@ const Message = memo(function Message({ m, npcs, speaker, playerPic, portraitSty
               <div className={`bubble ${isDice ? "dice" : ""} ${isCombat ? "combat-card" : ""} ${isCombat || isDice || m.meta?.app_line || (m.content.startsWith("\u2728") || m.content.startsWith("\u{1F4CC}")) ? "app-text" : ""}`}>
                 {isCombat ? <CombatText text={m.content} npcs={npcs} /> : <Markdown text={showThoughts(m.content)} story={!isDice} />}
               </div>
+              {(m.meta?.sheet_uses || []).length > 0 && (
+                <div className="sheet-uses app-text">{m.meta.sheet_uses.map((u, i) => <div key={i} className={u.ok ? "" : "warn-text"}>{u.line}</div>)}</div>
+              )}
               {m.meta?.edited && <div className="muted tiny edited">edited</div>}
               {actions}
             </>

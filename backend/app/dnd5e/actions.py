@@ -99,6 +99,12 @@ def options(char: dict, lib) -> dict:
         if re.search(r"additional action", f.get("text", ""), re.I):
             o["grants"] = "action"
         out[cost].append(o)
+    if sheet["class"] == "Paladin" and sheet["level"] >= 2 and (sheet.get("slots") or sheet.get("pact")):
+        for cost in out:  # the feature's own row would do nothing: the rules option spends the slot and rolls
+            out[cost] = [o for o in out[cost] if o["name"] != "Divine Smite"]
+        out["free"].insert(0, {"id": "rules:divine_smite", "name": "Divine Smite", "cost": "free", "kind": "smite",
+                               "text": "Right after a melee hit: spend a spell slot for 2d8 radiant (+1d8 per slot level above 1st, +1d8 "
+                                       "against undead and fiends)."})
     if sheet["class"] == "Monk":
         out["bonus"].insert(0, {"id": "rules:martial_arts", "name": "Martial Arts strike", "cost": "bonus", "kind": "bonus_attack",
                                 "text": "After the Attack action with an unarmed strike or monk weapon: one unarmed strike."})

@@ -1950,7 +1950,44 @@
 "📦 Take the packages": "📦 Ficar com os pacotes",
 "gp, then buy what you want below": "po, depois compre o que quiser abaixo",
 "Take this equipment": "Ficar com este equipamento",
-"Prices from the Library. Bought things can be returned here for the full price.": "Preços da Biblioteca. O que você comprou pode ser devolvido aqui pelo preço cheio."
+"Prices from the Library. Bought things can be returned here for the full price.": "Preços da Biblioteca. O que você comprou pode ser devolvido aqui pelo preço cheio.",
+"Cast with": "Lançar com",
+"the lowest slot that fits": "o menor espaço que serve",
+"On enemy turns the app takes these reactions for you, when they help": "Nos turnos dos inimigos o app usa estas reações por você, quando ajudam",
+"On enemy turns:": "Nos turnos dos inimigos:",
+"🛡 Shield (+5 AC when a hit would land; spends a level 1 slot)": "🛡 Escudo Arcano (+5 de CA quando um golpe acertaria; gasta um espaço de nível 1)",
+"🌀 Uncanny Dodge (half damage from a hit)": "🌀 Esquiva Sobrenatural (metade do dano de um golpe)",
+"No spell slot left for this.": "Nenhum espaço de magia sobrando para isto.",
+"Right after you hit with a melee weapon.": "Logo depois de acertar com uma arma corpo a corpo.",
+"Spent from the Resources section": "Gasto na seção Recursos",
+"How many points to spend (empty: heal what you are missing)": "Quantos pontos gastar (vazio: cura o que falta)",
+"How many points to spend": "Quantos pontos gastar",
+"back after a long rest": "volta após um descanso longo",
+"back after a short rest": "volta após um descanso curto",
+"Spend a slot (a spell cast in the story)": "Gastar um espaço (uma magia lançada na história)",
+"Give a slot back": "Devolver um espaço",
+"⚡ Divine Smite: after a melee hit, spend a slot for 2d8 radiant (+1d8 per level above 1st, +1d8 against undead and fiends). In fights it is one of your options.": "⚡ Destruição Divina: depois de um acerto corpo a corpo, gaste um espaço para 2d8 radiante (+1d8 por nível acima do 1º, +1d8 contra mortos-vivos e corruptores). Nas lutas é uma das suas opções.",
+"Say it in the chat too: “I use Lay on Hands for 5”, “I rage”, “I cast Cure Wounds at 2nd level”. The app spends it.": "Dá para dizer no chat também: “uso Imposição das Mãos com 5”, “entro em fúria”, “conjuro Cure Wounds no 2º nível”. O app gasta.",
+"No spell slots left.": "Nenhum espaço de magia sobrando.",
+"No pact slots left.": "Nenhum espaço de pacto sobrando.",
+"You have no slots of that level.": "Você não tem espaços desse nível.",
+"Divine Smite comes right after you hit with a melee weapon.": "A Destruição Divina vem logo depois de acertar com uma arma corpo a corpo.",
+"The action list needs a 5e sheet.": "A lista de ações precisa de uma ficha 5e.",
+"That is not one of your options.": "Isso não é uma das suas opções.",
+"- nobody inside": "- ninguém dentro",
+"Divine Smite": "Destruição Divina",
+"fire": "fogo",
+"lightning": "elétrico",
+"thunder": "trovejante",
+"acid": "ácido",
+"poison": "veneno",
+"necrotic": "necrótico",
+"radiant": "radiante",
+"force": "energia",
+"psychic": "psíquico",
+"· used": "· usada",
+"· used this round": "· usada nesta rodada",
+"Dodge": "Esquivar"
 },
 "patterns": [
 [
@@ -3200,6 +3237,182 @@
 [
 "Only things you bought can be returned.",
 "Só o que você comprou pode ser devolvido."
+],
+[
+"Spell save DC {0} · spell attack {1}",
+"CD de magia {0} · ataque mágico {1}"
+],
+[
+"{0} of {1} left · {2}",
+"{0} de {1} restantes · {2}"
+],
+[
+"Used up: {0}",
+"Esgotado: {0}"
+],
+[
+"Level {0} slots",
+"Espaços de nível {0}"
+],
+[
+"Pact slots (level {0})",
+"Espaços de pacto (nível {0})"
+],
+[
+"Slots left: {0}",
+"Espaços restantes: {0}"
+],
+[
+"a level {0} slot",
+"um espaço de nível {0}"
+],
+[
+"✨ {0}: a level {1} slot spent ({2} left at level {3})",
+"✨ {0}: um espaço de nível {1} gasto ({2} restantes no nível {3})"
+],
+[
+"✨ {0}: a level {1} slot spent ({2} left at level {3}): 🎲 {4} = {5} → {6}/{7} HP",
+"✨ {0}: um espaço de nível {1} gasto ({2} restantes no nível {3}): 🎲 {4} = {5} → {6}/{7} PV"
+],
+[
+"✨ Divine Smite: a level {0} slot spent, +{1} radiant on the hit (+1d8 against undead or fiends)",
+"✨ Destruição Divina: um espaço de nível {0} gasto, +{1} radiante no acerto (+1d8 contra mortos-vivos ou corruptores)"
+],
+[
+"✨ Lay on Hands: +{0} HP → {1}/{2} ({3}/{4} points left)",
+"✨ Imposição das Mãos: +{0} PV → {1}/{2} ({3}/{4} pontos restantes)"
+],
+[
+"✨ {0}: {1} spent ({2}/{3} left)",
+"✨ {0}: {1} gastos ({2}/{3} restantes)"
+],
+[
+"✨ {0} ({1}/{2} left)",
+"✨ {0} ({1}/{2} restantes)"
+],
+[
+"✨ {0} ({1}/{2} left): 🎲 {3} = {4} → {5}/{6} HP",
+"✨ {0} ({1}/{2} restantes): 🎲 {3} = {4} → {5}/{6} PV"
+],
+[
+"No spell slots of level {0} or higher left.",
+"Nenhum espaço de magia de nível {0} ou maior sobrando."
+],
+[
+"No level {0} spell slots left.",
+"Nenhum espaço de magia de nível {0} sobrando."
+],
+[
+"No level {0} slots left.",
+"Nenhum espaço de nível {0} sobrando."
+],
+[
+"No uses of {0} left until a short rest.",
+"Nenhum uso de {0} até um descanso curto."
+],
+[
+"No uses of {0} left until a long rest.",
+"Nenhum uso de {0} até um descanso longo."
+],
+[
+"{0} has no uses to spend.",
+"{0} não tem usos para gastar."
+],
+[
+"{0} is used up until you rest.",
+"{0} está esgotado até você descansar."
+],
+[
+"✨ {0}: No spell slots left.",
+"✨ {0}: nenhum espaço de magia sobrando."
+],
+[
+"✨ {0}: No level {1} spell slots left.",
+"✨ {0}: nenhum espaço de magia de nível {1} sobrando."
+],
+[
+"✨ {0}: No spell slots of level {1} or higher left.",
+"✨ {0}: nenhum espaço de magia de nível {1} ou maior sobrando."
+],
+[
+"✨ {0}: No uses of {1} left until a short rest.",
+"✨ {0}: nenhum uso de {1} até um descanso curto."
+],
+[
+"✨ {0}: No uses of {1} left until a long rest.",
+"✨ {0}: nenhum uso de {1} até um descanso longo."
+],
+[
+"{0}'s Divine Smite",
+"Destruição Divina de {0}"
+],
+[
+"(level {0} slot)",
+"(espaço de nível {0})"
+],
+[
+"{0} casts {1}",
+"{0} lança {1}"
+],
+[
+"💥 {0} radiant damage ({1}) → {2} {3}/{4} HP",
+"💥 {0} de dano radiante ({1}) → {2} {3}/{4} PV"
+],
+[
+"🎯 DC {0} {1} save: {2}",
+"🎯 CD {0}, teste de {1}: {2}"
+],
+[
+"💥 {0} damage ({1}) · DC {2} {3} save:",
+"💥 {0} de dano ({1}) · CD {2}, teste de {3}:"
+],
+[
+"- {0}: d20({1}){2} = {3} → saved → {4} → {5}/{6} HP",
+"- {0}: d20({1}){2} = {3} → passou → {4} → {5}/{6} PV"
+],
+[
+"- {0}: d20({1}){2} = {3} → failed → {4} → {5}/{6} HP",
+"- {0}: d20({1}){2} = {3} → falhou → {4} → {5}/{6} PV"
+],
+[
+"- {0}: d20({1}){2} = {3} → saved → no damage",
+"- {0}: d20({1}){2} = {3} → passou → sem dano"
+],
+[
+"✨ The Aedo narrates what {0} does.",
+"✨ O Aedo narra o que {0} faz."
+],
+[
+"Choose who {0} is aimed at.",
+"Escolha em quem {0} é mirada."
+],
+[
+"{0} resists ({1})",
+"{0} resiste ({1})"
+],
+[
+"{0} is affected ({1})",
+"{0} é afetado ({1})"
+],
+[
+"· 🛡 {0} casts Shield (reaction): AC {1}",
+"· 🛡 {0} lança Escudo Arcano (reação): CA {1}"
+],
+[
+"· 🌀 {0} uses Uncanny Dodge (reaction): half damage",
+"· 🌀 {0} usa Esquiva Sobrenatural (reação): metade do dano"
+],
+[
+"pact L{0} {1}",
+"pacto N{0} {1}"
+],
+[
+"💥 {0} {1} damage ({2}) · DC {3} {4} save:",
+"💥 {0} de dano de {1} ({2}) · CD {3}, teste de {4}:"
+],
+[
+"✨ {0}: {1} has no uses to spend.",
+"✨ {0}: {1} não tem usos para gastar."
 ]
 ]
 }

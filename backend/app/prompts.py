@@ -364,6 +364,10 @@ class PromptBuilder:
         used = used_section((last_user_msg or {}).get("meta", {}).get("skills_used") or [], state.get("abilities") or [], state)
         if used:
             extra = used + ("\n\n" + extra if extra else "")
+        from .dnd5e.chatuse import prompt_section as sheet_used_section
+        sheet_used = sheet_used_section((last_user_msg or {}).get("meta", {}).get("sheet_uses") or [])
+        if sheet_used:
+            extra = sheet_used + ("\n\n" + extra if extra else "")
         fixed = [f for f in state.get("corrections") or [] if f]
         if fixed:  # /fix: the player corrected the story; these win over anything said earlier
             extra = ("## Story facts the player fixed (always true, even where earlier messages said otherwise)\n"

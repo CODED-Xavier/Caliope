@@ -227,6 +227,11 @@ class ChatEngine:
                     self.repo.save_state(conv_id, st_now)
                     meta = {"snapshot": before, "skills_used": used}
                     yield {"type": "state", "state": st_now, "npcs": self.repo.list_npcs(conv_id), "changes": []}
+                elif st_now.get("character5e") and not (st_now.get("combat") or {}).get("active"):
+                    sheet_used = self._sheet_uses(conv_id, st_now, text)  # "I use Lay on Hands", "I cast Cure Wounds"
+                    if sheet_used:
+                        meta = {**sheet_used[0], "sheet_uses": sheet_used[1]}
+                        yield {"type": "state", "state": st_now, "npcs": self.repo.list_npcs(conv_id), "changes": []}
             user_msg = self.repo.add_message(conv_id, "user", text, meta)
             self._auto_title(conv_id, text)
             yield {"type": "user_message", "message": user_msg}
@@ -234,6 +239,21 @@ class ChatEngine:
                 async for event in turn:
                     yield event
         self._warm_later(conv_id)  # the new reply joins the story's memory while the player reads it
+
+    def _sheet_uses(self, conv_id: int, state: dict, text: str):
+        """5e features and spells named in the message are spent on the sheet (the Aedo hears what was spent)."""
+        from .dnd5e import chatuse
+        try:
+            before = self.repo.capture_snapshot(conv_id)
+            used = chatuse.apply(state, text, resources._library())
+        except Exception:  # noqa: BLE001 - spending from chat is a convenience: the message still goes through
+            import logging
+            logging.getLogger("rpg").exception("could not read 5e uses from the chat")
+            return None
+        if not used:
+            return None
+        self.repo.save_state(conv_id, state)
+        return {"snapshot": before}, used
 
     _tasks: set = set()
 

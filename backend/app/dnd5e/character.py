@@ -208,6 +208,17 @@ def derive(char: dict, lib) -> dict:
                                     "dtype": "bludgeoning", "range": "5 ft", "properties": [], "proficient": True, "ability": ab})
     sheet["features"] = _features(char, cls, look, level, mods)
     sheet.update(_slots(cls, level))
+    # spellcasting: the class's ability (or the subclass's, for an Eldritch Knight), save DC and spell attack
+    sab = ((cls or {}).get("spellcastingAbility") or "")
+    if not sab and char.get("subclass"):
+        sub = next((v for (k, n, _), v in look.lib.items.items() if k == "subclass" and n == str(char["subclass"].get("name", "")).lower()
+                    and v.get("className") == (cls or {}).get("name")), None)
+        sab = (sub or {}).get("spellcastingAbility") or ""
+    if sab in mods:
+        sheet.update(spell_ability=sab, spell_dc=8 + prof + mods[sab], spell_attack=prof + mods[sab])
+    from .magic import pact_left, slots_left
+    sheet["slots_left"] = slots_left(sheet, char)
+    sheet["pact_left"] = pact_left(sheet, char)
     cp = int(char.get("cp") or 0)  # money, kept in copper pieces
     sheet["coins"] = {"cp_total": cp, "gp": cp // 100, "sp": (cp % 100) // 10, "cp": cp % 10}
     sheet["warnings"] = look.warnings

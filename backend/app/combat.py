@@ -12,6 +12,7 @@ Two presets:
 """
 from __future__ import annotations
 
+import math
 import random
 import re
 import uuid
@@ -82,6 +83,8 @@ def player_defaults(state: dict, system: str) -> dict:
         melee = [a for a in sheet.get("attacks") or [] if "ft" in a.get("range", "") and "/" not in a.get("range", "")]
         att = (melee or sheet.get("attacks") or [None])[0]
         out = {"ac": as_int(sheet.get("ac", 10), 10), "init_bonus": as_int(sheet.get("initiative", 0), 0), "hp": as_int(p["hp"]["max"], 10)}
+        if sheet.get("class") == "Rogue":  # Sneak Attack: once a turn, with advantage or an ally next to the target
+            out["sneak"] = f"{(as_int(sheet.get('level', 1), 1) + 1) // 2}d6"
         if att:
             out.update(attack_bonus=att["bonus"], damage=att["damage"], weapon=att["name"])
         else:
@@ -92,6 +95,9 @@ def player_defaults(state: dict, system: str) -> dict:
     prof = 2 + max(0, as_int(p.get("level", 1), 1) - 1) // 4
     return {"attack_bonus": mod + prof, "damage": f"1d8{mod:+d}" if mod else "1d8", "ac": as_int(p.get("ac", 10), 10),
             "init_bonus": ability_mod(stats.get("DEX", 10)), "hp": as_int(p["hp"]["max"], 10)}
+
+
+DICE_RE = re.compile(r"\d{1,2}d\d{1,3}([+-]\d{1,2})?")
 
 
 def _combatant(raw: dict, side: str, system: str, index: int) -> dict:
@@ -112,6 +118,10 @@ def _combatant(raw: dict, side: str, system: str, index: int) -> dict:
         "range": max(1, min(30, as_int(raw.get("range", 1), 1))),   # squares: 1 = melee, more = ranged
         "speed": max(1, min(12, as_int(raw.get("speed", 6), 6))),   # squares per turn (6 = 30 ft)
     }
+    if raw.get("sneak") and DICE_RE.fullmatch(str(raw["sneak"])):
+        c["sneak"] = str(raw["sneak"])
+    if isinstance(raw.get("saves"), dict):  # saving throw bonuses (a bestiary sheet), for spells with a save
+        c["saves"] = {str(k)[:3].lower(): max(-5, min(20, as_int(v, 0))) for k, v in raw["saves"].items()}
     if side == "ally" and raw.get("companion"):  # app/party.py: Calíope plays them (healers heal, the others attack)
         c["companion"] = True
         c["role"] = str(raw.get("role") or "fighter")
@@ -285,6 +295,7 @@ class CombatEngine:
     def _advance(self, combat: dict) -> None:
         """Next living combatant; a new round starts after the last one."""
         n = len(combat["order"])
+        combat.pop("last_hit", None)
         for _ in range(n):
             combat["turn"] += 1
             if combat["turn"] >= n:
@@ -326,24 +337,158 @@ class CombatEngine:
             mode = "advantage"
         if any(x in att["conditions"] for x in ("poisoned", "frightened", "blinded", "restrained", "prone")):
             mode = "disadvantage" if mode != "advantage" else ""
-        ac = target["ac"] + (2 if cover else 0)
+        ac = target["ac"] + (2 if cover else 0) + (5 if target.get("shielded") == combat["round"] else 0)
         expr = "1d20" + (f"{att['attack_bonus']:+d}" if att["attack_bonus"] else "") + (f" {mode}" if mode else "")
         r = self.dice.roll(expr)
         hit = r.natural != 1 and (r.natural == 20 or r.total >= ac)
+        reacted = ""
+        if hit and r.natural != 20 and target["side"] == "player" and r.total < ac + 5 and self._can_react(combat, target, "shield"):
+            # Shield (reaction, a 1st-level slot): +5 AC until your next turn, this attack included
+            target["shielded"] = combat["round"]
+            combat["reaction_round"] = combat["round"]
+            combat.setdefault("auto_spent", []).append("slot")
+            ac += 5
+            hit = False
+            reacted = f" · 🛡 {target['name']} casts Shield (reaction): AC {ac}"
         tag = " (advantage)" if r.mode == "advantage" else " (disadvantage)" if r.mode == "disadvantage" else ""
         roll = (f"🎲 d20({r.natural}) {att['attack_bonus']:+d} = {r.total} vs AC {ac}"
                 + (" (cover +2)" if cover else "") + tag)
         if not hit:
-            return f"{head}\n{roll} → **{'natural 1, ' if r.natural == 1 else ''}MISS**"
+            return f"{head}\n{roll} → **{'natural 1, ' if r.natural == 1 else ''}MISS**{reacted}"
         dmg_expr = att["damage"]
+        extra = []
+        if att.get("raging") and att.get("range", 1) <= 1:  # Rage: a bonus on Strength melee damage
+            dmg_expr += f"+{att.get('rage_bonus', 2)}"
+            extra.append("Rage")
+        if att.get("sneak") and att["side"] == "player" and not combat.setdefault("spent", {}).get("sneak") and (
+                r.mode == "advantage" or any(o["side"] in ("ally",) and o["hp"] > 0 and distance(o["x"], o["y"], target["x"], target["y"]) <= 1
+                                             for o in combat["combatants"])):
+            dmg_expr += f"+{att['sneak']}"
+            combat["spent"]["sneak"] = True
+            extra.append("Sneak Attack")
         if r.natural == 20:  # critical: double the dice
             dmg_expr = re.sub(r"(\d*)d(\d+)", lambda m: f"{2 * int(m.group(1) or 1)}d{m.group(2)}", dmg_expr)
         d = self.dice.roll(dmg_expr)
         dmg = max(1, d.total)
-        after = self._hurt(combat, target, dmg, crit=r.natural == 20)
+        if att["side"] == "player":  # for Divine Smite: the last hit this turn
+            combat["last_hit"] = {"target": target["id"], "melee": att.get("range", 1) <= 1, "crit": r.natural == 20}
+        if target["side"] == "player" and self._can_react(combat, target, "uncanny"):  # Uncanny Dodge: half damage
+            combat["reaction_round"] = combat["round"]
+            dmg = max(1, dmg // 2)
+            reacted = f" · 🌀 {target['name']} uses Uncanny Dodge (reaction): half damage"
+        if extra:
+            dmg_expr += f" · {', '.join(extra)}"
+        after = self._hurt(combat, target, dmg, crit=r.natural == 20) + reacted
         crit = "CRITICAL HIT" if r.natural == 20 else "HIT"
         return (f"{head}\n{roll} → **{crit}**\n💥 {dmg} damage ({dmg_expr}) → {target['name']} {target['hp']}/{target['max_hp']} HP"
                 + after)
+
+    @staticmethod
+    def _can_react(combat: dict, me: dict, what: str) -> bool:
+        """An automatic reaction the player turned on (🛡 Shield with a slot left, 🌀 Uncanny Dodge), once a round."""
+        auto = combat.get("auto_reactions") or {}
+        if not auto.get(what) or me["hp"] <= 0 or combat.get("reaction_round") == combat["round"]:
+            return False
+        if what == "shield":
+            return auto.get("slots", 0) > len([x for x in combat.get("auto_spent", []) if x == "slot"])
+        return True
+
+    def _area_targets(self, combat: dict, me: dict, target: dict, area: dict) -> list[dict]:
+        """Everyone a spell's area covers (the map's 🔥 tool, the same squares)."""
+        size = max(5, as_int(area.get("size"), 5)) / 5
+        shape, origin = area.get("shape"), area.get("origin")
+        out = []
+        for c in combat["combatants"]:
+            if c["hp"] <= 0 or (c is me and origin == "self"):
+                continue
+            if shape == "sphere":
+                ox, oy = (me["x"], me["y"]) if origin == "self" else (target["x"], target["y"])
+                inside = math.hypot(c["x"] - ox, c["y"] - oy) <= size + 0.01
+            elif shape == "cube" and origin == "point":
+                n = max(1, round(size))
+                x0 = target["x"] if target["x"] >= me["x"] else target["x"] - n + 1
+                y0 = target["y"] if target["y"] >= me["y"] else target["y"] - n + 1
+                inside = x0 <= c["x"] < x0 + n and y0 <= c["y"] < y0 + n
+            elif shape == "cube":
+                n = max(1, round(size))
+                sx, sy = (target["x"] > me["x"]) - (target["x"] < me["x"]), (target["y"] > me["y"]) - (target["y"] < me["y"])
+                x0 = me["x"] + 1 if sx > 0 else me["x"] - n if sx < 0 else me["x"] - (n - 1) // 2
+                y0 = me["y"] + 1 if sy > 0 else me["y"] - n if sy < 0 else me["y"] - (n - 1) // 2
+                inside = (sx or sy) and x0 <= c["x"] < x0 + n and y0 <= c["y"] < y0 + n
+            else:  # cone or line from the caster toward the target
+                dx, dy = target["x"] - me["x"], target["y"] - me["y"]
+                length = math.hypot(dx, dy) or 1
+                vx, vy = c["x"] - me["x"], c["y"] - me["y"]
+                along = (vx * dx + vy * dy) / length
+                across = abs(vx * dy - vy * dx) / length
+                half = max(5, as_int(area.get("width"), 5)) / 10
+                inside = 0 < along <= size + 0.01 and (across <= half + 0.01 if shape == "line" else across <= along / 2 + 0.01)
+            if inside:
+                out.append(c)
+        return out
+
+    def _cast(self, combat: dict, me: dict, target_id: str, name: str, info: dict) -> str:
+        """A spell from the 5e sheet: its attack roll or saving throws, its damage (once, for everyone in the area),
+        or its healing. What the app can't roll (Hold Person's effect, a summon), the Aedo narrates."""
+        slot = f" (level {info['slot']} slot)" if info.get("slot") else ""
+        target = self._get(combat, target_id) if target_id else None
+        head = f"**{me['name']} casts {name}" + (f" at {target['name']}" if target and target is not me else "") + f"**{slot}"
+        kind = info.get("kind")
+        if kind == "attack":
+            if not target:
+                raise CombatError(f"Choose who {name} is aimed at.")
+            return self._attack(combat, {**me, "attack_bonus": info["attack"], "damage": info["dice"], "range": 99, "raging": False, "sneak": ""},
+                                target, head=head)
+        if kind == "heal":
+            who = target if target and target["side"] != "enemy" else me
+            r = self.dice.roll(info["dice"])
+            before = who["hp"]
+            who["hp"] = min(who["max_hp"], who["hp"] + max(1, r.total))
+            if who["hp"] > 0 and who.get("dying"):
+                who.update(dying=False, stable=False, death={"ok": 0, "fail": 0})
+            return f"{head}\n💚 +{who['hp'] - before} HP ({info['dice']}) → {who['name']} {who['hp']}/{who['max_hp']} HP"
+        if kind == "save":
+            if info.get("area") and target:
+                hit = self._area_targets(combat, me, target, info["area"])
+            elif target:
+                hit = [target]
+            else:
+                raise CombatError(f"Choose who {name} is aimed at.")
+            if not info.get("dice"):  # a save with no damage (Hold Person, Sleep…): who resists, who is affected
+                outcome = []
+                for c in hit:
+                    bonus = (c.get("saves") or {}).get(info["save"], 0)
+                    sv = self.dice.roll(f"1d20{bonus:+d}" if bonus else "1d20")
+                    outcome.append(f"{c['name']} {'resists' if sv.total >= info['dc'] else 'is affected'} ({sv.total})")
+                return f"{head}\n🎯 DC {info['dc']} {info['save'].upper()} save: " + ", ".join(outcome)
+            r = self.dice.roll(info["dice"])
+            lines = [f"{head}\n💥 {r.total} {info.get('dtype') or ''} damage ({info['dice']}) · DC {info['dc']} {info['save'].upper()} save:".replace("  ", " ")]
+            for c in hit or []:
+                bonus = (c.get("saves") or {}).get(info["save"], 0)
+                sv = self.dice.roll(f"1d20{bonus:+d}" if bonus else "1d20")
+                ok = sv.total >= info["dc"]
+                dmg = (r.total // 2 if info.get("half") else 0) if ok else r.total
+                after = self._hurt(combat, c, dmg) if dmg else ""
+                lines.append(f"- {c['name']}: d20({sv.natural}){bonus:+d} = {sv.total} → {'saved' if ok else 'failed'}"
+                             + (f" → {dmg} → {c['hp']}/{c['max_hp']} HP" if dmg else " → no damage") + after)
+            if not hit:
+                lines.append("- nobody inside")
+            return "\n".join(lines)
+        return f"{head}\n✨ The Aedo narrates what {name} does."
+
+    def _smite(self, combat: dict, me: dict, info: dict) -> str:
+        last = combat.get("last_hit")
+        target = self._get(combat, last["target"]) if last else None
+        if not target or not last.get("melee"):
+            raise CombatError("Divine Smite comes right after you hit with a melee weapon.")
+        dice = info["dice"]
+        if last.get("crit"):  # a critical hit doubles the smite's dice too
+            dice = re.sub(r"(\d*)d(\d+)", lambda m: f"{2 * int(m.group(1) or 1)}d{m.group(2)}", dice)
+        combat.pop("last_hit", None)  # one smite per hit
+        r = self.dice.roll(dice)
+        after = self._hurt(combat, target, max(1, r.total))
+        return (f"**{me['name']}'s Divine Smite** (level {info['slot']} slot)\n"
+                f"💥 {r.total} radiant damage ({dice}) → {target['name']} {target['hp']}/{target['max_hp']} HP{after}")
 
     def _hurt(self, combat: dict, target: dict, dmg: int, crit: bool = False) -> str:
         """Damage lands. A player at 0 HP is dying (5e death saves); a hit while dying is a failed save (a critical, two)."""
@@ -356,6 +501,8 @@ class CombatEngine:
                 target["dying"], target["dead"] = False, True
                 return f" · 💀 **{target['name']} dies.**"
             return f" · 💀 a hit while dying: death save failure ({death['fail']}/3)"
+        if target.get("raging"):  # Rage: resistance to weapon damage
+            dmg = max(1, dmg // 2)
         target["hp"] = max(0, target["hp"] - dmg)
         if target["hp"] > 0:
             return ""
@@ -554,6 +701,10 @@ class CombatEngine:
         elif kind == "opportunity":
             target = self._get(combat, target_id)
             line = self._attack(combat, me, target, "", head=f"**{me['name']} makes an opportunity attack on {target['name']} (reaction)**")
+        elif option.get("cast"):
+            line = self._cast(combat, me, target_id, name, option["cast"])
+        elif kind == "smite":
+            line = self._smite(combat, me, option["smite"])
         elif kind == "dash":
             combat["moved"] = combat.get("moved", 0) - me.get("speed", 6)
             line = f"**{me['name']} dashes** ({label})\n🏃 +{me.get('speed', 6) * 5} ft of movement this turn."

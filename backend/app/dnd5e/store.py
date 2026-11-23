@@ -72,6 +72,23 @@ def apply_change(char: dict, change: dict, lib) -> dict:
             char["extras"] = list(char.get("extras") or []) + [{"name": str(value.get("name", ""))[:80], "text": str(value.get("text", ""))[:1500], "homebrew": True}]
         else:
             raise ValueError("Unknown field.")
+    elif op == "slot":  # a spell slot spent (or given back) by hand on the sheet
+        from .magic import pact_left, slots_left
+        sheet = derive(char, lib)
+        lv, delta = str(change.get("level", "")), int(change.get("delta", 1))
+        if lv == "pact":
+            if delta > 0 and not pact_left(sheet, char):
+                raise ValueError("No pact slots left.")
+            char["pact_used"] = max(0, int(char.get("pact_used") or 0) + delta)
+        else:
+            total = {str(k): int(v) for k, v in (sheet.get("slots") or {}).items()}  # the sheet's levels are numbers
+            if lv not in total:
+                raise ValueError("You have no slots of that level.")
+            if delta > 0 and not slots_left(sheet, char).get(lv):
+                raise ValueError(f"No level {lv} slots left.")
+            used = dict(char.get("slots_used") or {})
+            used[lv] = max(0, min(total[lv], int(used.get(lv, 0)) + delta))
+            char["slots_used"] = used
     elif op == "start_gear":  # the class's and background's packages, or the class's gold instead
         from .equipment import apply_start
         char = apply_start(char, lib, change.get("choice") or {})
@@ -97,13 +114,28 @@ def apply_change(char: dict, change: dict, lib) -> dict:
     return char
 
 
-def use_feature(char: dict, name: str, lib, rng: random.Random | None = None) -> tuple[dict, str]:
+POOLS = ("lay on hands", "ki", "monk's focus", "font of magic", "sorcery points")  # spent by points, not one use
+
+
+def use_feature(char: dict, name: str, lib, rng: random.Random | None = None, amount: int | None = None) -> tuple[dict, str]:
     sheet = derive(char, lib)
     f = next((x for x in sheet["features"] if x["name"].lower() == name.lower()), None)
     if f is None or "uses_max" not in f:
         raise ValueError(f"{name} has no uses to spend.")
     if f["used"] >= f["uses_max"]:
         raise ValueError(f"No uses of {f['name']} left until a {f['per']} rest.")
+    left = f["uses_max"] - f["used"]
+    if f["name"].lower() in POOLS:  # a pool of points: spend as many as asked
+        if f["name"].lower() == "lay on hands":
+            missing = max(0, sheet["hp_max"] - sheet["hp"])
+            pts = max(1, min(left, int(amount) if amount else missing or 1))
+            new_hp = min(sheet["hp_max"], sheet["hp"] + pts)
+            char = {**char, "uses": {**(char.get("uses") or {}), f["name"]: f["used"] + pts},
+                    "hp": {**(char.get("hp") or {}), "current": new_hp}}
+            return char, f"✨ Lay on Hands: +{new_hp - sheet['hp']} HP → {new_hp}/{sheet['hp_max']} ({left - pts}/{f['uses_max']} points left)"
+        pts = max(1, min(left, int(amount or 1)))
+        char = {**char, "uses": {**(char.get("uses") or {}), f["name"]: f["used"] + pts}}
+        return char, f"✨ {f['name']}: {pts} spent ({left - pts}/{f['uses_max']} left)"
     char = {**char, "uses": {**(char.get("uses") or {}), f["name"]: f["used"] + 1}}
     line = f"✨ {f['name']} ({f['uses_max'] - f['used'] - 1}/{f['uses_max']} left)"
     if f["name"] == "Second Wind":
@@ -122,7 +154,8 @@ def rest(char: dict, when: str, lib) -> dict:
     char = {**char, "uses": keep}
     if when == "long_rest":
         char["hp"] = {**(char.get("hp") or {}), "current": sheet["hp_max"]}
-    return char
+    from .magic import restore_slots
+    return restore_slots(char, when)
 
 
 def sync_player(state: dict, lib) -> dict:
@@ -138,7 +171,8 @@ def sync_player(state: dict, lib) -> dict:
     p["hp"] = {"current": sheet["hp"], "max": sheet["hp_max"]}
     p["stats"] = {k.upper(): v["score"] for k, v in sheet["abilities"].items()}
     p["skills"] = [f"{n.title()} {'+' if s['bonus'] >= 0 else ''}{s['bonus']}" for n, s in sheet["skills"].items() if s["proficient"]]
-    state["character5e_sheet"] = {k: sheet[k] for k in ("ac", "attacks", "saves", "skills", "prof", "initiative", "speed", "hp_max", "level")}
+    state["character5e_sheet"] = {k: sheet[k] for k in ("ac", "attacks", "saves", "skills", "prof", "initiative", "speed", "hp_max", "level",
+                                                         "class", "slots_left", "pact_left") if k in sheet}
     state["character5e_sheet"]["martial_arts"] = sheet["class"] == "Monk"  # an Unarmed Strike as a bonus action after attacking
     # the sheet owns the hero's numbers and gear: the Aedo reads these notes and the bag, not an old free-form sheet
     if "notes_before_5e" not in p and p.get("notes"):
@@ -160,8 +194,13 @@ def sheet_summary(sheet: dict) -> str:
     feats = [f["name"] + (f" ({f['uses_max'] - f['used']}/{f['uses_max']} per {f['per']} rest)" if f.get("uses_max") else "") for f in sheet["features"]]
     if feats:
         parts.append("Features: " + ", ".join(feats) + ".")
+    if sheet.get("spell_dc"):
+        parts.append(f"Spell save DC {sheet['spell_dc']}, spell attack {sig(sheet.get('spell_attack', 0))}.")
     if sheet.get("slots"):
-        parts.append("Spell slots: " + ", ".join(f"level {k}: {v}" for k, v in sheet["slots"].items()) + ".")
+        left = sheet.get("slots_left") or {}
+        parts.append("Spell slots left: " + ", ".join(f"level {k}: {left.get(str(k), v)}/{v}" for k, v in sheet["slots"].items()) + ".")
+    if sheet.get("pact"):
+        parts.append(f"Pact slots left: {sheet.get('pact_left', 0)}/{sheet['pact']['count']} (level {sheet['pact']['level']}).")
     return " ".join(parts)
 
 

@@ -332,7 +332,7 @@ export default function App() {
   };
   const buyOffer = (messageId, index) => runTurn(`/api/conversations/${activeRef.current}/buy`, { message_id: messageId, index, qty: 1 });
   const usePower = (id) => runTurn(`/api/conversations/${activeRef.current}/ability`, { ability: id });
-  const useFeature5e = (name) => runTurn(`/api/conversations/${activeRef.current}/character/use`, { name });
+  const useFeature5e = (name, amount) => runTurn(`/api/conversations/${activeRef.current}/character/use`, { name, ...(amount ? { amount } : {}) });
   const restNow = (kind) => runTurn(`/api/conversations/${activeRef.current}/rest`, { kind });
   const payGold = (body) => runTurn(`/api/conversations/${activeRef.current}/pay`, body);
   const rollCheck = (messageId, index, mode) => runTurn(`/api/conversations/${activeRef.current}/check`, { message_id: messageId, index, mode });
