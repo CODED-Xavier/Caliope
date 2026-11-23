@@ -1511,6 +1511,45 @@ async def _wiki_fetch(url: str) -> dict:
     raise wikiresearch.ResearchError("The wiki redirected too many times.")
 
 
+async def _html_fetch(url: str) -> str:
+    """GET a public web page's HTML for the Muse's research (every redirect is checked again; 3 MB at most)."""
+    import httpx
+    from .images import validate_url
+    from .webpages import MAX_BYTES
+
+    async with httpx.AsyncClient(follow_redirects=False, timeout=25.0) as client:
+        for _ in range(5):
+            validate_url(url)
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 (Caliope personal roleplay app; research)",
+                                                  "Accept": "text/html,application/xhtml+xml"})
+            if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get("location"):
+                url = str(resp.url.join(resp.headers["location"]))
+                continue
+            resp.raise_for_status()
+            if "html" not in resp.headers.get("content-type", "html"):
+                raise wikiresearch.ResearchError("That link is not a web page.")
+            return resp.content[:MAX_BYTES].decode(resp.encoding or "utf-8", errors="replace")
+    raise wikiresearch.ResearchError("The page redirected too many times.")
+
+
+@app.post("/api/research/links")
+async def research_links(body: dict[str, Any] = Body(...)):
+    """🔗 Read the pages you give (any site) and draft a card, like the wiki research."""
+    from .webpages import parse_links, research_links as read_links
+    parse_links(str(body.get("links") or ""))  # a clear refusal before streaming starts
+    talk_id = body.get("talk_id")
+
+    async def events():
+        async for ev in read_links(_html_fetch, str(body.get("links") or ""), str(body.get("work") or ""), str(body.get("language") or "")):
+            if ev["type"] == "card" and talk_id:
+                try:
+                    svc().muse._add(int(talk_id), "assistant", ev["notes"])
+                except Exception:
+                    pass
+            yield ev
+    return stream_response(events())
+
+
 @app.post("/api/research/find")
 async def research_find(body: dict[str, Any] = Body(...)):
     """📚 The Muse looks for a work's wiki and lists its biggest character and lore pages."""

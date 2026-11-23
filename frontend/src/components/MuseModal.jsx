@@ -228,6 +228,19 @@ function ResearchPanel({ talkId, busy, setBusy, onClose, onError, onCard, onChar
   const [pickL, setPickL] = useState({});
   const [step, setStep] = useState("");
   const [built, setBuilt] = useState(null);
+  const [links, setLinks] = useState(""); // 🔗 any web pages, one per line
+  const [linksName, setLinksName] = useState("");
+  const fromLinks = async () => {
+    setBusy(true); setStep("Starting…"); setBuilt(null); onError("");
+    try {
+      await streamPost("/api/research/links", { links, work: linksName.trim(), talk_id: talkId || null }, (ev) => {
+        if (ev.type === "progress") setStep(ev.step);
+        else if (ev.type === "card") setBuilt(ev.card);
+        else if (ev.type === "error") onError(ev.message);
+      });
+    } catch (e) { onError(e.message); }
+    setBusy(false); setStep("");
+  };
   const find = async () => {
     if (!query.trim() || busy) return;
     setBusy(true); setStep("Looking for the wiki…"); setWiki(null); setBuilt(null); onError("");
@@ -274,6 +287,16 @@ function ResearchPanel({ talkId, busy, setBusy, onClose, onError, onCard, onChar
           onKeyDown={(e) => { if (e.key === "Enter") find(); }} disabled={busy} />
         <button className="btn small primary" onClick={find} disabled={busy || !query.trim()}>Find the wiki</button>
       </div>
+      {!wiki && !built && (
+        <details className="research-links">
+          <summary className="small">🔗 Or read the pages you choose (any site)</summary>
+          <div className="muted tiny">One link per line. Start a line with <code>world:</code>, <code>character:</code> or <code>lore:</code> to say what it is; otherwise pages with Personality / Appearance / Abilities become characters, the first page the world, the rest lore. Up to 30 pages.</div>
+          <input className="field" placeholder="Name of the work (optional)" value={linksName} onChange={(e) => setLinksName(e.target.value)} disabled={busy} />
+          <textarea className="field" rows={5} value={links} onChange={(e) => setLinks(e.target.value)} disabled={busy}
+            placeholder={"world: https://en.wikipedia.org/wiki/Jujutsu_Kaisen\ncharacter: https://jujutsu-kaisen.fandom.com/wiki/Satoru_Gojo\nlore: https://jujutsu-kaisen.fandom.com/wiki/Cursed_Energy"} />
+          <button className="btn small primary" disabled={busy || !/https?:\/\//.test(links)} onClick={fromLinks}>✨ Draft the card from these pages</button>
+        </details>
+      )}
       {step && <div className="muted small"><span className="spinner" /> {step}</div>}
       {wiki && !built && (
         <>

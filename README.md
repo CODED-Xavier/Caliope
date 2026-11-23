@@ -362,6 +362,8 @@ The bucket stays private: Calíope signs every download with your keys and keeps
 3. **✨ Draft the card**: the world comes from the work's own page, each character gets its introduction, personality and appearance from the wiki, and each lore page becomes a lorebook entry. No model is needed, so it takes about a minute.
 4. **See the card** (then ＋ Add to Calíope) or **👥 Add these characters to a card** you already have. With a talk open, the Muse gets a research note, so you can keep planning the story with her.
 
+**🔗 Or read the pages you choose (any site)**, under the search box: paste links, one per line, from any site (Wikipedia, a fan site, a blog, a wiki with no API). Mark a line with `world:`, `character:` or `lore:`, or let Calíope decide: a page with Personality, Appearance or Abilities sections becomes a character, the first page the world, the rest lorebook entries. Menus, ads and footers are dropped; unreachable pages are skipped. Up to 30 pages, then the same **See the card** / **👥 Add these characters**.
+
 The card comes without an opening: write one with ✨ Draft in the card editor, or ask the Muse; ✨ Fill adds speech styles. Wiki text is shared by its authors under CC BY-SA; the card is for your own games.
 
 The Muse and your games share the model, so one waits for the other.
@@ -609,6 +611,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.29.0 | Your turn by the 5e rules (action, bonus action, movement, reaction, End turn) with the option list sorted by cost; companions with 5e sheets built by the system around your hero or step by step; class and race emblems; ▸ details on classes, races and backgrounds; equipment categories; one Sheet tab (Status merged into it); the sheet owns gear and notes; fight damage reaches the sheet; the Aedo no longer acts for you when the app starts a fight; personas bring their world additions |
 | 2.29.1 | A book's placeholder classes are left out of the builder; hide repeated entries and choose each book's rules list (2014, 2024 or both) in the Library |
 | 2.30.0 | 📦 Export on every card tile and in the card editor; "Want to describe it?" after each part of your turn; the round card told by turns with your words and companion flavour; portrait tokens on the battle map; companion pictures on their sheets; 18 more race emblems (Goliath, Halfling, Minotaur, Kobold, Lizardfolk, Satyr, Vampire…) |
+| 2.46.0 | 🔗 The Muse drafts a card from any web pages you give (not only fan wikis): world, characters and lore |
 | 2.45.0 | 🌐 The story language per game (an English card played in Portuguese, its opening translated) and Portuguese copies of whole cards and adventures; a card's number can start from a choice (Lumencia's gold by origin) |
 | 2.44.0 | ✴ Arsenal: named techniques and spells of the player and the characters are kept (your [brackets], the Aedo's call-outs), reused with the same name and look, their power following the user's tier; an Arsenal tab to edit them |
 | 2.43.1 | Pictures follow the feeling: shown before a character's first line and again only when their mood changes (back to Standard too), never repeated in the same mood; up to six characters per reply instead of two |

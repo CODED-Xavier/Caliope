@@ -2156,7 +2156,18 @@
 "🌐 Done: a Portuguese copy is in your cards.": "🌐 Pronto: uma cópia em português está nos seus cards.",
 "🌐 Translation stopped.": "🌐 Tradução interrompida.",
 "The translation failed.": "A tradução falhou.",
-"Unknown language.": "Idioma desconhecido."
+"Unknown language.": "Idioma desconhecido.",
+"🔗 Or read the pages you choose (any site)": "🔗 Ou leia as páginas que você escolher (qualquer site)",
+"One link per line. Start a line with ": "Um link por linha. Comece a linha com ",
+" to say what it is; otherwise pages with Personality / Appearance / Abilities become characters, the first page the world, the rest lore. Up to 30 pages.": " para dizer o que é; senão, páginas com Personalidade / Aparência / Habilidades viram personagens, a primeira página vira o mundo e o resto, lore. Até 30 páginas.",
+"Name of the work (optional)": "Nome da obra (opcional)",
+"✨ Draft the card from these pages": "✨ Rascunhar o card a partir destas páginas",
+"That link is not a web page.": "Esse link não é uma página web.",
+"The page redirected too many times.": "A página redirecionou vezes demais.",
+"Paste one link per line (https://…).": "Cole um link por linha (https://…).",
+"None of the links could be read.": "Nenhum dos links pôde ser lido.",
+" or ": " ou ",
+", ": ", "
 },
 "patterns": [
 [
@@ -3938,6 +3949,18 @@
 [
 "Make a Portuguese copy of \"{0}\"? The story model translates every story text of the card (descriptions, lore, characters, openings, scenes) while you keep using Calíope. A big card or adventure can take from several minutes to an hour. The original card stays as it is; names, pictures and the card's sheet are kept.",
 "Fazer uma cópia em português de \"{0}\"? O modelo da história traduz todos os textos do card (descrições, lore, personagens, aberturas, cenas) enquanto você continua usando o Calíope. Um card ou aventura grande pode levar de alguns minutos a uma hora. O card original fica como está; nomes, imagens e a ficha do card são mantidos."
+],
+[
+"Skipped {0}: {1}",
+"Pulado {0}: {1}"
+],
+[
+"Skipped {0}: almost no text on the page",
+"Pulado {0}: quase não há texto na página"
+],
+[
+"Reading {0} ({1}/{2})",
+"Lendo {0} ({1}/{2})"
 ]
 ]
 }
