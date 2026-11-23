@@ -26,16 +26,94 @@ function AppliesFields({ applies, words, onApplies, onWords }) {
   );
 }
 
+const KINDS = [["drill", "Drill / study"], ["spar", "Spar / duel"], ["battle", "Long battle"], ["lethal", "Lethal trial / higher tier"]];
+
+/** The rule set's Fight EXP rules as form fields (app/fights.py): text in, numbers out. */
+const fightForm = (cfg) => cfg && cfg.stats ? {
+  on: true, stats: cfg.stats.join(", "),
+  kinds: Object.fromEntries(KINDS.map(([k]) => [k, (cfg.kinds[k] || ["", ""]).join("-")])),
+  long_after: String(cfg.long_after ?? 4),
+  links: Object.entries(cfg.bonus?.links || {}).map(([a, b]) => `${a}=${b}`).join(", "),
+  bonus_min: String(cfg.bonus?.min ?? 7), bonus_exp: String(cfg.bonus?.exp ?? 0),
+  streak: (cfg.streak || [1]).join(", "), lost: String(cfg.lost ?? 0.75), second: String(cfg.second ?? 0.5),
+  today: cfg.log?.today || "", total: cfg.log?.total || "",
+} : { on: false, stats: "", kinds: { drill: "", spar: "", battle: "", lethal: "" }, long_after: "4", links: "", bonus_min: "7",
+      bonus_exp: "0", streak: "1", lost: "0.75", second: "0.5", today: "", total: "" };
+
+const fightRules = (f) => !f.on ? {} : {
+  stats: f.stats.split(",").map((x) => x.trim()).filter(Boolean),
+  kinds: Object.fromEntries(KINDS.map(([k]) => [k, (f.kinds[k] || "").split(/[-–,]/).map((x) => parseInt(x, 10))])
+    .filter(([, r]) => r.length === 2 && r.every((n) => !isNaN(n)))),
+  long_after: parseInt(f.long_after, 10) || 0,
+  bonus: { min: parseInt(f.bonus_min, 10) || 0, exp: parseInt(f.bonus_exp, 10) || 0,
+           links: Object.fromEntries(f.links.split(",").map((x) => x.split("=").map((y) => y.trim())).filter((p) => p.length === 2 && p[0] && p[1])) },
+  streak: f.streak.split(",").map((x) => parseFloat(x)).filter((n) => !isNaN(n)),
+  lost: parseFloat(f.lost), second: parseFloat(f.second), log: { today: f.today.trim(), total: f.total.trim() },
+};
+
+/** ⚔ Fight EXP: the Aedo marks where fights start and end, Calíope counts the exchanges and pays the EXP. */
+function FightExpFields({ form, onChange }) {
+  const set = (k, v) => onChange({ ...form, [k]: v });
+  const usePreset = async () => {
+    try { const { presets } = await api.fightPresets(); onChange(fightForm(presets[0].rules)); } catch { /* the form stays */ }
+  };
+  return (
+    <div className="fight-exp">
+      <label className="row gap center"><input type="checkbox" checked={form.on} onChange={(e) => set("on", e.target.checked)} />
+        <b>⚔ Count fights and give EXP</b> <HelpTip id="fight_exp" /></label>
+      {form.on && (
+        <div className="stack gap">
+          <div className="row gap center wrap"><span className="muted small">Start from:</span>
+            <button type="button" className="btn small" onClick={usePreset}>Lumencia's numbers</button></div>
+          <label className="lbl">Sheet stats with EXP bars ("Grade [EXP/100]"), separated by commas
+            <input className="field" value={form.stats} onChange={(e) => set("stats", e.target.value)} placeholder="Body, Mana, INT, Divinity" /></label>
+          <div className="fight-kinds">
+            {KINDS.map(([k, label]) => (
+              <label key={k} className="lbl">{label} (EXP min-max)
+                <input className="field" value={form.kinds[k]} onChange={(e) => set("kinds", { ...form.kinds, [k]: e.target.value })} placeholder="10-15" /></label>
+            ))}
+          </div>
+          <div className="row gap wrap">
+            <label className="lbl">A spar this many exchanges long counts as a battle
+              <input className="field" type="number" min="0" value={form.long_after} onChange={(e) => set("long_after", e.target.value)} /></label>
+            <label className="lbl">Daily streak (1st, 2nd, 3rd+ fight)
+              <input className="field" value={form.streak} onChange={(e) => set("streak", e.target.value)} placeholder="1, 1.25, 1.5" /></label>
+          </div>
+          <label className="lbl">Bonus: stat = its Attribute, separated by commas
+            <input className="field" value={form.links} onChange={(e) => set("links", e.target.value)} placeholder="Body=Martial, Mana=Magic" /></label>
+          <div className="row gap wrap">
+            <label className="lbl">Bonus when the Attribute is at least
+              <input className="field" type="number" value={form.bonus_min} onChange={(e) => set("bonus_min", e.target.value)} /></label>
+            <label className="lbl">Bonus EXP
+              <input className="field" type="number" value={form.bonus_exp} onChange={(e) => set("bonus_exp", e.target.value)} /></label>
+            <label className="lbl">EXP kept on a loss (0-1)
+              <input className="field" value={form.lost} onChange={(e) => set("lost", e.target.value)} /></label>
+            <label className="lbl">Second stat's share (0-1)
+              <input className="field" value={form.second} onChange={(e) => set("second", e.target.value)} /></label>
+          </div>
+          <div className="row gap wrap">
+            <label className="lbl">Sheet field for fights today (optional)
+              <input className="field" value={form.today} onChange={(e) => set("today", e.target.value)} placeholder="Battles Today" /></label>
+            <label className="lbl">Sheet field for all fights (optional)
+              <input className="field" value={form.total} onChange={(e) => set("total", e.target.value)} placeholder="Total" /></label>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BookCard({ book, onChanged, onDelete }) {
   const [rules, setRules] = useState(book.house_rules);
   const [applies, setApplies] = useState(book.applies || "always");
   const [words, setWords] = useState(book.trigger_words || "");
+  const [fight, setFight] = useState(() => fightForm(book.fight_exp));
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState("");
   useEffect(() => { setRules(book.house_rules); setApplies(book.applies || "always"); setWords(book.trigger_words || ""); }, [book.house_rules, book.applies, book.trigger_words]);
   const ruleSet = !book.source && !book.sections;
   const save = async () => {
-    try { await api.updateRulebook(book.id, { house_rules: rules, applies, trigger_words: words }); setSaved("Saved"); setTimeout(() => setSaved(""), 1500); onChanged(); }
+    try { await api.updateRulebook(book.id, { house_rules: rules, applies, trigger_words: words, fight_exp: fightRules(fight) }); setSaved("Saved"); setTimeout(() => setSaved(""), 1500); onChanged(); }
     catch (e) { setSaved(e.message); }
   };
   const info = book.info || {};
@@ -44,7 +122,8 @@ function BookCard({ book, onChanged, onDelete }) {
       <div className="row gap center">
         <div className="grow">
           <div className="book-name">{ruleSet ? "📜" : "📖"} {book.name} <span className="tag">{ruleSet ? "Rule set" : SYSTEMS[book.system] || "Other"}</span>
-            {(book.applies || "always") !== "always" && <span className="tag">{APPLIES[book.applies]}</span>}</div>
+            {(book.applies || "always") !== "always" && <span className="tag">{APPLIES[book.applies]}</span>}
+            {book.fight_exp?.stats && <span className="tag">⚔ Fight EXP</span>}</div>
           {book.status === "processing" && (
             <>
               <div className="progress"><div style={{ width: `${Math.round(book.progress * 100)}%` }} /></div>
@@ -63,6 +142,7 @@ function BookCard({ book, onChanged, onDelete }) {
           <textarea className="field" rows={ruleSet ? 10 : 4} value={rules} onChange={(e) => setRules(e.target.value)}
             placeholder="e.g. Critical hits deal maximum damage. Potions of healing are a bonus action." />
           <AppliesFields applies={applies} words={words} onApplies={setApplies} onWords={setWords} />
+          <FightExpFields form={fight} onChange={setFight} />
           <div className="row gap center end"><span className="muted tiny">{saved}</span><button className="btn small primary" onClick={save}>Save</button></div>
         </div>
       )}

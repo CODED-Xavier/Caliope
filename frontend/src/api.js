@@ -195,6 +195,7 @@ export const api = {
     return res.json();
   },
   createRuleSet: (body) => request("POST", "/api/rulebooks/ruleset", body),
+  fightPresets: () => request("GET", "/api/rulebooks/fight-presets"),
   updateRulebook: (id, body) => request("PATCH", `/api/rulebooks/${id}`, body),
   deleteRulebook: (id) => request("DELETE", `/api/rulebooks/${id}`),
   searchRulebooks: (q, ids = []) => request("GET", `/api/rulebooks/search?${new URLSearchParams({ q, ids: ids.join(",") })}`),

@@ -17,7 +17,7 @@ from typing import AsyncIterator
 
 from .appearance import appearance_line, appearance_seed
 from .checks import find_checks
-from . import arsenal, adventure, aedo_desk, reputation, resources, routes, sheetchat, systems
+from . import arsenal, adventure, fights, aedo_desk, reputation, resources, routes, sheetchat, systems
 from .places import find_place, place_picture
 from .shop import find_offers, is_trade
 from . import statusbook
@@ -245,6 +245,15 @@ class ChatEngine:
                 if moves:
                     self.repo.save_state(conv_id, st_now)
                     meta = {**(meta or {}), "snapshot": before, "moves": moves}
+            if text and not text.startswith("/"):
+                st_now = self.repo.get_state(conv_id)
+                if (st_now.get("fight") or {}).get("active") and self._fight_rules(self.repo.get(conv_id)["scenario"]):
+                    before = (meta or {}).get("snapshot") or self.repo.capture_snapshot(conv_id)
+                    if fights.count_turn(st_now, text):  # a fight the Aedo forgot to close: it fades out
+                        gone = fights.drop(st_now)
+                        meta = {**(meta or {}), "fight_lines": [gone]} if gone else meta
+                    self.repo.save_state(conv_id, st_now)
+                    meta = {**(meta or {}), "snapshot": before}
             user_msg = self.repo.add_message(conv_id, "user", text, meta)
             self._auto_title(conv_id, text)
             yield {"type": "user_message", "message": user_msg}
@@ -252,6 +261,25 @@ class ChatEngine:
                 async for event in turn:
                     yield event
         self._warm_later(conv_id)  # the new reply joins the story's memory while the player reads it
+
+    def _fight_rules(self, scenario: dict) -> dict:
+        """Fight EXP rules from the card's ticked rule sets (role-play cards only; {} = fights are left to the story)."""
+        if not self.rulebooks or not scenario.get("rulebooks") or resolve_features(scenario)["kind"] != "roleplay":
+            return {}
+        try:
+            return fights.normalize(self.rulebooks.fight_rules(self.rulebooks.ready_ids(scenario["rulebooks"])))
+        except Exception:  # noqa: BLE001 - a broken rule set never stops a turn
+            return {}
+
+    @staticmethod
+    def _day(scenario: dict, state: dict) -> int:
+        cal = scenario.get("calendar") or {}
+        if not cal.get("enabled") or not cal.get("months"):
+            return 0
+        try:
+            return worldtime.day_index(cal, worldtime.clock_of(state))
+        except Exception:  # noqa: BLE001
+            return 0
 
     def _arsenal_on(self, conv_id: int) -> bool:
         """Named techniques are kept on role-play cards (adventure cards have their system's spells and features)."""
@@ -761,6 +789,7 @@ class ChatEngine:
             appearance_hint=hint, lore=lore, status_due=None if tpl else self._status_due(conv_id, scenario),
             player_name=state["player"].get("name") or "", rules=rules, house_rules=house, rules_now=rules_now,
             cantos=self.cantos.prompt_section(conv_id, int(settings["context_window"]) * 3 // 10) if self.cantos else "",
+            fight_rules=self._fight_rules(scenario),
         )
         yield {"type": "context", "debug": debug, "skills": [s["name"] for s in skills],
                "memories": [m["text"] for m in memories][: debug["memories"]], "rules": debug.get("rules", [])}
@@ -820,8 +849,33 @@ class ChatEngine:
         found_moves: list = []
         if self._arsenal_on(conv_id):  # [[move: Lilia | Crimson Fang]] becomes a call-out, and Lilia keeps the move
             reply, found_moves = arsenal.take_from_reply(reply, npcs, state["player"].get("name") or "")
+        fight_rules = self._fight_rules(scenario)
+        fight_marks: tuple = ([], [])
+        if fight_rules:  # [[fight: Lilia | spar]] … [[fight end: won | Body, INT]]: counted by the app, not shown
+            reply, *fight_marks = fights.take_tags(reply)
         snapshot = self.repo.capture_snapshot(conv_id)
         meta = {"snapshot": snapshot, **extra}
+        if fight_rules and (fight_marks[0] or fight_marks[1]):
+            st = self.repo.get_state(conv_id)
+            lines = []
+            starts, ends = fight_marks
+            day = self._day(scenario, st)
+
+            def begin():
+                if starts and not (st.get("fight") or {}).get("active"):
+                    fights.start(st, *starts[-1])
+                    lines.append(f"⚔ {starts[-1][1].capitalize()} with {starts[-1][0]} begins")
+
+            def end():
+                if ends and (st.get("fight") or {}).get("active"):
+                    lines.extend(fights.finish(fight_rules, st, ends[-1][0], ends[-1][1], day))
+
+            # a fight going on ends before a new one starts; with none going on, one can start and end in one reply
+            for step in ((end, begin) if (st.get("fight") or {}).get("active") else (begin, end)):
+                step()
+            self.repo.save_state(conv_id, st)
+            if lines:
+                meta["fight_lines"] = lines
         if found_moves:
             st = self.repo.get_state(conv_id)
             by_name = {n["name"]: n for n in npcs}
@@ -1101,7 +1155,7 @@ class ChatEngine:
         cal = scenario.get("calendar") or {}
         cal_on = bool(cal.get("enabled") and cal.get("months"))
         tpl = self._status_template(scenario, settings)
-        status_lines = statusbook.tracker_lines(state, tpl) if tpl else ""
+        status_lines = statusbook.tracker_lines(state, tpl, bool(self._fight_rules(scenario))) if tpl else ""
         res_line = resources.tracker_line(state)
         sys_def = scenario.get("systems") or {}
         sys_line = systems.tracker_line(sys_def, state.get("systems") or {}) if state.get("systems") else ""

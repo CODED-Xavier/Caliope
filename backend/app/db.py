@@ -273,6 +273,7 @@ class Database:
         self._ensure_column("messages", "snapshot", "BLOB")
         self._ensure_column("rulebooks", "applies", "TEXT NOT NULL DEFAULT 'always'")   # World Compendium rule sets
         self._ensure_column("rulebooks", "trigger_words", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column("rulebooks", "fight_exp", "TEXT NOT NULL DEFAULT ''")  # app/fights.py: Fight EXP rules
         self._move_snapshots()
 
     def _move_snapshots(self) -> None:

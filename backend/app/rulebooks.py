@@ -48,6 +48,14 @@ def applies_now(applies: str, words: str, text: str, fighting: bool = False) -> 
     return True
 
 
+def _json(text) -> dict:
+    try:
+        v = json.loads(text or "{}")
+    except ValueError:
+        return {}
+    return v if isinstance(v, dict) else {}
+
+
 class RulebookError(ValueError):
     pass
 
@@ -279,7 +287,8 @@ class RulebookRepository:
         return {"id": row["id"], "name": row["name"], "system": row["system"], "source": row["source"], "status": row["status"],
                 "progress": row["progress"], "message": row["message"], "info": json.loads(row["info"] or "{}"),
                 "house_rules": row["house_rules"], "sections": count, "created_at": row["created_at"],
-                "applies": row.get("applies") or "always", "trigger_words": row.get("trigger_words") or ""}
+                "applies": row.get("applies") or "always", "trigger_words": row.get("trigger_words") or "",
+                "fight_exp": _json(row.get("fight_exp"))}
 
     def create_ruleset(self, name: str, core: str = "", applies: str = "always", words: str = "") -> dict:
         """A rule set written in Calíope (no file): its core rules are sent to the Aedo when they apply."""
@@ -289,8 +298,12 @@ class RulebookRepository:
         return self.update(cur.lastrowid, house_rules=core, applies=applies, trigger_words=words)
 
     def update(self, book_id: int, name: str | None = None, house_rules: str | None = None, system: str | None = None,
-               applies: str | None = None, trigger_words: str | None = None) -> dict:
+               applies: str | None = None, trigger_words: str | None = None, fight_exp=None) -> dict:
         self.get(book_id)
+        if fight_exp is not None:  # {} or None-like clears it
+            from .fights import normalize as normalize_fights
+            cfg = normalize_fights(fight_exp)
+            self.db.execute("UPDATE rulebooks SET fight_exp = ? WHERE id = ?", (json.dumps(cfg) if cfg else "", book_id))
         if applies in APPLIES:
             self.db.execute("UPDATE rulebooks SET applies = ? WHERE id = ?", (applies, book_id))
         if trigger_words is not None:
@@ -482,6 +495,17 @@ class RulebookRepository:
             elif applies_now(r["applies"], r.get("trigger_words") or "", text, fighting):
                 now_.append((r["name"], core))
         return always, now_
+
+    def fight_rules(self, book_ids: list[int]) -> dict:
+        """The first ticked rule set's Fight EXP rules ({} = none): app/fights.py counts the fights with them."""
+        if not book_ids:
+            return {}
+        marks = ",".join("?" * len(book_ids))
+        for r in self.db.query(f"SELECT fight_exp FROM rulebooks WHERE id IN ({marks}) AND status = 'ready' ORDER BY name", tuple(book_ids)):
+            cfg = _json(r.get("fight_exp"))
+            if cfg:
+                return cfg
+        return {}
 
     def ready_ids(self, book_ids: list[int]) -> list[int]:
         if not book_ids:

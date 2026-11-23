@@ -1081,3 +1081,8 @@ button.s5-ability:hover:not(:disabled) { border-color: var(--accent); }
 .folder:hover img { transform: scale(1.12); }
 .system-card { background: linear-gradient(170deg, color-mix(in srgb, var(--accent) 6%, var(--panel)), var(--panel) 60%); }
 @media (prefers-reduced-motion: reduce) { .hub-tile, .hub-tile:hover .hub-art { animation: none; } .hub-tile::after { display: none; } }
+
+/* v2.50: Fight EXP rules in the Compendium */
+.fight-exp { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.fight-exp .stack { margin-top: 8px; }
+.fight-kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }

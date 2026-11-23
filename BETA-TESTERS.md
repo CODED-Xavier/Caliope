@@ -179,3 +179,5 @@ Thank you, and have fun!
 **5e character builder:** the Equipment step now gives your class's and background's starting packages (choose a or b), or the starting gold and a shop. The Spells step only shows your class's spells.
 
 **New look:** the home screen, its doors and the loading window were redecorated (stars, glows, ornaments, a bar with its percentage). If something looks off on your screen, send a screenshot.
+
+**Fight EXP:** in the 📚 Compendium, a rule set can now *Count fights and give EXP*. Tick it on a role-play card and spar with someone: the EXP lands on your sheet by itself. Tell me if a fight never ends or the numbers look off.

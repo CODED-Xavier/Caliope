@@ -279,7 +279,8 @@ class PromptBuilder:
               appearance_hint: str = "", lore: tuple[list[dict], list[dict]] = ([], []),
               status_due: bool | None = None, player_name: str = "", rules: list[dict] | None = None,
               house_rules: list[tuple[str, str]] | None = None, player_lore: list[dict] | None = None,
-              app_status: str | None = None, cantos: str = "", rules_now: list[tuple[str, str]] | None = None) -> tuple[list[dict], dict]:
+              app_status: str | None = None, cantos: str = "", rules_now: list[tuple[str, str]] | None = None,
+              fight_rules: dict | None = None) -> tuple[list[dict], dict]:
         """Return (messages, debug_info). History items need id, role, content and meta."""
         ctx = int(settings["context_window"])
         reserve = reply_token_limit(settings) + 150
@@ -402,6 +403,9 @@ class PromptBuilder:
             known_moves = prompt_list(state, [h["content"] for h in history[-4:]], (state.get("player") or {}).get("name") or "")
             if known_moves:
                 extra = known_moves + ("\n\n" + extra if extra else "")
+            if fight_rules:  # app/fights.py: the Aedo marks fights, the app counts them and pays the EXP
+                from .fights import prompt_text as fight_text
+                extra = "## Fights (counted by the app)\n" + fight_text(fight_rules, state) + ("\n\n" + extra if extra else "")
         notes = notes_section(npcs, [h["content"] for h in history[-4:]])
         if notes:
             extra = notes + ("\n\n" + extra if extra else "")

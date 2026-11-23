@@ -227,7 +227,7 @@ def apply_changes(state: dict, template: str, changes: list[dict]) -> list[str]:
     return out
 
 
-def tracker_lines(state: dict, template: str) -> str:
+def tracker_lines(state: dict, template: str, fights_counted: bool = False) -> str:
     fields = custom_fields(template)
     if not fields:
         return ""
@@ -236,6 +236,9 @@ def tracker_lines(state: dict, template: str) -> str:
     bars = [f for f in fields if PROGRESS.match(str(custom.get(f) or ""))]
     exp = (f" Fields written as 'Grade [EXP/100]' ({', '.join(bars)}): add the EXP the card's rules give to the number and "
            "write the new total, keeping the grade (the app raises the grade when the bar fills).") if bars else ""
+    if bars and fights_counted:
+        exp += (" EXP from fights, spars, duels and drills is added by the app: never report it, nor the battle counters;"
+                " only EXP the card gives for other things (study, a breakthrough).")
     return ("- status_changes: the card's own status fields that CHANGED in these exchanges (field, new value), following the "
             f"card's rules (for example EXP gained after a fight). Current values: {now}.{exp} Write real values only, never "
             "the card's rule text (not '>=8' or '[1-10]'). Fill unknown ones once from the story.")

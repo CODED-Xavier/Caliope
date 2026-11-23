@@ -2209,7 +2209,28 @@
 "(none picked: the song's name chooses, e.g. \"Tavern Jig\" → tavern)": "(nenhum escolhido: o nome da música escolhe, ex.: \"Tavern Jig\" → taverna)",
 "Moods for the songs you add now ": "Humores das músicas que você adicionar agora ",
 "Open the Compendium": "Abrir o Compêndio",
-"Tormenta20, Vampire, Call of Cthulhu… their rulebooks and rule sets live in the 📚 Compendium for now.": "Tormenta20, Vampire, Call of Cthulhu… por enquanto, os livros de regras e conjuntos de regras deles ficam no 📚 Compêndio."
+"Tormenta20, Vampire, Call of Cthulhu… their rulebooks and rule sets live in the 📚 Compendium for now.": "Tormenta20, Vampire, Call of Cthulhu… por enquanto, os livros de regras e conjuntos de regras deles ficam no 📚 Compêndio.",
+"⚔ Count fights and give EXP": "⚔ Contar as lutas e dar EXP",
+"Lumencia's numbers": "Os números do Lumencia",
+"Sheet stats with EXP bars (\"Grade [EXP/100]\"), separated by commas": "Atributos da ficha com barra de EXP (\"Grau [EXP/100]\"), separados por vírgulas",
+"Drill / study (EXP min-max)": "Treino / estudo (EXP mín-máx)",
+"Spar / duel (EXP min-max)": "Treino de luta / duelo (EXP mín-máx)",
+"Long battle (EXP min-max)": "Batalha longa (EXP mín-máx)",
+"Lethal trial / higher tier (EXP min-max)": "Prova letal / tier acima (EXP mín-máx)",
+"A spar this many exchanges long counts as a battle": "Um treino de luta com estas trocas vira batalha",
+"Daily streak (1st, 2nd, 3rd+ fight)": "Sequência do dia (1ª, 2ª, 3ª+ luta)",
+"Bonus: stat = its Attribute, separated by commas": "Bônus: atributo = seu Atributo base, separados por vírgulas",
+"Bonus when the Attribute is at least": "Bônus quando o Atributo é pelo menos",
+"Bonus EXP": "EXP de bônus",
+"EXP kept on a loss (0-1)": "EXP mantida na derrota (0-1)",
+"Second stat's share (0-1)": "Parte do segundo atributo (0-1)",
+"Sheet field for fights today (optional)": "Campo da ficha para lutas de hoje (opcional)",
+"Sheet field for all fights (optional)": "Campo da ficha para o total de lutas (opcional)",
+"⚔ Fight EXP": "⚔ EXP de luta",
+"Fight EXP": "EXP de luta",
+"The Aedo only marks where a spar, duel, battle, drill or lethal trial starts and ends; Calíope counts the exchanges and adds the EXP to the sheet's bars, with the bonus, the day's streak and the result. A full bar raises the grade.": "O Aedo só marca onde um treino de luta, duelo, batalha, treino ou prova letal começa e termina; o Calíope conta as trocas e soma a EXP nas barras da ficha, com o bônus, a sequência do dia e o resultado. Uma barra cheia sobe o grau.",
+"Tick this rule set on a role-play card whose sheet has 'Grade [EXP/100]' bars (Lumencia). A fight the Aedo forgets to close fades out after a few quiet turns with no EXP.": "Marque este conjunto de regras num cartão de roleplay cuja ficha tenha barras 'Grau [EXP/100]' (Lumencia). Uma luta que o Aedo esquecer de fechar se apaga depois de alguns turnos calmos, sem EXP.",
+"About 80 tokens per turn.": "Cerca de 80 tokens por turno."
 },
 "patterns": [
 [
@@ -4023,6 +4044,18 @@
 [
 "＋ {0}",
 "＋ {0}"
+],
+[
+"⚔ {0} with {1} begins",
+"⚔ {0} com {1} começa"
+],
+[
+"⚔ {0} with {1}: {2}, {3} exchange(s)",
+"⚔ {0} com {1}: {2}, {3} troca(s)"
+],
+[
+"⚔ The fight with {0} faded out (no EXP).",
+"⚔ A luta com {0} se apagou (sem EXP)."
 ]
 ]
 }

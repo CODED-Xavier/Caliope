@@ -161,6 +161,9 @@ def _story_part(merged: dict) -> dict:
     if isinstance(merged.get("arsenal"), dict):  # app/arsenal.py: named techniques and spells of each character
         from .arsenal import normalize
         out["arsenal"] = normalize(merged["arsenal"])
+    for key in ("fight", "fight_log"):  # app/fights.py: the narrated fight going on and the day's streak
+        if isinstance(merged.get(key), dict):
+            out[key] = merged[key]
     log = merged.get("rep_log")
     if isinstance(log, list):
         out["rep_log"] = [e for e in log if isinstance(e, dict)][-60:]
