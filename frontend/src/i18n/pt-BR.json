@@ -1924,7 +1924,29 @@
 "Lost": "Perdeu",
 "One step down": "Um degrau abaixo",
 "One step up (once a day)": "Um degrau acima (uma vez por dia)",
-"Choose a part to buy…": "Escolha uma peça para comprar…"
+"Choose a part to buy…": "Escolha uma peça para comprar…",
+"🏃 Move": "🏃 Mover",
+"📏 Measure": "📏 Medir",
+"🔥 Area": "🔥 Área",
+"How diagonals count": "Como as diagonais contam",
+"Diagonals: 5 ft": "Diagonais: 1,5 m (5 pés)",
+"Diagonals: 5-10-5 ft": "Diagonais: 5-10-5 pés",
+"Custom": "Personalizada",
+"Sphere / circle": "Esfera / círculo",
+"Around you": "Ao seu redor",
+"Cone": "Cone",
+"Line": "Linha",
+"Cube from you": "Cubo a partir de você",
+"Cube at a point": "Cubo em um ponto",
+"Radius in feet": "Raio em pés",
+"Size in feet": "Tamanho em pés",
+"ft": "pés",
+"✕ Close the big map": "✕ Fechar o mapa grande",
+"🗺 Big map": "🗺 Mapa grande",
+"🔥 Point where the spell goes; cones, lines and cubes from you point toward the mouse.": "🔥 Aponte para onde vai a magia; cones, linhas e cubos saem de você na direção do mouse.",
+"nobody inside": "ninguém dentro",
+"the marked square": "o quadrado marcado",
+"your token": "seu token"
 },
 "patterns": [
 [
@@ -3070,6 +3092,38 @@
 [
 "Credits: {0} · {1} parts owned",
 "Créditos: {0} · {1} peças suas"
+],
+[
+"📏 {0} ft",
+"📏 {0} pés"
+],
+[
+"📏 {0} ft · {1} of your {2} ft left after",
+"📏 {0} pés · sobram {1} dos seus {2} pés"
+],
+[
+"📏 {0} ft · walking there costs {1} ft (rough ground)",
+"📏 {0} pés · andar até lá custa {1} pés (terreno difícil)"
+],
+[
+"📏 {0} ft · walking there costs {1} ft (rough ground) · {2} of your {3} ft left after",
+"📏 {0} pés · andar até lá custa {1} pés (terreno difícil) · sobram {2} dos seus {3} pés"
+],
+[
+"📏 Point at a square to measure from {0} (click a square to measure from there).",
+"📏 Aponte para um quadrado para medir a partir de {0} (clique num quadrado para medir dali)."
+],
+[
+"🔥 {0}: {1} · click to place it",
+"🔥 {0}: {1} · clique para posicionar"
+],
+[
+"🔥 {0}: {1} · placed (click it again to lift it)",
+"🔥 {0}: {1} · posicionada (clique de novo para tirar)"
+],
+[
+"{0} ft ({1} m)",
+"{0} pés ({1} m)"
 ]
 ]
 }

@@ -3,6 +3,7 @@ import { ask } from "../dialogs.jsx";
 import { api } from "../api.js";
 import HelpTip from "./HelpTip.jsx";
 import BattleMap, { SIDE_COLOR, TILE_STYLE } from "./BattleMap.jsx";
+import { AREA_PRESETS, areaCells, distanceFt } from "../gridgeom.js";
 import MapEditor from "./MapEditor.jsx";
 import Modal from "./Modal.jsx";
 import { emblemFor } from "./Builder.jsx";
@@ -229,10 +230,62 @@ function reachable(combat, me, left) {
   return cost;
 }
 
+const TOOL_KEY = "caliope.diagonals";
+
+/** The map's tools: 🏃 move (your turn), 📏 measure (5 ft per square) and 🔥 area of effect (spells' shapes). */
+function MapTools({ tool, setTool, rule, setRule, area, setArea, spells, onBig, big }) {
+  const presets = [...spells.map((o) => ({ name: o.name, ...o.area })), ...AREA_PRESETS.filter((p) => !spells.some((o) => o.name === p.name))];
+  return (
+    <div className="map-tools row gap center wrap">
+      {[["move", "🏃 Move"], ["measure", "📏 Measure"], ["area", "🔥 Area"]].map(([k, label]) => (
+        <button key={k} type="button" className={`btn small ${tool === k ? "primary" : "ghost"}`} onClick={() => setTool(k)}>{label}</button>
+      ))}
+      {tool === "measure" && (
+        <select className="field small" value={rule} onChange={(e) => setRule(e.target.value)} title="How diagonals count">
+          <option value="5e">Diagonals: 5 ft</option>
+          <option value="variant">Diagonals: 5-10-5 ft</option>
+        </select>
+      )}
+      {tool === "area" && (
+        <>
+          <select className="field small" value={area.name || ""} onChange={(e) => { const p = presets.find((x) => x.name === e.target.value); if (p) setArea({ width: 5, ...p }); }}>
+            {!presets.some((p) => p.name === area.name) && <option value="">Custom</option>}
+            {presets.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+          </select>
+          <select className="field small" value={`${area.shape}:${area.origin}`} onChange={(e) => { const [shape, origin] = e.target.value.split(":"); setArea({ ...area, name: "", shape, origin }); }}>
+            <option value="sphere:point">Sphere / circle</option>
+            <option value="sphere:self">Around you</option>
+            <option value="cone:self">Cone</option>
+            <option value="line:self">Line</option>
+            <option value="cube:self">Cube from you</option>
+            <option value="cube:point">Cube at a point</option>
+          </select>
+          <input className="field num small" value={area.size} onChange={(e) => setArea({ ...area, name: "", size: Math.max(5, Number(e.target.value.replace(/\D/g, "")) || 5) })}
+            title={area.shape === "sphere" ? "Radius in feet" : "Size in feet"} aria-label="Size in feet" />
+          <span className="muted tiny">ft</span>
+        </>
+      )}
+      <button type="button" className="btn small ghost push-right" onClick={onBig}>{big ? "✕ Close the big map" : "🗺 Big map"}</button>
+    </div>
+  );
+}
+
 function Grid({ combat, selected, onSelect, convId, onState, busy, myTurn, current, faces = {} }) {
   const { w, h, tiles = [], background = "", name = "", geom = null, fog = null, painted = false } = combat.grid;
+  const [spells, setSpells] = useState([]); // your sheet's spells with an area (Fireball, Burning Hands…) for the 🔥 tool
+  useEffect(() => {
+    if (!convId) return;
+    api.combatOptions(convId).then((d) => setSpells(Object.values(d?.groups || {}).flat().filter((o) => o.area))).catch(() => setSpells([]));
+  }, [convId, combat.round]); // eslint-disable-line react-hooks/exhaustive-deps
   const [painting, setPainting] = useState(false);
   const [paintError, setPaintError] = useState("");
+  const [tool, setTool] = useState("move");
+  const [rule, setRuleState] = useState(() => { try { return localStorage.getItem(TOOL_KEY) || "5e"; } catch { return "5e"; } });
+  const setRule = (v) => { setRuleState(v); try { localStorage.setItem(TOOL_KEY, v); } catch { /* private window */ } };
+  const [area, setArea] = useState({ ...AREA_PRESETS[0], width: 5 });
+  const [anchor, setAnchor] = useState(null); // 📏 the start square (your token by default)
+  const [pinned, setPinned] = useState(null); // 🔥 a placed area stays until clicked again
+  const [big, setBig] = useState(false);
   const paint = async () => { // a plain grid gets a painted map; everyone is placed again
     setPainting(true); setPaintError("");
     try { const r = await api.combatPaintMap(convId); onState?.(r.state); } catch (e) { setPaintError(e.message); } finally { setPainting(false); }
@@ -252,6 +305,49 @@ function Grid({ combat, selected, onSelect, convId, onState, busy, myTurn, curre
     if (!reach.has(`${x},${y}`)) { if (!(me.x === x && me.y === y)) setWalkError(left ? `Too far: you can move ${left} more squares (${left * 5} ft) this turn.` : "No movement left this turn."); return; }
     try { const r = await api.combatMove(convId, x, y); onState?.(r.state); } catch (e) { setWalkError(e.message); }
   };
+  // 📏 measure: from the start square to the one under the mouse
+  const start = anchor || (me ? { x: me.x, y: me.y } : null);
+  const measureTo = tool === "measure" ? hover : null;
+  const feet = start && measureTo ? distanceFt(start, measureTo, rule) : 0;
+  const walkFt = measureTo && !anchor && reach.has(`${measureTo.x},${measureTo.y}`) ? reach.get(`${measureTo.x},${measureTo.y}`) * 5 : null;
+  // 🔥 area: aimed at the square under the mouse, or a placed one
+  const aim = tool === "area" ? (pinned || hover) : null;
+  const marks = useMemo(() => (aim && me ? areaCells(area, me, aim, w, h) : null), [aim?.x, aim?.y, area, me?.x, me?.y, w, h]); // eslint-disable-line
+  const inside = marks ? people.filter((c) => c.hp > 0 && marks.has(`${c.x},${c.y}`)) : [];
+  const click = (x, y) => {
+    if (tool === "measure") { setAnchor(anchor && anchor.x === x && anchor.y === y ? null : { x, y }); return; }
+    if (tool === "area") { setPinned(pinned && pinned.x === x && pinned.y === y ? null : { x, y }); return; }
+    if (!busy) walk(x, y);
+  };
+  const map = (cell) => (
+    <BattleMap w={w} h={h} tiles={tiles} background={background} tokens={people} selected={selected} geom={geom} cell={cell} painted={painted}
+      // fog of war: the places already visited stay clear, and your side sees around itself
+      fog={fog ? [...fog, ...people.filter((c) => c.side !== "enemy" && c.hp > 0).map((c) => ({ x: c.x + 0.5, y: c.y + 0.5, r: 4 }))] : null}
+      reach={busy || tool !== "move" ? null : new Set(reach.keys())}
+      marks={marks}
+      ruler={start && measureTo && (measureTo.x !== start.x || measureTo.y !== start.y)
+        ? { from: start, to: measureTo, label: `${feet} ft (${(feet * 0.3).toFixed(1).replace(/\.0$/, "")} m)` } : null}
+      onToken={(id) => { const c = people.find((p) => p.id === id); if (tool !== "move" && c) click(c.x, c.y); else onSelect(id); }}
+      onLeave={() => setHover(null)} onCellEnter={(x, y) => setHover({ x, y })} onCell={click} />
+  );
+  const status = (
+    <div className="muted tiny">
+      {name && <>{name} · </>}
+      {tool === "measure" && (measureTo
+        ? `📏 ${feet} ft${walkFt != null && walkFt !== feet ? ` · walking there costs ${walkFt} ft (rough ground)` : ""}${me && myTurn && !anchor ? ` · ${Math.max(0, left * 5 - (walkFt ?? feet))} of your ${left * 5} ft left after` : ""}`
+        : `📏 Point at a square to measure from ${anchor ? "the marked square" : "your token"} (click a square to measure from there).`)}
+      {tool === "area" && (aim
+        ? `🔥 ${area.name || `${area.size} ft ${area.shape}`}: ${inside.length ? inside.map((c) => `${c.name}${c.side !== "enemy" ? " ⚠" : ""}`).join(", ") : "nobody inside"}${pinned ? " · placed (click it again to lift it)" : " · click to place it"}`
+        : "🔥 Point where the spell goes; cones, lines and cubes from you point toward the mouse.")}
+      {tool === "move" && (myTurn
+        ? `🏃 Your turn: click a lit square to move (${left} of ${me?.speed || 6} squares left). Click an enemy to target it.`
+        : `⏳ ${current?.name}'s turn. You move on your turn.`)}
+      {tool === "move" && myTurn && hoverCost ? ` · ${hoverCost} ${hoverCost === 1 ? "square" : "squares"}` : ""}
+      {hoverTile && hoverTile.label !== "Floor / grass" && <> · {hoverTile.label}</>}
+    </div>
+  );
+  const tools = <MapTools tool={tool} setTool={(t) => { setTool(t); setAnchor(null); setPinned(null); }} rule={rule} setRule={setRule} area={area} setArea={setArea}
+    spells={spells} big={big} onBig={() => setBig((b) => !b)} />;
   return (
     <div className="grid-wrap">
       {!background && convId && (
@@ -260,21 +356,20 @@ function Grid({ combat, selected, onSelect, convId, onState, busy, myTurn, curre
           {paintError && <span className="error-text tiny">{paintError}</span>}
         </div>
       )}
-      <BattleMap w={w} h={h} tiles={tiles} background={background} tokens={people} selected={selected} geom={geom} cell={geom ? 28 : 30} painted={painted}
-        // fog of war: the places already visited stay clear, and your side sees around itself
-        fog={fog ? [...fog, ...people.filter((c) => c.side !== "enemy" && c.hp > 0).map((c) => ({ x: c.x + 0.5, y: c.y + 0.5, r: 4 }))] : null}
-        reach={busy ? null : new Set(reach.keys())}
-        onToken={onSelect} onLeave={() => setHover(null)} onCellEnter={(x, y) => setHover({ x, y })}
-        onCell={(x, y) => { if (!busy) walk(x, y); }} />
-      <div className="muted tiny">
-        {name && <>{name} · </>}
-        {myTurn
-          ? `🏃 Your turn: click a lit square to move (${left} of ${me?.speed || 6} squares left). Click an enemy to target it.`
-          : `⏳ ${current?.name}'s turn. You move on your turn.`}
-        {myTurn && hoverCost ? ` · ${hoverCost} ${hoverCost === 1 ? "square" : "squares"}` : ""}
-        {hoverTile && hoverTile.label !== "Floor / grass" && <> · {hoverTile.label}</>}
-      </div>
+      {tools}
+      {map(geom ? 28 : 30)}
+      {status}
       {walkError && <div className="error-text tiny">{walkError}</div>}
+      {big && ( // the same map, big in the middle of the screen
+        <div className="big-map-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setBig(false); }}>
+          <div className="big-map-box">
+            {tools}
+            <div className="big-map-scroll">{map(geom ? 44 : 48)}</div>
+            {status}
+            {walkError && <div className="error-text tiny">{walkError}</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

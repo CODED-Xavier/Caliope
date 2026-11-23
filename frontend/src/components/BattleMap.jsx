@@ -20,8 +20,10 @@ const initials = (name) => name.split(/\s+/).map((w) => w[0]).join("").slice(0, 
 /**
  * A battle map: terrain squares (+ an optional picture underneath) and tokens.
  * onCell(x, y) is called on click; onCellEnter(x, y) while the mouse moves (used for painting and distances).
+ * marks: squares an area covers (the 🔥 tool); ruler: {from, to, label} for the 📏 tool.
  */
-export default function BattleMap({ w, h, tiles = [], background = "", tokens = [], selected, onCell, onCellEnter, onToken, onLeave, cell = 30, className = "", geom = null, fog = null, painted = false, reach = null }) {
+export default function BattleMap({ w, h, tiles = [], background = "", tokens = [], selected, onCell, onCellEnter, onToken, onLeave, cell = 30, className = "", geom = null, fog = null, painted = false, reach = null,
+  marks = null, ruler = null }) {
   const bg = background ? portraitSrc(background) : "";
   const maskId = React.useId().replace(/:/g, "");
   return (
@@ -60,6 +62,10 @@ export default function BattleMap({ w, h, tiles = [], background = "", tokens = 
         const [x, y] = k.split(",").map(Number);
         return <rect key={`r${k}`} x={x * cell + 1} y={y * cell + 1} width={cell - 2} height={cell - 2} className="reach-cell" pointerEvents="none" />;
       })}
+      {marks && [...marks].map((k) => { // the squares a spell's area covers
+        const [x, y] = k.split(",").map(Number);
+        return <rect key={`a${k}`} x={x * cell} y={y * cell} width={cell} height={cell} className="aoe-cell" pointerEvents="none" />;
+      })}
       {tokens.map((c) => {
         const r = cell * 0.44;
         const img = c.image && c.hp > 0 ? (c.image.startsWith("/emblems/") ? c.image : portraitSrc(c.image)) : "";
@@ -85,6 +91,14 @@ export default function BattleMap({ w, h, tiles = [], background = "", tokens = 
           </g>
         );
       })}
+      {ruler && ( // the measuring line, drawn over everything
+        <g pointerEvents="none" className="ruler">
+          <line x1={ruler.from.x * cell + cell / 2} y1={ruler.from.y * cell + cell / 2} x2={ruler.to.x * cell + cell / 2} y2={ruler.to.y * cell + cell / 2} />
+          <circle cx={ruler.from.x * cell + cell / 2} cy={ruler.from.y * cell + cell / 2} r={cell * 0.14} />
+          <rect x={ruler.to.x * cell + cell / 2 + 6} y={ruler.to.y * cell - 4} width={ruler.label.length * 7 + 10} height={18} rx={4} />
+          <text x={ruler.to.x * cell + cell / 2 + 11} y={ruler.to.y * cell + 9} fontSize="12">{ruler.label}</text>
+        </g>
+      )}
     </svg>
   );
 }

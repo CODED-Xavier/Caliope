@@ -163,3 +163,5 @@ Things that are especially useful to test:
 Thank you, and have fun!
 
 **Fixing the story:** if the Aedo mixes something up (a wrong name, who someone is), write **/fix** and the right fact, like *"/fix Aria is the Saintess, not Anastasia"*. Calíope keeps it for the rest of the game (📌 in the Sheet tab).
+
+**Map tools in fights:** above the battle map, **📏 Measure** shows distances (5 ft per square), **🔥 Area** shows where a spell like Fireball lands and who's inside, and **🗺 Big map** opens the map large in the middle of the screen.

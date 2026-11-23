@@ -978,3 +978,17 @@ button.s5-ability:hover:not(:disabled) { border-color: var(--accent); }
 .steps-dots { display: inline-flex; gap: 3px; }
 .steps-dots span { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--accent); }
 .steps-dots span.on { background: var(--accent); }
+/* Map tools: 📏 measure, 🔥 area of effect, 🗺 big map */
+.map-tools { margin: 4px 0; }
+.map-tools .push-right { margin-left: auto; }
+.map-tools .field.small { padding: 3px 6px; font-size: 12.5px; width: auto; }
+.map-tools .field.num.small { width: 56px; }
+.aoe-cell { fill: #ff7a2f; fill-opacity: 0.32; stroke: #ff7a2f; stroke-opacity: 0.7; stroke-width: 1; }
+.ruler line { stroke: #ffd36b; stroke-width: 3; stroke-dasharray: 6 4; }
+.ruler circle { fill: #ffd36b; }
+.ruler rect { fill: #1a1424; stroke: #ffd36b; stroke-width: 1; }
+.ruler text { fill: #ffd36b; font-weight: 700; }
+.big-map-overlay { position: fixed; inset: 0; z-index: 900; background: rgba(8, 6, 14, 0.72); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.big-map-box { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px; width: min(1200px, 96vw); max-height: 94vh; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 20px 60px #0009; }
+.big-map-scroll { overflow: auto; flex: 1; min-height: 0; display: flex; justify-content: center; }
+.big-map-scroll .battle-grid { width: 100%; max-width: none; height: auto; max-height: 78vh; }

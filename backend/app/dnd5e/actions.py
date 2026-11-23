@@ -55,6 +55,34 @@ def _spell_cost(entry: dict) -> str | None:
     return {"action": "action", "bonus": "bonus", "reaction": "reaction"}.get(unit)
 
 
+_AREA_TEXT = re.compile(r"(\d+)-foot(?:-radius)?[- ](sphere|cube|cone|line|cylinder|radius|square|emanation|hemisphere)", re.I)
+_RADIUS_TEXT = re.compile(r"(\d+)-foot-radius", re.I)
+
+
+def spell_area(e: dict) -> dict | None:
+    """A spell's area for the map's 🔥 tool: {shape, size, width, origin}. Self-centred shapes come from its range
+    (Burning Hands: 15 ft cone), others from its text ("a 20-foot-radius sphere" for Fireball)."""
+    rng = e.get("range") or {}
+    kind, amount = rng.get("type"), ((rng.get("distance") or {}).get("amount"))
+    text = " ".join(strip_tags(x) for x in (e.get("entries") or []) if isinstance(x, str))
+    if kind in ("cone", "line", "cube", "sphere", "radius", "hemisphere", "emanation") and amount:
+        shape = {"radius": "sphere", "hemisphere": "sphere", "emanation": "sphere"}.get(kind, kind)
+        width = 5
+        if shape == "line":
+            m = re.search(r"(\d+) feet wide", text)
+            width = int(m.group(1)) if m else 5
+        return {"shape": shape, "size": int(amount), "width": width, "origin": "self"}
+    m = _AREA_TEXT.search(text)
+    if m:
+        shape = m.group(2).lower()
+        shape = {"cylinder": "sphere", "radius": "sphere", "emanation": "sphere", "hemisphere": "sphere", "square": "cube"}.get(shape, shape)
+        if shape in ("cone", "line"):
+            return {"shape": shape, "size": int(m.group(1)), "width": 5, "origin": "self"}
+        return {"shape": shape, "size": int(m.group(1)), "width": 5, "origin": "point"}
+    m = _RADIUS_TEXT.search(text)
+    return {"shape": "sphere", "size": int(m.group(1)), "width": 5, "origin": "point"} if m else None
+
+
 def options(char: dict, lib) -> dict:
     """{"action": [...], "bonus": [...], "reaction": [...], "free": [...]}: each option has id, name, cost, kind, text."""
     out = {c: [] for c in COSTS}
@@ -82,6 +110,7 @@ def options(char: dict, lib) -> dict:
         lvl = int((e or {}).get("level", 0))
         cond = ((e or {}).get("time") or [{}])[0].get("condition", "")
         out[cost].append({"id": f"spell:{e['name']}", "name": e["name"], "cost": cost, "kind": "spell", "level": lvl,
+                          **({"area": spell_area(e)} if spell_area(e or {}) else {}),
                           "text": ("Cantrip. " if not lvl else f"Level {lvl} spell. ") + (strip_tags(cond).capitalize() + ". " if cond else "")
                           + _short((e or {}).get("entries"))})
     return out
