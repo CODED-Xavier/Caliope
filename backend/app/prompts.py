@@ -369,7 +369,7 @@ class PromptBuilder:
             extra = ("## Story facts the player fixed (always true, even where earlier messages said otherwise)\n"
                      + "\n".join(f"- {f}" for f in fixed) + ("\n\n" + extra if extra else ""))
         from .systems import SYSTEM_RULES, prompt_text
-        sheet = prompt_text(scenario.get("systems") or {}, state.get("systems") or {})
+        sheet = prompt_text(scenario.get("systems") or {}, state.get("systems") or {}, (state.get("player") or {}).get("name", ""))
         if sheet:
             extra = "## The player's sheet (kept by the app)\n" + sheet + "\n" + SYSTEM_RULES + ("\n\n" + extra if extra else "")
         own_skills = skills_section(state.get("abilities") or [])
@@ -743,7 +743,8 @@ def analysis_schema(tracker: str, calendar: bool = False, status: bool = False, 
         required.append("resource_changes")
     if systems:  # the card's own sheet kept by the app (app/systems.py)
         props["system_changes"] = {"type": "array", "items": {"type": "object", "properties": {
-            "stat": {"type": "string"}, "delta": {"type": "integer"}, "value": {"type": "string"}}, "required": ["stat"]}}
+            "stat": {"type": "string"}, "delta": {"type": "integer"}, "value": {"type": "string"}, "buy": {"type": "string"},
+            "gain": {"type": "string"}, "step": {"type": "string"}}}}
         required.append("system_changes")
     return {"type": "object", "properties": props, "required": required}
 

@@ -84,7 +84,32 @@ def normalize(raw) -> dict:
                          "per": {_s(k, 24): as_int(v) for k, v in (d.get("per") or {}).items()}}
                         for d in lo.get("derived") or [] if isinstance(d, dict) and _s(d.get("stat"))][:4],
         }
+    if out.get("loadout"):  # buying parts: tier words -> amounts of the money stat
+        sh = raw.get("shop") if isinstance(raw.get("shop"), dict) else {}
+        prices = sh.get("prices") if isinstance(sh.get("prices"), dict) else {}
+        out["shop"] = {"currency": _s(sh.get("currency"), 30) or next((x["key"] for x in stats if re.search(r"credit|gold|coin|money|crown", x["key"], re.I)), ""),
+                       "prices": {_s(k, 20): max(0, as_int(v)) for k, v in (prices or DEFAULT_PRICES).items() if _s(k)}}
+    bd = raw.get("board")
+    if isinstance(bd, dict) and isinstance(bd.get("grades"), list) and bd["grades"]:
+        out["board"] = {"size": max(1, min(6, as_int(bd.get("size"), 3))), "pay_stat": _s(bd.get("pay_stat"), 30),
+                        "level_stat": _s(bd.get("level_stat"), 30), "refresh_days": max(1, min(30, as_int(bd.get("refresh_days"), 7))),
+                        "grades": [{"grade": _s(g.get("grade"), 8), "pay": max(0, as_int(g.get("pay"))),
+                                    "min_level": max(0, as_int(g.get("min_level"))), "text": _s(g.get("text"), 160)}
+                                   for g in bd["grades"][:8] if isinstance(g, dict) and _s(g.get("grade"))]}
+    rk = raw.get("ranking")
+    if isinstance(rk, dict) and isinstance(rk.get("names"), list) and rk["names"]:
+        out["ranking"] = {"size": max(2, min(20, as_int(rk.get("size"), len(rk["names"])))), "names": [_s(n, 40) for n in rk["names"] if _s(n)][:20],
+                          "protect_days": max(0, min(30, as_int(rk.get("protect_days"), 3))),
+                          "step_only": bool(rk.get("step_only"))}  # challenge only the rank directly above (unranked: the last)
+    sp = raw.get("steps")
+    if isinstance(sp, dict) and isinstance(sp.get("labels"), list) and sp["labels"]:
+        out["steps"] = {"name": _s(sp.get("name"), 30) or "Steps", "labels": [_s(x, 30) for x in sp["labels"] if _s(x)][:10],
+                        "people": [_s(x, 40) for x in sp.get("people") or [] if _s(x)][:20], "per_day": max(1, as_int(sp.get("per_day"), 1))}
     return out
+
+
+DEFAULT_PRICES = {"Cheap": 50, "Moderate": 150, "Expensive": 400, "Rare": 1000}
+NOT_SOLD = re.compile(r"wager|reward|mission|legendar|bount|quest|apost|recompens", re.I)
 
 
 # ------------------------------------------------------------------ the catalog reader
@@ -178,7 +203,17 @@ def start_state(sys: dict) -> dict:
     values = {s["key"]: s.get("start", "") for s in sys.get("stats") or []}
     lo = sys.get("loadout") or {}
     loadout = {sl["key"]: (_item(sys, sl["start"]) or {}).get("name", "") for sl in lo.get("slots") or []}
-    return {"values": values, "loadout": loadout}
+    st: dict = {"values": values, "loadout": loadout}
+    if lo:  # parts you own: the starting ones (and what is installed)
+        st["owned"] = sorted({i["name"] for i in lo.get("catalog") or [] if i["start"]} | {v for v in loadout.values() if v})
+    if sys.get("board"):
+        st["board"] = {"jobs": [], "log": [], "posted": None}
+    if sys.get("ranking"):
+        st["ranking"] = {"order": list(sys["ranking"]["names"][: sys["ranking"]["size"]]), "player": None, "protected": {}, "duels": []}
+    if sys.get("steps"):
+        st["steps"] = {p: 0 for p in sys["steps"]["people"]}
+        st["step_days"] = {}
+    return st
 
 
 def compute(sys: dict, st: dict) -> dict:
@@ -217,6 +252,8 @@ def set_part(sys: dict, st: dict, slot: str, name: str) -> str:
     level = as_int((st.get("values") or {}).get(lo.get("level_stat") or ""), 0)
     if item["level"] and not item["start"] and lo.get("level_stat") and level < item["level"]:
         return f"{item['name']} needs Level {item['level']} ({lo['level_stat']} {level} now)."
+    if "owned" in st and item["name"] not in st["owned"] and not item["start"]:
+        return f"Not owned yet: {item['name']}. Buy it or earn it first."
     before = compute(sys, st)
     old = before["items"].get(sl["key"])
     used = before["used"] - (old["cost"] if old else 0) + item["cost"]
@@ -265,6 +302,18 @@ def apply_changes(sys: dict, st: dict, changes: list) -> list[str]:
     for ch in changes if isinstance(changes, list) else []:
         if not isinstance(ch, dict):
             continue
+        if ch.get("buy") or ch.get("gain"):  # a part bought in the story, or earned (wager, reward)
+            name = str(ch.get("buy") or ch.get("gain"))
+            item = _item(sys, name)
+            if item and item["name"] not in st.get("owned", []):
+                err = buy(sys, st, name, story=True) if ch.get("buy") else gain(sys, st, name)
+                if not err:
+                    lines.append(f"{'Bought' if ch.get('buy') else 'Got'}: {item['name']}")
+            continue
+        if ch.get("step"):
+            if not step(sys, st, str(ch["step"]), as_int(ch.get("delta"), 1), day=as_int(ch.get("day"), 0)):
+                lines.append(f"{sys['steps']['name']}: {ch['step']} {st['steps'].get(_person(sys, str(ch['step'])) or '', 0)}")
+            continue
         stat = _stat(sys, str(ch.get("stat", "")))
         if not stat:
             continue
@@ -294,8 +343,13 @@ def merge_state(sys: dict, raw) -> dict:
             _set_value(sys, st, stat, v, maxes)
     _level_up(sys, st)
     for slot, name in (raw.get("loadout") or {}).items() if isinstance(raw.get("loadout"), dict) else []:
-        if name and name != st["loadout"].get(slot):
-            set_part(sys, st, slot, name)
+        if name and name != st["loadout"].get(slot) and _item(sys, name):
+            st.setdefault("owned", [])
+            added = name not in st["owned"]
+            if added:
+                st["owned"].append(_item(sys, name)["name"])  # chosen when making the character: yours
+            if set_part(sys, st, slot, name) and added:
+                st["owned"].remove(_item(sys, name)["name"])
     return st
 
 
@@ -307,10 +361,14 @@ def normalize_state(sys: dict, raw) -> dict:
     raw = raw if isinstance(raw, dict) else {}
     values = {**base["values"], **{k: v for k, v in (raw.get("values") or {}).items() if _stat(sys, k)}}
     loadout = {**base["loadout"], **{k: v for k, v in (raw.get("loadout") or {}).items() if k in base["loadout"] and (not v or _item(sys, v))}}
-    return {"values": values, "loadout": loadout}
+    out = {"values": values, "loadout": loadout}
+    for key in ("owned", "board", "ranking", "steps", "step_days"):
+        if key in base:
+            out[key] = raw.get(key) if isinstance(raw.get(key), type(base[key])) else base[key]
+    return out
 
 
-def prompt_text(sys: dict, st: dict) -> str:
+def prompt_text(sys: dict, st: dict, player_name: str = "") -> str:
     """The sheet for the Aedo, written by the app every turn."""
     if not sys or not st:
         return ""
@@ -331,6 +389,21 @@ def prompt_text(sys: dict, st: dict) -> str:
         lines.append(f"{lo.get('name') or 'Loadout'} ({lo['points']} {budget}): {slots}.")
         if net or speed:
             lines.append(f"NET: {net}{speed}")
+    jobs = [j for j in (st.get("board") or {}).get("jobs", []) if j["status"] == "active"]
+    if jobs:
+        lines.append("Active missions: " + "; ".join(f"{j['title']} (Grade {j['grade']}, pays {j['pay']}{', extra: ' + j['extra'] if j.get('extra') else ''})" for j in jobs))
+    open_jobs = [j for j in (st.get("board") or {}).get("jobs", []) if j["status"] == "open"]
+    if open_jobs:
+        lines.append("Bounty board: " + "; ".join(f"{j['title']} (Grade {j['grade']}, {j['pay']})" for j in open_jobs))
+    rk = st.get("ranking")
+    if rk:
+        order = [player_name or "the player" if n == YOU else n for n in rk["order"]]
+        top = ", ".join(f"{i + 1}. {n}" for i, n in enumerate(order[: sys["ranking"]["size"]]))
+        lines.append(f"Ranking: {top}" + ("" if rk.get("player") else f" · {player_name or 'the player'}: unranked"))
+    if st.get("steps"):
+        labels = sys["steps"]["labels"]
+        lines.append(f"{sys['steps']['name']}: " + " · ".join(
+            f"{p} {n}" + (f" ({labels[n - 1]})" if 0 < n <= len(labels) else "") for p, n in st["steps"].items()))
     return "\n".join(lines)
 
 
@@ -343,8 +416,9 @@ def tracker_line(sys: dict, st: dict) -> str:
         return ""
     keys = ", ".join(s["key"] for s in sys["stats"])
     return ("- system_changes: the player's sheet stats that changed in these exchanges, as {stat, delta} for numbers "
-            f"(XP gained, damage taken, money) or {{stat, value}} for others. Stats: {keys}. Follow the card's rules; leave "
-            "empty when nothing changed.")
+            f"(XP gained, damage taken, money) or {{stat, value}} for others. Stats: {keys}. Also {{buy: part}} when the "
+            "player buys a catalog part, {gain: part} when they win or are given one, and {step: name, delta: 1} when "
+            "someone on the card's ladder clearly moves up. Follow the card's rules; leave empty when nothing changed.")
 
 
 # ------------------------------------------------------------------ the card reader (🔍 Find systems)
@@ -427,3 +501,174 @@ async def read_card(llm, card: dict) -> dict:
             if data.get("speed_weight") else {},
         }
     return normalize(out)
+
+
+# ------------------------------------------------------------------ v2.36: shop, mission board, ranking, steps
+def price_of(sys: dict, item: dict | None) -> int | None:
+    if not item:
+        return None
+    prices = (sys.get("shop") or {}).get("prices") or {}
+    return prices.get(item.get("price")) if item.get("price") else None
+
+
+def gain(sys: dict, st: dict, name: str) -> str:
+    """A part earned (a wager, a mission reward): owned, no money."""
+    item = _item(sys, name)
+    if not item:
+        return f"{name} is not in the catalog."
+    st.setdefault("owned", [])
+    if item["name"] not in st["owned"]:
+        st["owned"].append(item["name"])
+    return ""
+
+
+def buy(sys: dict, st: dict, name: str, story: bool = False) -> str:
+    """Buy a part with the money stat: sold parts only (not wagers or rewards), level gate, enough money."""
+    item = _item(sys, name)
+    if not item:
+        return f"{name} is not in the catalog."
+    if item["name"] in st.get("owned", []):
+        return f"You already own {item['name']}."
+    if item["source"] and NOT_SOLD.search(item["source"]) and not re.search(r"market|shop|workshop|lise", item["source"], re.I):
+        return f"{item['name']} is not sold: it comes from {item['source']}."
+    lo = sys.get("loadout") or {}
+    level = as_int((st.get("values") or {}).get(lo.get("level_stat") or ""), 0)
+    if item["level"] and lo.get("level_stat") and level < item["level"]:
+        return f"{item['name']} needs Level {item['level']} ({lo['level_stat']} {level} now)."
+    cost = price_of(sys, item)
+    cur = (sys.get("shop") or {}).get("currency")
+    if cost and cur:
+        have = as_int((st.get("values") or {}).get(cur))
+        if have < cost:
+            return f"Not enough {cur}: {item['name']} costs {cost}, you have {have}."
+        st["values"][cur] = have - cost
+    return gain(sys, st, item["name"])
+
+
+def _day_week(sys: dict, day: int) -> int:
+    return (max(1, day) - 1) // (sys.get("board") or {}).get("refresh_days", 7)
+
+
+def board_stale(sys: dict, st: dict, day: int) -> bool:
+    """New jobs are due: never posted, or a new week has started (the board refreshes every Monday)."""
+    b = st.get("board") or {}
+    return b.get("posted") is None or _day_week(sys, day) != _day_week(sys, b["posted"])
+
+
+def board_post(sys: dict, st: dict, jobs: list, day: int) -> list[dict]:
+    """Jobs drafted by the Aedo, laid on the board with the card's pay for their grade."""
+    grades = {g["grade"].upper(): g for g in (sys.get("board") or {}).get("grades") or []}
+    b = st.setdefault("board", {"jobs": [], "log": [], "posted": None})
+    kept = [j for j in b["jobs"] if j["status"] == "active"]
+    new = []
+    for j in jobs if isinstance(jobs, list) else []:
+        g = grades.get(str((j or {}).get("grade", "")).upper().strip())
+        if not g or not _s(j.get("title")):
+            continue
+        new.append({"id": f"j{day}-{len(new) + 1}", "title": _s(j["title"], 80), "grade": g["grade"], "pay": g["pay"],
+                    "min_level": g["min_level"], "extra": _s(j.get("extra"), 80), "status": "open"})
+        if len(new) >= sys["board"]["size"]:
+            break
+    b["jobs"] = kept + new
+    b["posted"] = day
+    return new
+
+
+def board_act(sys: dict, st: dict, job_id: str, action: str, day: int) -> str:
+    """accept / done / fail a job; done pays its grade's pay; done and fail go to the mission log."""
+    b = st.get("board") or {}
+    job = next((j for j in b.get("jobs", []) if j["id"] == job_id), None)
+    if not job:
+        return "That job is not on the board."
+    level_stat = sys["board"].get("level_stat")
+    if action == "accept":
+        level = as_int(st["values"].get(level_stat), 0) if level_stat else 99
+        if job["min_level"] and level < job["min_level"]:
+            return f"Grade {job['grade']} needs Level {job['min_level']}."
+        job["status"] = "active"
+        return ""
+    if action in ("done", "fail") and job["status"] == "active":
+        b["jobs"] = [j for j in b["jobs"] if j["id"] != job_id]
+        reward = ""
+        if action == "done" and sys["board"].get("pay_stat"):
+            apply_changes(sys, st, [{"stat": sys["board"]["pay_stat"], "delta": job["pay"]}])
+            reward = f"{job['pay']} {sys['board']['pay_stat']}" + (f" + {job['extra']}" if job.get("extra") else "")
+        b.setdefault("log", []).insert(0, f"Day {day} · Grade {job['grade']} · {job['title']} · {'done' if action == 'done' else 'failed'}"
+                                          + (f" · {reward}" if reward else ""))
+        b["log"] = b["log"][:8]
+        return ""
+    return "Accept the job first."
+
+
+YOU = "@you"
+
+
+def duel(sys: dict, st: dict, opponent: str, won: bool, day: int) -> str:
+    """A ranked duel: beating someone above you (or anyone, when unranked) takes their place; everyone from there
+    moves down one and the last falls off. Whoever you just fought is protected from a rematch for the card's
+    protection days. The last 3 duels are kept."""
+    rk = st.get("ranking")
+    if not rk:
+        return "This card keeps no ranking."
+    order = list(rk["order"])
+    name = next((n for n in order if n.lower() == (opponent or "").strip().lower()), _s(opponent, 40))
+    until = rk["protected"].get(name)
+    if until and day <= until:
+        return f"{name} is protected until day {until}."
+    mine = order.index(YOU) if YOU in order else None
+    if sys["ranking"].get("step_only") and name in order:
+        want = (mine - 1) if mine is not None else len(order) - 1
+        if mine == 0 or order.index(name) != want:
+            return f"You can only challenge {order[want] if want >= 0 else 'nobody above you'} (the rank directly above you)."
+    if won and name in order:
+        their = order.index(name)
+        if mine is None or their < mine:
+            if mine is not None:
+                order.remove(YOU)
+            order.insert(their, YOU)
+            order = order[: sys["ranking"]["size"]]
+    rk["order"] = order
+    rk["player"] = order.index(YOU) + 1 if YOU in order else None
+    rk["protected"][name] = day + sys["ranking"]["protect_days"]
+    rk["duels"] = ([{"day": day, "opponent": name, "won": bool(won)}] + rk.get("duels", []))[:3]
+    return ""
+
+
+def _person(sys: dict, name: str) -> str | None:
+    low = (name or "").strip().lower()
+    return next((p for p in (sys.get("steps") or {}).get("people", []) if p.lower() == low or p.lower().split()[0] == low), None)
+
+
+def step(sys: dict, st: dict, person: str, delta: int, day: int) -> str:
+    """Move someone on the step ladder (romance): at most the card's steps per day, within the ladder."""
+    sp = sys.get("steps")
+    if not sp:
+        return "This card keeps no ladder."
+    who = _person(sys, person)
+    if not who:
+        return f"{person} is not on the {sp['name']} ladder."
+    days = st.setdefault("step_days", {})
+    if delta > 0 and day and days.get(who) == day:
+        return f"{who} already moved a step today."
+    st.setdefault("steps", {})[who] = max(0, min(len(sp["labels"]), as_int(st["steps"].get(who)) + delta))
+    if delta > 0 and day:
+        days[who] = day
+    return ""
+
+
+BOARD_SCHEMA = {"type": "object", "properties": {"jobs": {"type": "array", "items": {"type": "object", "properties": {
+    "title": {"type": "string"}, "grade": {"type": "string"}, "extra": {"type": "string"}}, "required": ["title", "grade", "extra"]}}},
+    "required": ["jobs"]}
+
+
+def board_messages(sys: dict, st: dict, card_text: str) -> list[dict]:
+    """Ask the Aedo for this week's jobs: titles and extras only; the app sets pay and level gates from the grades."""
+    b = sys["board"]
+    level = as_int(st["values"].get(b.get("level_stat") or ""), 0) if b.get("level_stat") else 0
+    grades = "\n".join(f"- Grade {g['grade']}: {g['text']} (pays {g['pay']}, Level {g['min_level']}+)" for g in b["grades"])
+    return [{"role": "user", "content": (
+        f"Write this week's bounty board for the story below: exactly {b['size']} jobs, each with a short title (what the job "
+        f"is, where), its grade, and one extra reward (salvage, a part, a contact, information or prestige; not the same kind "
+        f"twice). The player is Level {level}: at least one job must be a grade they can take. Grades:\n{grades}\n\n"
+        f"The card's rules about missions (use their names and places; never invent noble houses or named characters):\n"
+        f"{truncate(card_text, 6000)}")}]

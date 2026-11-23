@@ -14,7 +14,7 @@ import { GridOverlay } from "./AdventureEditor.jsx";
 import PlayerLore from "./PlayerLore.jsx";
 import CardSheetForm, { startValues } from "./CardSheetForm.jsx";
 import SkillsEditor from "./SkillsEditor.jsx";
-import SystemsSheet from "./SystemsSheet.jsx";
+import SystemsSheet, { SystemsPanels } from "./SystemsSheet.jsx";
 import { CalendarBox } from "./Calendar.jsx";
 import { CantosBox, MapBag } from "./Cantos.jsx";
 
@@ -261,6 +261,7 @@ function CardSystems({ view, convId, onReload, busy }) {
       <div className="section-title">{view.systems.loadout?.name ? `Sheet · ${view.systems.loadout.name}` : "Sheet"}</div>
       <SystemsSheet systems={view.systems} state={view.state} computed={view.computed} error={error} busy={busy || working}
         onValue={(stat, value) => change({ stat, value })} onPart={(slot, item) => change({ slot, item })} />
+      <SystemsPanels view={view} onAct={change} busy={busy || working} />
     </>
   );
 }

@@ -1079,7 +1079,9 @@ class ChatEngine:
         if res_line and not any(resources.is_ability(u) or "\u2694" in u for u, _ in exchanges):
             changes += resources.apply_tracker(new_state, updates.get("resource_changes", []))  # the app counted ✨/⚔ turns
         if sys_line and new_state.get("systems"):
-            changes += systems.apply_changes(sys_def, new_state["systems"], updates.get("system_changes", []))
+            day = (new_state.get("clock") or {}).get("minutes", 0) // 1440 + 1
+            changes += systems.apply_changes(sys_def, new_state["systems"],
+                                             [{**c, "day": day} if c.get("step") else c for c in updates.get("system_changes", [])])
         if cal_on:
             changes += self._move_clock(new_state, cal, updates)
         adv = scenario.get("adventure") or {}

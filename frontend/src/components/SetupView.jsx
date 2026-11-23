@@ -298,7 +298,7 @@ export default function SetupView({ scenarioId, onBack, onStart }) {
             <>
               <div className="section-title">{`${card.name}'s sheet`}</div>
               <div className="muted tiny">Kept by the app with the card's rules: pick your parts (the budget and level locks are checked) and set your starting numbers. It lives in the Sheet tab, and the Aedo sees the real numbers.</div>
-              <SystemsSheet systems={card.systems} state={sys.state} computed={sys.computed} error={sys.error}
+              <SystemsSheet creating systems={card.systems} state={sys.state} computed={sys.computed} error={sys.error}
                 onValue={sysValue} onPart={(slot, item) => sysTry({ slot, item })} />
             </>
           )}

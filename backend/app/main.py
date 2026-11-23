@@ -1317,12 +1317,31 @@ async def change_systems(conv_id: int, data: dict[str, Any] = Body(...)):
         raise HTTPException(400, "This game's card keeps no sheet of its own.")
     state = s.conversations.get_state(conv_id)
     st = systems.normalize_state(sys_def, state.get("systems"))
+    day = (state.get("clock") or {}).get("minutes", 0) // 1440 + 1
+    error = ""
     if data.get("slot"):
         error = systems.set_part(sys_def, st, str(data["slot"]), str(data.get("item") or ""))
-        if error:
-            raise HTTPException(400, error)
     elif data.get("stat"):
         systems.apply_changes(sys_def, st, [{"stat": str(data["stat"]), "value": data.get("value")}])
+    elif data.get("buy"):
+        error = systems.buy(sys_def, st, str(data["buy"]))
+    elif data.get("gain"):
+        error = systems.gain(sys_def, st, str(data["gain"]))
+    elif data.get("job") and data.get("act"):
+        error = systems.board_act(sys_def, st, str(data["job"]), str(data["act"]), day)
+    elif data.get("board") == "new" and sys_def.get("board"):
+        from .util import extract_json
+        raw = await s.llm.chat(systems.board_messages(sys_def, st, systems._card_text(s.conversations.get(conv_id)["scenario"])),
+                               json_schema=systems.BOARD_SCHEMA, max_tokens=500, temperature=0.8)
+        jobs = (extract_json(raw or "") or {}).get("jobs") or []
+        if not systems.board_post(sys_def, st, jobs, day):
+            error = "The Aedo didn't write usable jobs. Try again."
+    elif data.get("duel"):
+        error = systems.duel(sys_def, st, str(data["duel"]), bool(data.get("won")), day)
+    elif data.get("step"):
+        error = systems.step(sys_def, st, str(data["step"]), int(data.get("delta") or 1), day)
+    if error:
+        raise HTTPException(400, error)
     state["systems"] = st
     s.conversations.save_state(conv_id, state)
     return full_conversation(conv_id)
@@ -1871,7 +1890,11 @@ def _systems_view(conv_id: int) -> dict | None:
     if not sys_def:
         return None
     st = systems.normalize_state(sys_def, s.conversations.get_state(conv_id).get("systems"))
-    return {"systems": sys_def, "state": st, "computed": systems.compute(sys_def, st)}
+    state = s.conversations.get_state(conv_id)
+    day = (state.get("clock") or {}).get("minutes", 0) // 1440 + 1
+    return {"systems": sys_def, "state": st, "computed": systems.compute(sys_def, st), "day": day,
+            "board_due": bool(sys_def.get("board")) and systems.board_stale(sys_def, st, day),
+            "prices": {i["name"]: systems.price_of(sys_def, i) for i in (sys_def.get("loadout") or {}).get("catalog") or []}}
 
 
 def full_conversation(conv_id: int) -> dict:

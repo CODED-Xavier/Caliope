@@ -968,3 +968,13 @@ button.s5-ability:hover:not(:disabled) { border-color: var(--accent); }
 .sys-mod.down strong { color: var(--bad); }
 .sys-slot { display: flex; flex-direction: column; gap: 3px; }
 .pill.bad { border-color: var(--bad); color: var(--bad); }
+.systems-panels { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.sys-panel { border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.sys-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.sys-job { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; background: var(--bg2); }
+.sys-job.active { border-left: 3px solid var(--accent); }
+.sys-rank { margin: 0; padding-left: 22px; font-size: 13px; }
+.sys-rank li.you { font-weight: 700; color: var(--accent); }
+.steps-dots { display: inline-flex; gap: 3px; }
+.steps-dots span { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--accent); }
+.steps-dots span.on { background: var(--accent); }

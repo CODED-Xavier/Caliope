@@ -85,6 +85,9 @@ class SheetTests(unittest.TestCase):
         st = sy.start_state(sys)
         self.assertIn("Level 4", sy.set_part(sys, st, "Right arm", "Hydraulic brawler arm"))
         self.assertIn("arm", sy.set_part(sys, st, "Legs", "War sword"))
+        self.assertIn("Not owned", sy.set_part(sys, st, "Thrusters", "Overhauled thrusters"))
+        sy.gain(sys, st, "Overhauled thrusters")
+        sy.gain(sys, st, "Reactive skirts")
         self.assertIn("Frame Points", sy.set_part(sys, st, "Back", "Reactive skirts"))  # 11 of 10
         self.assertEqual(sy.set_part(sys, st, "Thrusters", "Overhauled thrusters"), "")
         self.assertEqual(sy.compute(sys, st)["mods"]["Handling"], -4)

@@ -10,6 +10,8 @@ import uuid
 
 from .appearance import normalize_appearance
 from .portraits import normalize_portraits
+import json
+
 from .util import as_int, clamp, deep_merge, truncate
 from .reputation import EVENTS
 
@@ -132,7 +134,11 @@ def _systems_part(raw) -> dict:
               for k, v in list((raw.get("values") if isinstance(raw.get("values"), dict) else {}).items())[:30]}
     loadout = {truncate(str(k), 30): truncate(str(v or ""), 80)
                for k, v in list((raw.get("loadout") if isinstance(raw.get("loadout"), dict) else {}).items())[:16]}
-    return {"values": values, "loadout": loadout} if values or loadout else {}
+    out = {"values": values, "loadout": loadout} if values or loadout else {}
+    for key in ("owned", "board", "ranking", "steps", "step_days"):  # v2.36: shop, mission board, ranking, ladder
+        if out and isinstance(raw.get(key), (list, dict)):
+            out[key] = json.loads(json.dumps(raw[key]))[:200] if isinstance(raw[key], list) else json.loads(json.dumps(raw[key]))
+    return out
 
 
 def _story_part(merged: dict) -> dict:
@@ -193,7 +199,7 @@ def normalize_updates(raw) -> dict:
                              for c in _list(raw.get("resource_changes")) if isinstance(c, dict)],
         "status_changes": [{"field": str(c.get("field", "")), "value": str(c.get("value", ""))}
                            for c in _list(raw.get("status_changes")) if isinstance(c, dict)],
-        "system_changes": [{"stat": str(c.get("stat", "")), "delta": c.get("delta"), "value": c.get("value")}
+        "system_changes": [{k: c.get(k) for k in ("stat", "delta", "value", "buy", "gain", "step") if c.get(k) not in (None, "")}
                            for c in _list(raw.get("system_changes")) if isinstance(c, dict)],
         "appointments": [],
     }
