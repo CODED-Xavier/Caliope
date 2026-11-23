@@ -455,6 +455,16 @@ async def character_levelup_plan(conv_id: int, who: str = Query("")):
     return await asyncio.to_thread(build.level_up_plan, char, library5e())
 
 
+@app.get("/api/conversations/{conv_id}/character/levels")
+async def character_levels(conv_id: int, who: str = Query("")):
+    """📜 The 20 levels of this character's class: features, proficiency, slots, the class's columns, spells and uses."""
+    from .dnd5e import levels, store
+    char = store.char_of(svc().conversations.get_state(conv_id), who)
+    if not char:
+        raise ValueError("This sheet is not a 5e sheet yet.")
+    return await asyncio.to_thread(levels.progression, char, library5e())
+
+
 @app.post("/api/conversations/{conv_id}/character/levelup")
 async def character_levelup(conv_id: int, body: dict[str, Any] = Body(...), who: str = Query("")):
     """Level up: HP (average or a roll), the class table's new features, and the player's choices."""

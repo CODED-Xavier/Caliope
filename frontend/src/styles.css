@@ -789,6 +789,15 @@ button.s5-ability:hover:not(:disabled) { border-color: var(--accent); }
 .pip { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--accent); }
 .pip.on { background: var(--accent); }
 .pip.slot { border-radius: 2px; transform: rotate(45deg); width: 9px; height: 9px; }
+.level-table-wrap { overflow-x: auto; max-width: 100%; }
+.level-table { border-collapse: collapse; font-size: 0.8rem; width: 100%; }
+.level-table th, .level-table td { border-bottom: 1px solid var(--border); padding: 4px 6px; text-align: left; vertical-align: top; }
+.level-table th { position: sticky; top: 0; background: var(--panel); white-space: nowrap; }
+.level-table tr.current td { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.level-table tr.next td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.level-changes { border-collapse: collapse; font-size: 0.88rem; margin-bottom: 4px; }
+.level-changes td { padding: 2px 8px 2px 0; }
+.pill.warn { border-color: var(--bad); color: var(--bad); }
 .s5-resources { display: flex; flex-direction: column; gap: 5px; }
 .s5-res-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); flex-wrap: wrap; }
 .s5-res-count { font-weight: 700; font-variant-numeric: tabular-nums; }

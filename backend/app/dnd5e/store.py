@@ -89,6 +89,12 @@ def apply_change(char: dict, change: dict, lib) -> dict:
             used = dict(char.get("slots_used") or {})
             used[lv] = max(0, min(total[lv], int(used.get(lv, 0)) + delta))
             char["slots_used"] = used
+    elif op == "prepare":  # a spellbook spell prepared today, or left in the book
+        i = int(change.get("index", -1))
+        if not 0 <= i < len(char.get("spells") or []):
+            raise ValueError("That spell is not on the sheet.")
+        char["spells"] = [dict(x) for x in char["spells"]]
+        char["spells"][i]["prepared"] = bool(change.get("on"))
     elif op == "start_gear":  # the class's and background's packages, or the class's gold instead
         from .equipment import apply_start
         char = apply_start(char, lib, change.get("choice") or {})

@@ -11,6 +11,10 @@ class TextTests(unittest.TestCase):
     def test_strip_tags(self):
         self.assertEqual(strip_tags("regain {@dice 1d10} + level"), "regain 1d10 + level")
         self.assertEqual(strip_tags("cast {@spell fireball|PHB}"), "cast fireball")
+        self.assertEqual(strip_tags("not behind {@quickref Cover||3||total cover}"), "not behind total cover")
+        self.assertEqual(strip_tags("{@quickref difficult terrain||3}"), "difficult terrain")
+        self.assertEqual(strip_tags("{@filter Cantrips Known|spells|level=0|class=bard}"), "Cantrips Known")
+        self.assertEqual(strip_tags("{@book Chapter 9|PHB|9}"), "Chapter 9")
         self.assertEqual(strip_tags("{@atk mw} {@hit 5} to hit. {@h}7 ({@damage 1d8+3})"), "Melee Weapon Attack: +5 to hit. Hit: 7 (1d8+3)")
         self.assertEqual(strip_tags("a {@dc 13} save"), "a DC 13 save")
         self.assertEqual(strip_tags("{@item longsword|phb|a fine sword}"), "a fine sword")

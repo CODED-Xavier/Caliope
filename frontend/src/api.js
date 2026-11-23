@@ -226,6 +226,7 @@ export const api = {
   changeCharacter5e: (id, change, who = "") => request("PATCH", `/api/conversations/${id}/character${who ? `?who=${encodeURIComponent(who)}` : ""}`, { change }),
   builder5e: (id, who = "") => request("GET", `/api/conversations/${id}/character/builder${who ? `?who=${encodeURIComponent(who)}` : ""}`),
   levelUpPlan: (id, who = "") => request("GET", `/api/conversations/${id}/character/levelup${who ? `?who=${encodeURIComponent(who)}` : ""}`),
+  characterLevels: (id, who = "") => request("GET", `/api/conversations/${id}/character/levels${who ? `?who=${encodeURIComponent(who)}` : ""}`),
   levelUp: (id, answers, who = "") => request("POST", `/api/conversations/${id}/character/levelup${who ? `?who=${encodeURIComponent(who)}` : ""}`, { answers }),
   autoParty5e: (id, body = {}) => request("POST", `/api/conversations/${id}/character/party/auto`, body),
   libraryDetails: (type, source, name) => request("GET", `/api/library/5e/details?type=${encodeURIComponent(type)}&source=${encodeURIComponent(source)}&name=${encodeURIComponent(name)}`),

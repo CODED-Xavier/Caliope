@@ -109,6 +109,8 @@ def options(char: dict, lib) -> dict:
         out["bonus"].insert(0, {"id": "rules:martial_arts", "name": "Martial Arts strike", "cost": "bonus", "kind": "bonus_attack",
                                 "text": "After the Attack action with an unarmed strike or monk weapon: one unarmed strike."})
     for ref in char.get("spells") or []:
+        if ref.get("prepared") is False:  # in the spellbook, not prepared today
+            continue
         e = lib.items.get(("spell", ref["name"].lower(), ref.get("source", "PHB").upper()))
         cost = _spell_cost(e or {})
         if not cost:

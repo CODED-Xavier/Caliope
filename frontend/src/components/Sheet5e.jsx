@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import { LibraryPicker, DRAG_TYPE } from "./Library.jsx";
 import Builder, { emblemFor } from "./Builder.jsx";
-import LevelUp from "./LevelUp.jsx";
+import LevelUp, { LevelTable } from "./LevelUp.jsx";
 import Modal from "./Modal.jsx";
 import { portraitSrc } from "../portraits.js";
 
@@ -83,6 +83,7 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
         <div className="s5-xp" title={`${sh.xp} XP${sh.next_level_xp ? ` · level ${sh.level + 1} at ${sh.next_level_xp}` : ""}`}>
           <span className="tiny muted">{sh.next_level_xp ? `${sh.xp} / ${sh.next_level_xp} XP` : `${sh.xp} XP · highest level`}</span>
           <span className="tracker-bar wide"><span style={{ width: `${xpPct}%` }} /></span>
+          {sh.class && <button type="button" className="btn small ghost" onClick={() => setModal("levels")} title="What each level of your class gives">📜 Levels</button>}
           {sh.level < 20 && sh.class && <button type="button" className={`btn small ${ready ? "primary" : ""}`} disabled={disabled || inFight} onClick={() => setModal("levelup")}>⬆ Level up</button>}
         </div>
       )}
@@ -143,11 +144,16 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
           ))}
 
           <Resources sh={sh} who={who} disabled={disabled} onUse={onUse} change={change} />
-          {(ch.spells || []).length > 0 && (
+          {((ch.spells || []).length > 0 || sh.spell_counts) && (
             <>
               <div className="section-title">Spells</div>
-              {ch.spells.map((s, i) => (
+              {sh.spell_counts && <SpellCounts c={sh.spell_counts} />}
+              {(ch.spells || []).map((s, i) => (
                 <div className="s5-row" key={`${s.name}-${i}`}>
+                  {sh.spell_counts?.mode === "spellbook" && (
+                    <input type="checkbox" checked={s.prepared !== false} disabled={disabled} title="Prepared today (unticked: only in your spellbook)"
+                      onChange={(e) => change({ op: "prepare", index: i, on: e.target.checked })} />
+                  )}
                   <div className="grow">{s.name}{s.homebrew && <span className="pill small">house rule</span>}</div>
                   <button type="button" className="icon-btn" disabled={disabled} onClick={() => change({ op: "remove", slot: "spells", index: i })} title="Remove">✕</button>
                 </div>
@@ -216,6 +222,7 @@ export default function Sheet5e({ convId, state, busy, onUse, onRest, onRoll, on
       {showLib && <LibraryPicker edition={ch.edition || "2014"} onAdd={add} busy={disabled} />}
 
       {modal === "builder" && <Builder convId={convId} who={who} onClose={() => setModal(null)} onChanged={took} />}
+      {modal === "levels" && <Modal title={`📜 ${sh?.class || "Class"}: what each level gives`} onClose={() => setModal(null)} wide><LevelTable convId={convId} who={who} /></Modal>}
       {modal === "levelup" && <LevelUp convId={convId} who={who} onClose={() => setModal(null)} onDone={(r) => { took(r); setModal(null); }} />}
     </div>
   );
@@ -353,6 +360,20 @@ function Resources({ sh, who, disabled, onUse, change }) {
       )}
       {smite && <div className="muted tiny">⚡ Divine Smite: after a melee hit, spend a slot for 2d8 radiant (+1d8 per level above 1st, +1d8 against undead and fiends). In fights it is one of your options.</div>}
       {!who && <div className="muted tiny">Say it in the chat too: “I use Lay on Hands for 5”, “I rage”, “I cast Cure Wounds at 2nd level”. The app spends it.</div>}
+    </div>
+  );
+}
+
+/** How many cantrips and spells this level has, against what the sheet holds. */
+function SpellCounts({ c }) {
+  const part = (label, have, max) => <span className={`pill ${have > max ? "warn" : ""}`}>{`${label} ${have}/${max}`}</span>;
+  return (
+    <div className="chip-row tight">
+      {c.cantrips > 0 && part("Cantrips", c.have_cantrips, c.cantrips)}
+      {c.mode === "known" && part("Spells known", c.have_spells, c.known || 0)}
+      {c.mode === "spellbook" && <span className="pill">{`Spellbook ${c.have_spells}/${c.spellbook}`}</span>}
+      {c.mode === "spellbook" && part("Prepared", c.have_prepared, c.prepared || 0)}
+      {c.mode === "prepared" && part("Prepared", c.have_spells, c.prepared || 0)}
     </div>
   );
 }

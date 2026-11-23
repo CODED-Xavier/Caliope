@@ -1987,7 +1987,41 @@
 "psychic": "psíquico",
 "· used": "· usada",
 "· used this round": "· usada nesta rodada",
-"Dodge": "Esquivar"
+"Dodge": "Esquivar",
+"Search spells…": "Buscar magias…",
+"Search spells": "Buscar magias",
+"Cantrip": "Truque",
+"No spells found in your Library.": "Nenhuma magia encontrada na sua Biblioteca.",
+"Cantrips": "Truques",
+"Spells known": "Magias conhecidas",
+"Spellbook": "Grimório",
+"Prepared": "Preparadas",
+"Uses": "Usos",
+"You are at the highest level.": "Você está no nível máximo.",
+"You prepare your spells from your whole class list after a long rest: add or remove them on the sheet.": "Você prepara suas magias de toda a lista da classe após um descanso longo: adicione ou tire na ficha.",
+"You may also swap one spell you know for another: remove it on the sheet and add the new one from the Library.": "Você também pode trocar uma magia que conhece por outra: tire na ficha e adicione a nova pela Biblioteca.",
+"▾ All 20 levels": "▾ Todos os 20 níveis",
+"▸ 📜 All 20 levels": "▸ 📜 Todos os 20 níveis",
+"What each level of your class gives": "O que cada nível da sua classe dá",
+"📜 Levels": "📜 Níveis",
+"Prepared today (unticked: only in your spellbook)": "Preparada hoje (desmarcada: só no grimório)",
+"Proficiency bonus": "Bônus de proficiência",
+"Hit points (with the average)": "Pontos de vida (com a média)",
+"Pact slots": "Espaços de pacto",
+"Cantrips known": "Truques conhecidos",
+"Spells in your spellbook": "Magias no grimório",
+"Prepared spells": "Magias preparadas",
+"Rages": "Fúrias",
+"Rage Damage": "Dano da Fúria",
+"Martial Arts": "Artes Marciais",
+"Ki Points": "Pontos de Ki",
+"Unarmored Movement": "Movimento sem Armadura",
+"Sneak Attack": "Ataque Furtivo",
+"Sorcery Points": "Pontos de Feitiçaria",
+"Invocations Known": "Invocações Conhecidas",
+"That spell is not on the sheet.": "Essa magia não está na ficha.",
+"This sheet is not a 5e sheet yet.": "Esta ficha ainda não é uma ficha 5e.",
+"Choose a class first.": "Escolha uma classe primeiro."
 },
 "patterns": [
 [
@@ -3413,6 +3447,134 @@
 [
 "✨ {0}: {1} has no uses to spend.",
 "✨ {0}: {1} não tem usos para gastar."
+],
+[
+"New cantrips: choose {0}",
+"Novos truques: escolha {0}"
+],
+[
+"Mystic Arcanum: one level {0} spell",
+"Arcana Mística: uma magia de nível {0}"
+],
+[
+"Add {0} spells to your spellbook",
+"Adicione {0} magias ao grimório"
+],
+[
+"New spells: choose {0}",
+"Novas magias: escolha {0}"
+],
+[
+"{0} list · up to level {1} · {2}/{3} chosen · optional: you can also add them later from the Library",
+"Lista de {0} · até o nível {1} · {2}/{3} escolhidas · opcional: dá para adicionar depois pela Biblioteca"
+],
+[
+"{0} list · {1}/{2} chosen · optional: you can also add them later from the Library",
+"Lista de {0} · {1}/{2} escolhidas · opcional: dá para adicionar depois pela Biblioteca"
+],
+[
+"Level {0}",
+"Nível {0}"
+],
+[
+"Level {0} · {1}",
+"Nível {0} · {1}"
+],
+[
+"Cantrip · {0}",
+"Truque · {0}"
+],
+[
+"Your level ({0}) and the next one are marked.",
+"Seu nível ({0}) e o próximo estão marcados."
+],
+[
+"What changes at level {0}",
+"O que muda no nível {0}"
+],
+[
+"📜 {0}: what each level gives",
+"📜 {0}: o que cada nível dá"
+],
+[
+"Spellbook {0}/{1}",
+"Grimório {0}/{1}"
+],
+[
+"Cantrips {0}/{1}",
+"Truques {0}/{1}"
+],
+[
+"Spells known {0}/{1}",
+"Magias conhecidas {0}/{1}"
+],
+[
+"Prepared {0}/{1}",
+"Preparadas {0}/{1}"
+],
+[
+"You know {0} cantrips; a level {1} {2} knows {3}.",
+"Você conhece {0} truques; um(a) {2} de nível {1} conhece {3}."
+],
+[
+"You know {0} spells; a level {1} {2} knows {3}.",
+"Você conhece {0} magias; um(a) {2} de nível {1} conhece {3}."
+],
+[
+"You have {0} spells prepared; a level {1} {2} prepares {3}.",
+"Você tem {0} magias preparadas; um(a) {2} de nível {1} prepara {3}."
+],
+[
+"This level gives {0} new cantrip.",
+"Este nível dá {0} truque novo."
+],
+[
+"This level gives {0} new cantrips.",
+"Este nível dá {0} truques novos."
+],
+[
+"This level gives {0} new spell.",
+"Este nível dá {0} magia nova."
+],
+[
+"This level gives {0} new spells.",
+"Este nível dá {0} magias novas."
+],
+[
+"{0} is not in the Library.",
+"{0} não está na Biblioteca."
+],
+[
+"{0} is not a cantrip.",
+"{0} não é um truque."
+],
+[
+"{0} is a cantrip, not a levelled spell.",
+"{0} é um truque, não uma magia com nível."
+],
+[
+"Mystic Arcanum here is a level {0} spell.",
+"A Arcana Mística aqui é uma magia de nível {0}."
+],
+[
+"{0} is level {1}; your highest spell slot will be level {2}.",
+"{0} é de nível {1}; seu maior espaço de magia será de nível {2}."
+],
+[
+"{0} is not on the {1} spell list.",
+"{0} não está na lista de magias de {1}."
+],
+[
+"You already have {0}.",
+"Você já tem {0}."
+],
+[
+"{0} ({1}) is missing from the library — {2}.",
+"{0} ({1}) não está na biblioteca — {2}."
+],
+[
+"HP · {0}",
+"PV · {0}"
 ]
 ]
 }

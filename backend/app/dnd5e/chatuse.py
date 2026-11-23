@@ -79,6 +79,8 @@ def found_in_text(text: str, char: dict, lib) -> list[dict]:
     feats = [f for f in sheet["features"] if f.get("uses_max")]
     spells = []
     for sp in char.get("spells") or []:
+        if sp.get("prepared") is False:
+            continue
         e = lib.items.get(("spell", str(sp.get("name", "")).lower(), str(sp.get("source", "PHB")).upper()))
         if e and int(e.get("level", 0)) > 0:
             spells.append((e["name"], int(e["level"])))

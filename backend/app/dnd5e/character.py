@@ -210,15 +210,21 @@ def derive(char: dict, lib) -> dict:
     sheet.update(_slots(cls, level))
     # spellcasting: the class's ability (or the subclass's, for an Eldritch Knight), save DC and spell attack
     sab = ((cls or {}).get("spellcastingAbility") or "")
-    if not sab and char.get("subclass"):
-        sub = next((v for (k, n, _), v in look.lib.items.items() if k == "subclass" and n == str(char["subclass"].get("name", "")).lower()
-                    and v.get("className") == (cls or {}).get("name")), None)
-        sab = (sub or {}).get("spellcastingAbility") or ""
+    sub_entry = None
+    if char.get("subclass"):
+        sub_entry = next((v for (k, n, _), v in look.lib.items.items() if k == "subclass" and n == str(char["subclass"].get("name", "")).lower()
+                          and v.get("className") == (cls or {}).get("name")), None)
+    if not sab:
+        sab = (sub_entry or {}).get("spellcastingAbility") or ""
     if sab in mods:
         sheet.update(spell_ability=sab, spell_dc=8 + prof + mods[sab], spell_attack=prof + mods[sab])
     from .magic import pact_left, slots_left
     sheet["slots_left"] = slots_left(sheet, char)
     sheet["pact_left"] = pact_left(sheet, char)
+    if sab in mods:  # how many cantrips and spells this level knows or prepares, and what the sheet has
+        from .levels import counts, warnings
+        sheet["spell_counts"] = counts(char, cls, sub_entry, level, mods, bool(sheet.get("slots") or sheet.get("pact")), look.lib)
+        look.warnings.extend(warnings(sheet["spell_counts"], level, (cls or {}).get("name", "")))
     cp = int(char.get("cp") or 0)  # money, kept in copper pieces
     sheet["coins"] = {"cp_total": cp, "gp": cp // 100, "sp": (cp % 100) // 10, "cp": cp % 10}
     sheet["warnings"] = look.warnings

@@ -22,6 +22,10 @@ def _one(m: re.Match) -> str:
     if tag == "recharge":
         return f"(Recharge {body or 6}–6)" if body != "6" and body else "(Recharge 6)"
     parts = body.split("|")
+    if tag in ("filter", "book", "adventure", "5etools", "link"):  # {@filter Cantrips Known|spells|level=0}: the text comes first
+        return parts[0].strip()
+    if tag == "quickref":  # {@quickref Cover||3||total cover}: the text to show is the 5th part, or the 1st
+        return (parts[4] if len(parts) >= 5 and parts[4] else parts[0]).strip()
     return (parts[2] if len(parts) >= 3 and parts[2] else parts[0]).strip()
 
 

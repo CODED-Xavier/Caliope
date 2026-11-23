@@ -150,7 +150,64 @@ def level_up_plan(char: dict, lib) -> dict:
     styles, after, _ = _style_options(cls, to, lib)
     if after > before:
         choices.append({"id": "optionalfeature", "kind": "optionalfeature", "options": styles, "count": after - before})
-    return {"to_level": to, "hit_die": f"d{faces}", "hp_average": faces // 2 + 1, "gains": gains, "choices": choices}
+    from .character import derive
+    from .levels import changes
+    table, bc, ac = changes(char, to, lib)
+    casting = caster_list(char, lib)
+    if ac and casting:  # new spells: cantrips, spells known or the spellbook, a Warlock's Mystic Arcanum
+        top = _top_slot(derive({**char, "level": to}, lib))
+        if (ac.get("cantrips") or 0) > (bc.get("cantrips") or 0):
+            choices.append({"id": "cantrips", "kind": "cantrips", "count": ac["cantrips"] - (bc.get("cantrips") or 0),
+                            "list": casting, "max_level": 0})
+        key = {"known": "known", "spellbook": "spellbook"}.get(ac["mode"])
+        if key and (ac.get(key) or 0) > (bc.get(key) or 0):
+            choices.append({"id": "spells", "kind": "spells", "count": ac[key] - (bc.get(key) or 0), "list": casting,
+                            "max_level": top, "spellbook": key == "spellbook"})
+        arcanum = next((v for k, v in ((cls.get("spellsKnownProgressionFixedByLevel") or {}).items()) if int(k) == to), None)
+        if isinstance(arcanum, dict):
+            for spell_level, n in arcanum.items():
+                choices.append({"id": "arcanum", "kind": "spells", "count": int(n), "list": casting,
+                                "exact_level": int(spell_level), "max_level": int(spell_level)})
+    return {"to_level": to, "hit_die": f"d{faces}", "hp_average": faces // 2 + 1, "gains": gains, "choices": choices,
+            "changes": table, "spell_mode": (ac or {}).get("mode")}
+
+
+SPELL_KINDS = ("spells", "cantrips")
+
+
+def _top_slot(sheet: dict) -> int:
+    return max([int(k) for k in sheet.get("slots") or {}] + ([int(sheet["pact"]["level"])] if sheet.get("pact") else []) + [0])
+
+
+def _new_spells(ch: dict, picked, have: set, lib) -> list[dict]:
+    """Spells chosen at level-up, checked: real spells, the right level, on the class's list, not already known."""
+    from .spell_lists import on_list
+    picked = [p for p in (picked if isinstance(picked, list) else [picked]) if isinstance(p, dict) and p.get("name")]
+    if len(picked) > ch["count"]:
+        raise ValueError(f"This level gives {ch['count']} new {'cantrip' if ch['kind'] == 'cantrips' else 'spell'}"
+                         f"{'s' if ch['count'] > 1 else ''}.")
+    out = []
+    for p in picked:
+        e = lib.items.get(("spell", str(p["name"]).lower(), str(p.get("source", "PHB")).upper()))
+        if not e:
+            raise ValueError(f"{p['name']} is not in the Library.")
+        lv = int(e.get("level", 0))
+        if ch["kind"] == "cantrips" and lv != 0:
+            raise ValueError(f"{e['name']} is not a cantrip.")
+        if ch["kind"] == "spells":
+            if lv == 0:
+                raise ValueError(f"{e['name']} is a cantrip, not a levelled spell.")
+            if ch.get("exact_level") and lv != ch["exact_level"]:
+                raise ValueError(f"Mystic Arcanum here is a level {ch['exact_level']} spell.")
+            if lv > ch["max_level"]:
+                raise ValueError(f"{e['name']} is level {lv}; your highest spell slot will be level {ch['max_level']}.")
+        if on_list(e["name"], ch["list"], lib) is False:
+            raise ValueError(f"{e['name']} is not on the {ch['list']} spell list.")
+        if e["name"].lower() in have:
+            raise ValueError(f"You already have {e['name']}.")
+        have.add(e["name"].lower())
+        out.append({"type": "spell", "name": e["name"], "source": e.get("source", "PHB")})
+    return out
 
 
 def apply_level_up(char: dict, answers: dict, lib) -> dict:
@@ -164,9 +221,14 @@ def apply_level_up(char: dict, answers: dict, lib) -> dict:
             raise ValueError(f"A d{faces} roll is between 1 and {faces}.")
     else:
         roll = faces // 2 + 1
-    new = {**char, "picks": {**(char.get("picks") or {})}, "options": list(char.get("options") or []), "feats": list(char.get("feats") or [])}
+    new = {**char, "picks": {**(char.get("picks") or {})}, "options": list(char.get("options") or []), "feats": list(char.get("feats") or []),
+           "spells": list(char.get("spells") or [])}
+    have = {str(x.get("name", "")).lower() for x in new["spells"]}
     for ch in plan["choices"]:
         ans = answers.get(ch["id"])
+        if ch["kind"] in SPELL_KINDS:  # optional: spells can also be added later from the Library
+            new["spells"] += _new_spells(ch, ans or [], have, lib)
+            continue
         if not ans:
             raise ValueError(f"Choose your {ch['kind'].replace('_', ' ')} first.")
         if ch["kind"] == "subclass":
