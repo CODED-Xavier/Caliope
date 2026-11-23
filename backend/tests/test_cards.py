@@ -118,9 +118,24 @@ class PortraitTests(unittest.TestCase):
         out, shown = resolve_portraits(text, self.npcs)
         self.assertIn("[[show: Lilia Valenheart | Happy]]", out)
         self.assertIn("[[show: Professor Artemis | Disgusted/Very Angry]]", out)
-        self.assertNotIn("Asmo |", out)  # third character: no picture
+        self.assertIn("Asmo | Happy", out)  # a third character gets a picture too
         self.assertNotIn("http", out)
         self.assertEqual(shown["Lilia Valenheart|Happy"], f"{BASE}/Lilia/2.png")
+
+    def test_a_picture_only_when_the_mood_changes(self):
+        text = ('[[show: Lilia | Standard]]\n"Again."\n\n[[show: Lilia | Standard]]\n"Your stance is off."\n\n'
+                '[[show: Lilia | Blushing]]\n"W-what did you say?"\n\n[[show: Lilia | Standard]]\n"Focus."\n\n'
+                '[[show: Lilia | Standard]]\n"From the top."\n\n[[show: Artemis | Standard]]\n"Enough."\n\n'
+                '[[show: Lilia | Standard]]\n"Yes, Professor."')
+        out, _ = resolve_portraits(text, self.npcs)
+        tags = [line for line in out.split("\n") if line.startswith("[[show:")]
+        self.assertEqual(tags, ["[[show: Lilia Valenheart | Standard]]", "[[show: Lilia Valenheart | Blushing]]",
+                                "[[show: Lilia Valenheart | Standard]]", "[[show: Professor Artemis | Standard]]"])
+
+    def test_up_to_six_characters(self):
+        names = ["Lilia", "Artemis", "Asmo"]
+        out, shown = resolve_portraits("\n\n".join(f'[[show: {n} | Happy]]\n"Hi."' for n in names), self.npcs)
+        self.assertEqual(len(shown), 3)
 
     def test_guess_from_url(self):
         out, shown = resolve_portraits(f"![]({BASE}/Asmo/2.png)\nAsmo waves.", self.npcs)
@@ -265,7 +280,7 @@ class UploadTests(unittest.TestCase):
         from app.portraits import portrait_instructions
         npcs = [{"name": "Mira", "is_main": True, "active": True, "portraits": {"default": "https://x/m.png", "moods": []}}]
         self.assertIn("Start EVERY reply with a line  [[show: Mira | Mood]]", portrait_instructions(npcs, "character"))
-        self.assertIn("At most 2 characters with portraits", portrait_instructions(npcs, "gm_cast"))
+        self.assertIn("ONLY when that character's mood changes", portrait_instructions(npcs, "gm_cast"))
 
 
 class CoverTests(unittest.TestCase):

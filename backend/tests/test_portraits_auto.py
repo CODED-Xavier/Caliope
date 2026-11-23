@@ -23,10 +23,10 @@ class AutoTests(unittest.TestCase):
         self.assertEqual(list(meta["portraits"]), ["Isabel|Happy", "Elara|Happy"])
         self.assertLess(text.index("[[show: Isabel"), text.index("Isabel smirks"))
 
-    def test_mood_from_the_paragraph_and_at_most_two(self):
+    def test_mood_from_the_paragraph_for_each_speaker(self):
         story = ('Lyra glares at you. "Move."\n\nIsabel blushes. "W-what?"\n\nElara sighs. "Again?"')
         _, meta, _ = portraits.process_reply(story, CAST)
-        self.assertEqual(list(meta["portraits"]), ["Lyra|Angry", "Isabel|Blushing"])
+        self.assertEqual(list(meta["portraits"]), ["Lyra|Angry", "Isabel|Blushing", "Elara|Sad"])
 
     def test_tagged_replies_are_left_alone(self):
         _, meta, _ = portraits.process_reply('[[show: Elara | Sad]]\nElara looks down. "Sorry."\nIsabel nods. "Fine."', CAST)

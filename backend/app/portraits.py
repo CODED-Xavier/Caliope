@@ -3,13 +3,16 @@
 The model marks a portrait with a line like  [[show: Lilia Valenheart | Happy]]. Some cards instead ask
 for a markdown image  ![Lilia - Happy](https://...)  and small models often garble those links, so the
 app never trusts the link: it reads the name and the mood, finds the right picture in the character's
-portrait list, and rewrites the line as a clean [[show: ...]] tag. At most two portraits per reply.
+portrait list, and rewrites the line as a clean [[show: ...]] tag.
+
+A character's picture is shown before their first line in a reply, and again only when their mood changes (back to
+Standard included); the same face is never repeated while the mood stays. Up to six characters per reply get pictures.
 """
 from __future__ import annotations
 
 import re
 
-MAX_PER_REPLY = 2
+MAX_PER_REPLY = 6
 
 
 def _url(value) -> str:
@@ -124,7 +127,6 @@ def resolve_portraits(text: str, npcs: list[dict], max_n: int = MAX_PER_REPLY) -
     shown: dict[str, str] = {}
     people: set[str] = set()
     last_mood: dict[str, str] = {}
-    last_who = [""]
 
     def tag(npc: dict | None, mood: str) -> str:
         if not npc or not npc.get("portraits"):
@@ -134,12 +136,11 @@ def resolve_portraits(text: str, npcs: list[dict], max_n: int = MAX_PER_REPLY) -
             return ""
         key = f"{npc['name']}|{label}"
         if npc["name"] not in people and len(people) >= max_n:
-            return ""  # only the two most important characters get a picture
-        if last_mood.get(npc["name"]) == label and last_who[0] == npc["name"]:
-            return ""  # the same face again, nothing changed
+            return ""  # only the most important characters get a picture
+        if last_mood.get(npc["name"]) == label:
+            return ""  # the same face again: the mood hasn't changed
         people.add(npc["name"])
         last_mood[npc["name"]] = label
-        last_who[0] = npc["name"]
         shown[key] = url
         return f"\n[[show: {npc['name']} | {label}]]\n"
 
@@ -233,10 +234,11 @@ def portrait_instructions(npcs: list[dict], mode: str = "gm_world") -> str:
         )
     return (
         "## Portraits\n"
-        "Narrate first. Then, right before a character's spoken line, write a line  [[show: Name | Mood]]  with their mood. "
-        "When their mood changes later in the reply, write the line again with the new mood before they speak again. "
-        "Moods: Standard, Happy, Sad, Angry, Disgusted, Blushing." + extra_line + " At most 2 characters with portraits per "
-        "reply (the 2 most important of the scene). Never write image links or URLs; the app inserts the pictures.\n"
+        "Narrate first. Right before a character's FIRST spoken line in the reply, write a line  [[show: Name | Mood]]  with "
+        "their mood. Write it again ONLY when that character's mood changes (also when they calm down back to Standard), "
+        "right before the line where the new feeling shows; while the mood stays the same, write no new line. "
+        "Moods: Standard, Happy, Sad, Angry, Disgusted, Blushing." + extra_line + " Never write image links or URLs; the app "
+        "inserts the pictures.\n"
         "Characters with portraits: " + ", ".join(names)
     )
 
