@@ -72,6 +72,15 @@ def apply_change(char: dict, change: dict, lib) -> dict:
             char["extras"] = list(char.get("extras") or []) + [{"name": str(value.get("name", ""))[:80], "text": str(value.get("text", ""))[:1500], "homebrew": True}]
         else:
             raise ValueError("Unknown field.")
+    elif op == "start_gear":  # the class's and background's packages, or the class's gold instead
+        from .equipment import apply_start
+        char = apply_start(char, lib, change.get("choice") or {})
+    elif op == "buy":
+        from .equipment import buy
+        char = buy(char, lib, str(change.get("name", "")), str(change.get("source", "PHB")), int(change.get("qty") or 1))
+    elif op == "refund":
+        from .equipment import refund
+        char = refund(char, int(change.get("index", -1)))
     elif op == "pick":
         kind, value = change.get("kind"), change.get("value")
         if kind in ("skills", "expertise"):
@@ -136,6 +145,8 @@ def sync_player(state: dict, lib) -> dict:
         p["notes_before_5e"] = p["notes"]
     p["notes"] = sheet_summary(sheet)
     _sync_bag(state, char, lib)
+    if "cp" in char:  # the sheet's money is the game's money (the Bag shows it)
+        state["gold"] = int(char["cp"]) // 100
     return sheet
 
 

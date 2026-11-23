@@ -17,6 +17,14 @@ def check_add(char: dict, entry: dict, kind: str, lib) -> str:
     sheet = derive(char, lib)
     level = sheet["level"]
     if kind == "spell":
+        cls = _cls(char, lib)
+        if cls:
+            casting = caster_list(char, lib)
+            if not casting:
+                return f"{cls['name']}s don't cast spells{'' if char.get('subclass') else ' (unless a subclass gives magic)'}."
+            from .spell_lists import on_list
+            if on_list(entry["name"], casting, lib) is False:
+                return f"{entry['name']} isn't on the {casting} spell list."
         need = int(entry.get("level", 0))
         top = max([int(k) for k in sheet["slots"]] + ([sheet["pact"]["level"]] if sheet.get("pact") else []) + [0])
         if need > 0 and need > top:
@@ -39,6 +47,23 @@ def check_add(char: dict, entry: dict, kind: str, lib) -> str:
                 return f"{entry['name']} needs level {req['level']}."
             if req.get("spellcasting") and not sheet["slots"] and not sheet.get("pact"):
                 return f"{entry['name']} needs the ability to cast spells."
+    return ""
+
+
+def caster_list(char: dict, lib) -> str:
+    """The class spell list this character learns from ("" for a class without magic). Fighters and rogues whose
+    subclass casts (Eldritch Knight, Arcane Trickster) learn from the Wizard list."""
+    cls = _cls(char, lib)
+    if not cls:
+        return ""
+    if cls.get("spellcastingAbility"):
+        return cls["name"]
+    sub = char.get("subclass") or {}
+    if sub:
+        e = next((v for (k, n, _), v in lib.items.items() if k == "subclass" and n == str(sub.get("name", "")).lower()
+                  and v.get("className") == cls["name"]), None)
+        if e and e.get("spellcastingAbility"):
+            return "Wizard" if e["spellcastingAbility"] == "int" else cls["name"]
     return ""
 
 
@@ -85,7 +110,12 @@ def builder_steps(char: dict, lib) -> list[dict]:
             have = [o["name"] for o in char.get("options") or []]
             steps.append({"id": "style", "title": "Fighting style" if "Fighting Style" in str(cls.get("optionalfeatureProgression")) else "Options",
                           "done": len([h for h in have if h in styles]) >= count, "count": count, "options": styles})
-    steps.append({"id": "equipment", "title": "Equipment", "done": bool(char.get("items")), "type": "baseitem"})
+        casting = caster_list(char, lib)
+        if casting:  # only classes with magic get a spells step, filtered to their own list
+            top = max([int(k) for k in sheet["slots"]] + ([sheet["pact"]["level"]] if sheet.get("pact") else []) + [0])
+            steps.append({"id": "spells", "title": "Spells", "done": bool(char.get("spells")), "type": "spell",
+                          "list": casting, "max_level": top})
+    steps.append({"id": "equipment", "title": "Equipment", "done": bool(char.get("items")) or "start_cp" in char, "type": "baseitem"})
     return steps
 
 

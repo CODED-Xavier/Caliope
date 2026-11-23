@@ -208,6 +208,8 @@ def derive(char: dict, lib) -> dict:
                                     "dtype": "bludgeoning", "range": "5 ft", "properties": [], "proficient": True, "ability": ab})
     sheet["features"] = _features(char, cls, look, level, mods)
     sheet.update(_slots(cls, level))
+    cp = int(char.get("cp") or 0)  # money, kept in copper pieces
+    sheet["coins"] = {"cp_total": cp, "gp": cp // 100, "sp": (cp % 100) // 10, "cp": cp % 10}
     sheet["warnings"] = look.warnings
     return sheet
 

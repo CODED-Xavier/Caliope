@@ -87,6 +87,7 @@ class Library:
 
     def load(self) -> dict:
         self.items = {}
+        self.spell_classes = {}  # from Spells/sources.json, when your files have it (app/dnd5e/spell_lists.py)
         path = self._choices_path()
         try:
             self._apply_choices(json.loads(path.read_text(encoding="utf-8")) if path and path.is_file() else {})
@@ -101,6 +102,11 @@ class Library:
                 continue
             if not isinstance(data, dict):
                 errors.append(f"{path.name}: not a 5e.tools data file")
+                continue
+            if path.name.lower() == "sources.json":  # which classes learn each spell
+                from .spell_lists import load_sources
+                self.spell_classes.update(load_sources(path))
+                files += 1
                 continue
             files += 1
             for kind in TYPES:
@@ -124,14 +130,23 @@ class Library:
         elif kind == "subclass":
             card["class"] = e.get("className", "")
         elif kind == "spell":
+            from .spell_lists import classes_for
             card["level"] = e.get("level", 0)
+            got = classes_for(e["name"], self)
+            if got:
+                card["classes"] = sorted(got)
         elif kind == "subrace":
             card["race"] = e.get("raceName", "")
-        elif kind == "baseitem":
+        elif kind in ("baseitem", "item"):
             card["category"] = item_category(e)
+            if e.get("value"):
+                card["value"] = int(e["value"])  # copper pieces
         return card
 
-    def search(self, kind: str, q: str = "", edition: str = "2014", limit: int = 60, category: str = "", include_hidden: bool = False) -> list[dict]:
+    def search(self, kind: str, q: str = "", edition: str = "2014", limit: int = 60, category: str = "", include_hidden: bool = False,
+               cls: str = "", max_level: int | None = None) -> list[dict]:
+        """cls: only spells on that class's list (spells no list knows stay in); max_level: no higher spells."""
+        from .spell_lists import on_list
         q = (q or "").lower().strip()
         out = []
         for (k, name, _), e in self.items.items():
@@ -141,6 +156,10 @@ class Library:
             if category and item_category(e) != category:
                 continue
             if q and q not in name and q not in str(e.get("className", "")).lower():
+                continue
+            if kind == "spell" and cls and on_list(e["name"], cls, self) is False:
+                continue
+            if kind == "spell" and max_level is not None and int(e.get("level", 0)) > max_level:
                 continue
             out.append({**self._card(kind, e), **({"hidden": True} if hidden else {})})
             if len(out) >= limit:

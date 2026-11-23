@@ -992,3 +992,12 @@ button.s5-ability:hover:not(:disabled) { border-color: var(--accent); }
 .big-map-box { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px; width: min(1200px, 96vw); max-height: 94vh; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 20px 60px #0009; }
 .big-map-scroll { overflow: auto; flex: 1; min-height: 0; display: flex; justify-content: center; }
 .big-map-scroll .battle-grid { width: 100%; max-width: none; height: auto; max-height: 78vh; }
+/* Starting equipment */
+.start-gear { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+.gear-part { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.gear-group { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; border-top: 1px dashed var(--border); }
+.gear-group:first-of-type { border-top: 0; }
+.gear-choices { display: flex; flex-direction: column; gap: 4px; }
+.gear-choice { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; padding: 4px 6px; border-radius: 8px; cursor: pointer; }
+.gear-choice.on { background: var(--bg2); }
+.gear-owned { display: flex; flex-wrap: wrap; gap: 4px; }

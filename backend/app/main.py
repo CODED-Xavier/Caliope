@@ -334,9 +334,10 @@ def library5e():
 
 @app.get("/api/library/5e")
 async def library_search(type: str = Query("spell"), q: str = Query(""), edition: str = Query("2014"), limit: int = Query(60), category: str = Query(""),
-                         hidden: bool = Query(False)):
+                         hidden: bool = Query(False), cls: str = Query(""), max_level: int = Query(-1)):
     lib = await asyncio.to_thread(library5e)
-    return {"results": lib.search(type, q, "2024" if edition == "2024" else "2014", max(1, min(500, limit)), category, include_hidden=hidden)}
+    return {"results": lib.search(type, q, "2024" if edition == "2024" else "2014", max(1, min(500, limit)), category, include_hidden=hidden,
+                                  cls=cls, max_level=None if max_level < 0 else max_level)}
 
 
 @app.get("/api/library/5e/choices")
@@ -432,6 +433,16 @@ async def character_builder(conv_id: int, who: str = Query("")):
     s = svc()
     char = store.char_of(s.conversations.get_state(conv_id), who) or new_character(_edition(s, conv_id))
     return {"steps": await asyncio.to_thread(build.builder_steps, char, library5e()), "methods": build.ABILITY_METHODS}
+
+
+@app.get("/api/conversations/{conv_id}/character/starting")
+async def character_starting(conv_id: int, who: str = Query("")):
+    """The class's and background's starting gear to choose from (or the class's gold instead), and your money."""
+    from .dnd5e import equipment, store
+    from .dnd5e.character import new_character
+    s = svc()
+    char = store.char_of(s.conversations.get_state(conv_id), who) or new_character(_edition(s, conv_id))
+    return await asyncio.to_thread(equipment.starting_options, library5e(), char)
 
 
 @app.get("/api/conversations/{conv_id}/character/levelup")

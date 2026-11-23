@@ -73,15 +73,20 @@ function Details({ type, entry }) {
 }
 
 /** Pick from the Library with big cards (class, race, background, equipment). The ▸ arrow shows what it gives. */
-function OptionCards({ type, edition, onPick, picked, busy, categories }) {
+export const money = (cp) => { // copper pieces -> "15 gp 5 sp"
+  const gp = Math.floor(cp / 100), sp = Math.floor((cp % 100) / 10), c = cp % 10;
+  return [gp && `${gp} gp`, sp && `${sp} sp`, c && `${c} cp`].filter(Boolean).join(" ") || "0 gp";
+};
+
+function OptionCards({ type, edition, onPick, picked, busy, categories, cls = "", maxLevel = -1, buyLabel = "" }) {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [open, setOpen] = useState("");
   const [results, setResults] = useState([]);
   useEffect(() => {
-    const t = setTimeout(() => { api.librarySearch(type, q, edition, cat).then((r) => setResults((r?.results || []).slice(0, 80))).catch(() => setResults([])); }, 200);
+    const t = setTimeout(() => { api.librarySearch(type, q, edition, cat, false, cls, maxLevel).then((r) => setResults((r?.results || []).slice(0, 80))).catch(() => setResults([])); }, 200);
     return () => clearTimeout(t);
-  }, [type, q, edition, cat]);
+  }, [type, q, edition, cat, cls, maxLevel]);
   const detailed = ["class", "race", "background"].includes(type);
   return (
     <>
@@ -103,7 +108,7 @@ function OptionCards({ type, edition, onPick, picked, busy, categories }) {
                 {img && <img className="option-emblem" src={img} alt="" />}
                 <span className="option-text">
                   <span className="option-name">{r.name}</span>
-                  <span className="option-src">{`${r.source}${r.srd ? " · SRD" : ""}${r.category ? ` · ${r.category}` : ""}`}</span>
+                  <span className="option-src">{`${r.source}${r.srd ? " · SRD" : ""}${r.category ? ` · ${r.category}` : ""}${r.level !== undefined && type === "spell" ? (r.level ? ` · level ${r.level}` : " · cantrip") : ""}${buyLabel && r.value ? ` · ${money(r.value)}` : ""}`}</span>
                   {r.summary && !isOpen && <span className="option-sum">{r.summary}</span>}
                 </span>
               </button>
@@ -195,6 +200,76 @@ function Pick({ step, chosen, onSave, busy }) {
   );
 }
 
+/** Starting equipment: the class's and background's packages (pick a or b), or the class's gold instead. */
+function StartGear({ convId, who, busy, onApply }) {
+  const [opt, setOpt] = useState(null);
+  const [mode, setMode] = useState("packages");
+  const [picks, setPicks] = useState({ class: {}, background: {} });
+  const [chosen, setChosen] = useState({ class: {}, background: {} });
+  const [gold, setGold] = useState("");
+  useEffect(() => { api.characterStarting(convId, who).then(setOpt).catch(() => setOpt({})); }, [convId, who]);
+  if (!opt) return <div className="muted tiny">Loading…</div>;
+  const g = opt.class?.gold;
+  const part = (which) => {
+    const o = opt[which];
+    if (!o?.groups?.length) return null;
+    return (
+      <div className="gear-part">
+        <div className="lbl">{which === "class" ? `From your class (${o.name})` : `From your background (${o.name})`}</div>
+        {o.groups.map((grp) => {
+          const key = picks[which][grp.id] || grp.choices[0]?.key;
+          return (
+            <div className="gear-group" key={grp.id}>
+              {grp.fixed.length > 0 && <div className="small">{grp.fixed.map((f) => f.label).join(", ")}</div>}
+              {grp.choices.length > 0 && (
+                <div className="gear-choices">
+                  {grp.choices.map((c) => (
+                    <label key={c.key} className={`gear-choice ${key === c.key ? "on" : ""}`}>
+                      <input type="radio" name={`${which}-${grp.id}`} checked={key === c.key} onChange={() => setPicks({ ...picks, [which]: { ...picks[which], [grp.id]: c.key } })} />
+                      <span><strong>{`(${c.key})`}</strong> {c.label}</span>
+                    </label>
+                  ))}
+                  {(grp.choices.find((c) => c.key === key)?.items || []).map((it, n) => it.pick && (
+                    <select key={n} className="field" value={chosen[which][`${grp.id}.${key}.${n}`] || ""}
+                      onChange={(e) => setChosen({ ...chosen, [which]: { ...chosen[which], [`${grp.id}.${key}.${n}`]: e.target.value } })}>
+                      <option value="">{`Choose ${it.label}…`}</option>
+                      {it.candidates.map((cd) => <option key={`${cd.name}|${cd.source}`} value={`${cd.name}|${cd.source}`}>{cd.name}</option>)}
+                    </select>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+  const roll = () => { const [n, s] = g.dice.split("d").map(Number); let t = 0; for (let i = 0; i < n; i++) t += 1 + Math.floor(Math.random() * s); setGold(String(t * g.times)); };
+  const apply = () => onApply({ op: "start_gear", choice: {
+    ...(mode === "gold" ? { class_gold: Number(gold) } : { class: picks.class, class_picks: chosen.class }),
+    background: picks.background, background_picks: chosen.background } });
+  return (
+    <div className="start-gear">
+      {g && (
+        <div className="chip-row tight">
+          <button type="button" className={`pill ${mode === "packages" ? "on" : ""}`} onClick={() => setMode("packages")}>📦 Take the packages</button>
+          <button type="button" className={`pill ${mode === "gold" ? "on" : ""}`} onClick={() => setMode("gold")}>{`💰 Take the gold instead (${g.dice} × ${g.times} gp)`}</button>
+        </div>
+      )}
+      {mode === "gold" && g ? (
+        <div className="row gap center wrap">
+          <button type="button" className="btn small" onClick={roll}>{`🎲 Roll ${g.dice} × ${g.times}`}</button>
+          <button type="button" className="btn small ghost" onClick={() => setGold(String(g.average))}>{`Take the average (${g.average} gp)`}</button>
+          <input className="field num" value={gold} onChange={(e) => setGold(e.target.value.replace(/\D/g, ""))} aria-label="Gold" />
+          <span className="muted small">gp, then buy what you want below</span>
+        </div>
+      ) : part("class")}
+      {part("background")}
+      <button type="button" className="btn primary" disabled={busy || (mode === "gold" && !gold)} onClick={apply}>Take this equipment</button>
+    </div>
+  );
+}
+
 /**
  * The 5e builder, like Roll20's Charactermancer: one step at a time with big cards. Every choice goes on the sheet
  * at once, so you can close it and come back.
@@ -260,10 +335,28 @@ export default function Builder({ convId, onClose, onChanged, who = "" }) {
               })}
             </div>
           )}
+          {step?.id === "spells" && (
+            <>
+              <div className="muted small">{`Spells from the ${step.list} list${step.max_level ? `, up to level ${step.max_level}` : ": cantrips only for now"}. On your sheet: ${(ch.spells || []).map((x) => x.name).join(", ") || "none yet"}.`}</div>
+              <OptionCards type="spell" edition={edition} busy={busy} cls={step.list} maxLevel={step.max_level} onPick={(ref) => apply({ op: "add", ...ref }, false)} />
+            </>
+          )}
           {step?.id === "equipment" && (
             <>
-              <div className="muted small">{`Weapons and armour from the Library. On your sheet now: ${(ch.items || []).map((x) => x.name).join(", ") || "nothing"}. Tick "worn" on the sheet to wear armour and hold weapons.`}</div>
-              <OptionCards type="baseitem" edition={edition} busy={busy} categories onPick={(ref) => apply({ op: "add", ...ref }, false)} />
+              <StartGear convId={convId} who={who} busy={busy} onApply={(change) => apply(change, false)} />
+              <div className="section-title">{`🛒 Shop · you have ${money(ch.cp || 0)}`}</div>
+              <div className="muted small">Prices from the Library. Bought things can be returned here for the full price.</div>
+              {(ch.items || []).length > 0 && (
+                <div className="gear-owned">
+                  {(ch.items || []).map((it, i) => (
+                    <span key={`${it.name}-${i}`} className="pill small">
+                      {`${it.qty > 1 ? `${it.qty} × ` : ""}${it.name}`}
+                      {it.bought ? <button type="button" className="link-btn" title={`Return it (${money(it.bought)} back)`} onClick={() => apply({ op: "refund", index: i }, false)}> ✕</button> : null}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <OptionCards type="baseitem" edition={edition} busy={busy} categories buyLabel="Buy" onPick={(ref) => apply({ op: "buy", ...ref }, false)} />
             </>
           )}
         </div>

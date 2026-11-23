@@ -1946,7 +1946,11 @@
 "🔥 Point where the spell goes; cones, lines and cubes from you point toward the mouse.": "🔥 Aponte para onde vai a magia; cones, linhas e cubos saem de você na direção do mouse.",
 "nobody inside": "ninguém dentro",
 "the marked square": "o quadrado marcado",
-"your token": "seu token"
+"your token": "seu token",
+"📦 Take the packages": "📦 Ficar com os pacotes",
+"gp, then buy what you want below": "po, depois compre o que quiser abaixo",
+"Take this equipment": "Ficar com este equipamento",
+"Prices from the Library. Bought things can be returned here for the full price.": "Preços da Biblioteca. O que você comprou pode ser devolvido aqui pelo preço cheio."
 },
 "patterns": [
 [
@@ -3124,6 +3128,78 @@
 [
 "{0} ft ({1} m)",
 "{0} pés ({1} m)"
+],
+[
+"From your class ({0})",
+"Da sua classe ({0})"
+],
+[
+"From your background ({0})",
+"Do seu antecedente ({0})"
+],
+[
+"Choose {0}…",
+"Escolha {0}…"
+],
+[
+"💰 Take the gold instead ({0} × {1} gp)",
+"💰 Ficar com o ouro ({0} × {1} po)"
+],
+[
+"🎲 Roll {0} × {1}",
+"🎲 Rolar {0} × {1}"
+],
+[
+"Take the average ({0} gp)",
+"Ficar com a média ({0} po)"
+],
+[
+"Spells from the {0} list. On your sheet: {1}.",
+"Magias da lista de {0}. Na sua ficha: {1}."
+],
+[
+"Spells from the {0} list, up to level {1}. On your sheet: {2}.",
+"Magias da lista de {0}, até o nível {1}. Na sua ficha: {2}."
+],
+[
+"Spells from the {0} list: cantrips only for now. On your sheet: {1}.",
+"Magias da lista de {0}: só truques por enquanto. Na sua ficha: {1}."
+],
+[
+"🛒 Shop · you have {0}",
+"🛒 Loja · você tem {0}"
+],
+[
+"Return it ({0} back)",
+"Devolver ({0} de volta)"
+],
+[
+"{0}s don't cast spells.",
+"{0}s não conjuram magias."
+],
+[
+"{0}s don't cast spells (unless a subclass gives magic).",
+"{0}s não conjuram magias (a menos que uma subclasse dê magia)."
+],
+[
+"{0} isn't on the {1} spell list.",
+"{0} não está na lista de magias de {1}."
+],
+[
+"Not enough money: {0} costs {1}, you have {2}.",
+"Dinheiro insuficiente: {0} custa {1}, você tem {2}."
+],
+[
+"Pick which {0} you take.",
+"Escolha qual {0} você leva."
+],
+[
+"Starting gold is {0} × {1} gp: between {2} and {3}.",
+"O ouro inicial é {0} × {1} po: entre {2} e {3}."
+],
+[
+"Only things you bought can be returned.",
+"Só o que você comprou pode ser devolvido."
 ]
 ]
 }
