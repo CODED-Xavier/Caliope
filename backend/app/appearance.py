@@ -29,7 +29,7 @@ def normalize_appearance(raw) -> dict:
     for key in FIELDS:
         value = " ".join(str(raw.get(key, "") or "").split())
         if value:
-            out[key] = value[:100]
+            out[key] = value[:200]
     return out
 
 

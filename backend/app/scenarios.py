@@ -17,7 +17,7 @@ from .appearance import normalize_appearance
 from .cards import KINDS, default_kind, normalize_features
 from .db import Database
 from .portraits import _url, normalize_portraits  # noqa: F401  (kept here for older imports)
-from .routes import normalize_starts
+from .routes import normalize_default, normalize_starts
 from .places import normalize_places
 from .adventure import normalize_adventure
 from .status import split_template
@@ -135,9 +135,9 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         npcs.append(
             {
                 "name": truncate(str(n["name"]).strip(), 60),
-                "description": truncate(str(n.get("description", "")), 600),
-                "personality": truncate(str(n.get("personality", "")), 600),
-                "speech_style": truncate(str(n.get("speech_style", "")), 300),
+                "description": truncate(str(n.get("description", "")), 1500),
+                "personality": truncate(str(n.get("personality", "")), 800),
+                "speech_style": truncate(str(n.get("speech_style", "")), 400),
                 "appearance": normalize_appearance(n.get("appearance")),
                 "portraits": normalize_portraits(n.get("portraits")),
                 "in_prompt": bool(n.get("in_prompt", True)),
@@ -186,6 +186,7 @@ def normalize_scenario(raw: dict, default_mode: str = "gm_world") -> dict:
         "alternate_openings": [_clip(x, 6000) for x in raw.get("alternate_openings", [])[:10] if str(x).strip()] if isinstance(raw.get("alternate_openings"), list) else [],
         "opening_message": str(raw.get("opening_message", "")),
         "starts": normalize_starts(raw.get("starts")),
+        "default_start": normalize_default(raw.get("default_start")),
         "places": normalize_places(raw.get("places")),
         "fixed_facts": _clip(raw.get("fixed_facts"), 3000),
         "sheet_template": _clip(raw.get("sheet_template"), 2000),

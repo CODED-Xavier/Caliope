@@ -2131,7 +2131,9 @@
 "A character of one route only (like the cult's students) never shows up in the card's other routes": "Um personagem de uma rota só (como os alunos do culto) nunca aparece nas outras rotas do card",
 "Rainy (four seasons, rain much more often)": "Chuvoso (quatro estações, chuva bem mais frequente)",
 "Update from the card (new characters, lore and rules; the story stays)": "Atualizar pelo card (novos personagens, lore e regras; a história continua)",
-"⟳ Update": "⟳ Atualizar"
+"⟳ Update": "⟳ Atualizar",
+"Name on the start screen (e.g. Light route)": "Nome na tela de início (ex.: Rota da luz)",
+"(the card's opening message)": "(a mensagem de abertura do card)"
 },
 "patterns": [
 [
@@ -3885,6 +3887,10 @@
 [
 "This game's card no longer exists.",
 "O card deste jogo não existe mais."
+],
+[
+"(the card's opening message · {0} scenes)",
+"(a mensagem de abertura do card · {0} cenas)"
 ]
 ]
 }

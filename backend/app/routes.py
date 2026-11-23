@@ -46,10 +46,19 @@ def normalize_starts(raw) -> list[dict]:
     return out
 
 
+def normalize_default(raw) -> dict:
+    """The card's default start can have its own name, framing, characters and fixed scenes too (its opening is the
+    card's opening message)."""
+    raw = raw if isinstance(raw, dict) else {}
+    one = normalize_starts([{**raw, "name": raw.get("name") or "Default start", "id": "x"}])[0]
+    return {k: one[k] for k in ("name", "description", "setting", "focus", "scenes")}
+
+
 def starts_of(data: dict) -> list[dict]:
     """Every way to begin this card: the default opening, alternate openings, then the card's own starts."""
-    out = [{"id": "default", "name": "Default start", "description": "The card's own opening.",
-            "opening": data.get("opening_message", ""), "setting": "", "focus": [], "scenes": []}]
+    ds = normalize_default(data.get("default_start"))
+    out = [{"id": "default", "name": ds["name"], "description": ds["description"] or "The card's own opening.",
+            "opening": data.get("opening_message", ""), "setting": ds["setting"], "focus": ds["focus"], "scenes": ds["scenes"]}]
     for i, text in enumerate(data.get("alternate_openings") or []):
         first = re.sub(r"[*_#>\[\]!()]", "", str(text)).strip().split("\n")[0]
         out.append({"id": f"alt-{i + 1}", "name": f"Alternate opening {i + 1}", "description": truncate(first, 140),
@@ -59,9 +68,10 @@ def starts_of(data: dict) -> list[dict]:
 
 
 def resolve(data: dict, start_id: str | None) -> dict | None:
-    """The chosen start, or None for the default."""
+    """The chosen start, or None for a default start that is only the card's opening."""
     if not start_id or start_id == "default":
-        return None
+        first = starts_of(data)[0]
+        return first if (first["setting"] or first["scenes"] or first["focus"]) else None
     for s in starts_of(data):
         if s["id"] == start_id:
             return s

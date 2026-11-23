@@ -378,7 +378,8 @@ function Editor({ initial, id, onCancel, onSaved }) {
       </details>
       <label className="lbl">Opening message <DraftButton field="opening_message" card={d} onText={(t) => set("opening_message", t)} /></label>
       <textarea className="field" rows={4} value={d.opening_message} onChange={(e) => set("opening_message", e.target.value)} />
-      <StartsEditor starts={d.starts} npcs={d.npcs} onChange={(v) => set("starts", v)} />
+      <StartsEditor starts={d.starts} npcs={d.npcs} onChange={(v) => set("starts", v)}
+        defaultStart={d.default_start} onDefault={(v) => set("default_start", v)} />
       <PlacesEditor places={d.places} onChange={(v) => set("places", v)} />
       {d.mode !== "character" && <AdventureEditor cardId={id} adventure={d.adventure} onChange={(v) => set("adventure", v)}
         onImported={(card) => setD((p) => {
@@ -430,7 +431,7 @@ function Editor({ initial, id, onCancel, onSaved }) {
             <label className="row gap center small">Appears in
               <select value={n.route || ""} onChange={(e) => setNpc(i, "route", e.target.value)} title="A character of one route only (like the cult's students) never shows up in the card's other routes">
                 <option value="">every route</option>
-                <option value="default">the default start only</option>
+                <option value="default">{`${d.default_start?.name || "the default start"} only`}</option>
                 {d.starts.map((st) => <option key={st.id || st.name} value={st.id || st.name}>{`${st.name} only`}</option>)}
               </select>
             </label>

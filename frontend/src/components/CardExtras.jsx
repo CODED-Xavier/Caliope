@@ -47,7 +47,8 @@ export function CharacterPreview({ npcs, onClose }) {
 
 /** Starts of a card, as the backend lists them (default, alternate openings, the card's own starts). */
 export function startsOf(card) {
-  const out = [{ id: "default", name: "Default start", description: "The card's own opening." }];
+  const ds = card.default_start || {};
+  const out = [{ id: "default", name: ds.name || "Default start", description: ds.description || "The card's own opening." }];
   (card.alternate_openings || []).forEach((t, i) => {
     const first = String(t).replace(/[*_#>[\]!()]/g, "").trim().split("\n")[0];
     out.push({ id: `alt-${i + 1}`, name: `Alternate opening ${i + 1}`, description: first.length > 140 ? `${first.slice(0, 137)}…` : first });
@@ -76,8 +77,41 @@ export function StartPicker({ card, value, onChange }) {
 
 const SCENE_SPLIT = /\n\s*---+\s*\n/;
 
+/** The parts a start can have besides its name and opening: framing, characters known from the beginning, fixed scenes. */
+function StartFields({ s, names, set, listId }) {
+  return (
+    <>
+      <label className="lbl">How the world is on this route</label>
+      <textarea className="field" rows={3} value={s.setting || ""} onChange={(e) => set("setting", e.target.value)} placeholder="Sent to the Aedo every turn: what is different here, the tone, the goal…" />
+      <label className="lbl">Starts with (characters known from the beginning)</label>
+      <input className="field" list={listId} value={(s.focus || []).join(", ")}
+        onChange={(e) => set("focus", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))}
+        placeholder="Names, separated by commas. Everyone else is met in the story." />
+      <datalist id={listId}>{names.map((n) => <option key={n} value={n} />)}</datalist>
+      <label className="lbl">Fixed scenes, in order <span className="muted tiny">(separate scenes with a line of ---)</span></label>
+      <textarea className="field" rows={5} value={(s.scenes || []).join("\n\n---\n\n")}
+        onChange={(e) => set("scenes", e.target.value.split(SCENE_SPLIT).map((x) => x.trim()).filter(Boolean))}
+        placeholder={"The welcoming ceremony: …\n\n---\n\nThe first night in the dormitory: …"} />
+    </>
+  );
+}
+
+/** Card editor: the default start (the card's opening message) can be named and scripted like the other starts. */
+function DefaultStartEditor({ value, npcs, onChange }) {
+  const s = value || {};
+  const set = (k, v) => onChange({ ...s, [k]: v });
+  return (
+    <details className="card">
+      <summary className="small"><strong>{s.name || "Default start"}</strong> <span className="muted tiny">(the card's opening message{(s.scenes || []).length ? ` · ${s.scenes.length} scenes` : ""})</span></summary>
+      <input className="field" placeholder="Name on the start screen (e.g. Light route)" value={s.name || ""} onChange={(e) => set("name", e.target.value)} />
+      <input className="field" placeholder="One line for the start screen" value={s.description || ""} onChange={(e) => set("description", e.target.value)} />
+      <StartFields s={s} names={(npcs || []).map((n) => n.name)} set={set} listId="default-start-npcs" />
+    </details>
+  );
+}
+
 /** Card editor: the card's own starts (routes). */
-export function StartsEditor({ starts, npcs, onChange }) {
+export function StartsEditor({ starts, npcs, onChange, defaultStart, onDefault }) {
   const list = starts || [];
   const setAt = (i, k, v) => onChange(list.map((s, j) => (j === i ? { ...s, [k]: v } : s)));
   const names = (npcs || []).map((n) => n.name);
@@ -85,6 +119,7 @@ export function StartsEditor({ starts, npcs, onChange }) {
     <>
       <div className="section-title">Starts (routes) <HelpTip id="card_starts" /> <span className="muted tiny">({list.length}/8)</span></div>
       <div className="muted tiny">The card's opening message is the default start. Add other ways into the same world: their own opening, how the world differs on this route, who the story starts with, and scenes the Aedo plays in order.</div>
+      {onDefault && <DefaultStartEditor value={defaultStart} npcs={npcs} onChange={onDefault} />}
       {list.map((s, i) => (
         <div className="card" key={i}>
           <div className="row gap center">
@@ -94,17 +129,7 @@ export function StartsEditor({ starts, npcs, onChange }) {
           <input className="field" placeholder="One line for the start screen" value={s.description || ""} onChange={(e) => setAt(i, "description", e.target.value)} />
           <label className="lbl">Opening message</label>
           <textarea className="field" rows={4} value={s.opening || ""} onChange={(e) => setAt(i, "opening", e.target.value)} placeholder="The first scene the player sees (leave empty to use the card's opening)" />
-          <label className="lbl">How the world is on this route</label>
-          <textarea className="field" rows={3} value={s.setting || ""} onChange={(e) => setAt(i, "setting", e.target.value)} placeholder="Sent to the Aedo every turn: what is different here, the tone, the goal…" />
-          <label className="lbl">Starts with (characters known from the beginning)</label>
-          <input className="field" list="start-npcs" value={(s.focus || []).join(", ")}
-            onChange={(e) => setAt(i, "focus", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))}
-            placeholder="Names, separated by commas. Everyone else is met in the story." />
-          <datalist id="start-npcs">{names.map((n) => <option key={n} value={n} />)}</datalist>
-          <label className="lbl">Fixed scenes, in order <span className="muted tiny">(separate scenes with a line of ---)</span></label>
-          <textarea className="field" rows={5} value={(s.scenes || []).join("\n\n---\n\n")}
-            onChange={(e) => setAt(i, "scenes", e.target.value.split(SCENE_SPLIT).map((x) => x.trim()).filter(Boolean))}
-            placeholder={"The welcoming ceremony: …\n\n---\n\nThe first night in the dormitory: …"} />
+          <StartFields s={s} names={names} set={(k, v) => setAt(i, k, v)} listId={`start-npcs-${i}`} />
         </div>
       ))}
       {list.length < 8 && <button className="btn small" onClick={() => onChange([...list, { name: "", description: "", opening: "", setting: "", focus: [], scenes: [] }])}>＋ Add a start</button>}

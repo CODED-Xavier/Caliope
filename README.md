@@ -279,6 +279,8 @@ A card can be entered in different ways. In the card editor, under *Opening mess
 - **who the story starts with**: everyone else is met in the story
 - **fixed scenes**, played one per reply in order and adapted to what you do (separate them with a line of `---`)
 
+The **default start** (the card's own opening message) can have all of this too: open it at the top of the Starts list to give it a name for the start screen, its framing, its characters and its fixed scenes (Lumencia's *Light route: Enrolment Day* uses it).
+
 A character in the card's list can be set to **Appears in: <a start> only**: they exist only in games begun from that start (the cult's Seminary students never walk into the academy route).
 
 ### Facts, secrets and the ending
@@ -596,6 +598,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.29.0 | Your turn by the 5e rules (action, bonus action, movement, reaction, End turn) with the option list sorted by cost; companions with 5e sheets built by the system around your hero or step by step; class and race emblems; ▸ details on classes, races and backgrounds; equipment categories; one Sheet tab (Status merged into it); the sheet owns gear and notes; fight damage reaches the sheet; the Aedo no longer acts for you when the app starts a fight; personas bring their world additions |
 | 2.29.1 | A book's placeholder classes are left out of the builder; hide repeated entries and choose each book's rules list (2014, 2024 or both) in the Library |
 | 2.30.0 | 📦 Export on every card tile and in the card editor; "Want to describe it?" after each part of your turn; the round card told by turns with your words and companion flavour; portrait tokens on the battle map; companion pictures on their sheets; 18 more race emblems (Goliath, Halfling, Minotaur, Kobold, Lizardfolk, Satyr, Vampire…) |
+| 2.43.0 | The card's default start can have its own name, framing and fixed scenes, like the other starts; characters keep longer texts (description 1500 characters, looks 200 per field) |
 | 2.42.0 | ⟳ Update from the card: a running game takes the card's new characters, lore, rules, calendar and sheet, keeping its story, relationships and changes |
 | 2.41.2 | 12 more race emblems: gnoll, grimlock, hadozee, harengon, hexblood, hobgoblin, kalashtar, kenku, khenra, khoravar, reborn, firbolg |
 | 2.41.1 | New PixelLab emblems: 16 more races (aarakocra, aetherborn, aven, bugbear, bullywug, centaur, changeling, duergar, genasi, flamekin, giff, gith, githyanki, githzerai, grung, kithkin, half-elf) and 9 background types (acolyte, criminal, noble, sage, soldier, sailor, outlander, artisan, hermit) shown in the character builder |
