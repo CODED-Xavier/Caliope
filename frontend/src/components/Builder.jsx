@@ -11,11 +11,24 @@ const roll4d6 = () => { const d = Array.from({ length: 4 }, () => 1 + Math.floor
 
 const CLASS_EMBLEMS = ["artificer", "barbarian", "bard", "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"];
 // race slugs with an emblem in /emblems/race-<slug>.png (most specific first: "half-orc" before "orc")
-const RACE_EMBLEMS = ["custom-lineage", "shadar-kai", "half-orc", "half-elf", "dragonborn", "tiefling", "aasimar", "warforged", "autognome", "lizardfolk", "shifter", "triton",
+const RACE_EMBLEMS = ["custom-lineage", "shadar-kai", "half-orc", "half-elf", "aarakocra", "aetherborn", "aven", "bugbear", "bullywug", "centaur",
+  "changeling", "duergar", "genasi", "flamekin", "giff", "githyanki", "githzerai", "gith", "grung", "kithkin", "dragonborn", "tiefling", "aasimar", "warforged", "autognome", "lizardfolk", "shifter", "triton",
   "goblin", "gnome", "dwarf", "human", "fairy", "faerie", "drow", "eladrin", "goliath", "halfling", "minotaur", "boggart", "kobold", "kender", "lupin",
   "merfolk", "vampire", "dhampir", "satyr", "skeleton", "elf", "orc"];
 // races without their own emblem borrow a kin's (a duergar is a dwarf, a hobgoblin a goblinoid, a firbolg giant-kin…)
-const RACE_KIN = { duergar: "dwarf", hobgoblin: "goblin", bugbear: "goblin", kithkin: "halfling", khoravar: "half-elf", firbolg: "goliath", gnoll: "lupin" };
+const RACE_KIN = { hobgoblin: "goblin", khoravar: "half-elf", firbolg: "goliath", gnoll: "lupin" };
+// backgrounds share 12 emblems by type (/emblems/bg-<type>.png): the first matching word wins
+const BG_EMBLEMS = [
+  ["acolyte", ["acolyte", "inquisitor", "initiate", "pilgrim", "priest", "cleric", "cloistered", "faith", "temple"]],
+  ["criminal", ["criminal", "charlatan", "grinner", "faceless", "smuggler", "thief", "spy", "rogue"]],
+  ["noble", ["noble", "courtier", "inheritor", "heir", "aristocrat", "knight"]],
+  ["sage", ["sage", "scholar", "archaeologist", "investigator", "researcher", "scribe", "wizard"]],
+  ["soldier", ["soldier", "guard", "watch", "mercenary", "veteran", "fist", "militia"]],
+  ["sailor", ["sailor", "fisher", "freebooter", "pirate", "ship", "marine"]],
+  ["outlander", ["outlander", "guide", "feylost", "foundling", "hunter", "ranger", "wilderness", "nomad"]],
+  ["artisan", ["artisan", "crafter", "farmer", "merchant", "guild", "smith", "builder"]],
+  ["hermit", ["hermit", "haunted", "far-traveler", "traveler", "wanderer", "recluse"]],
+];
 const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** The emblem shown on a class (or race) card; classes without their own get the generic one. */
@@ -27,6 +40,7 @@ export function emblemFor(type, name) {
     const r = kin ? RACE_KIN[kin] : RACE_EMBLEMS.find((x) => n === x || n.startsWith(`${x}-`) || n.endsWith(`-${x}`));
     return r ? `/emblems/race-${r}.png` : "";
   }
+  if (type === "background") { const b = BG_EMBLEMS.find(([, words]) => words.some((w) => n.includes(w))); return b ? `/emblems/bg-${b[0]}.png` : ""; }
   return "";
 }
 
