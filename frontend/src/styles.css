@@ -1024,3 +1024,10 @@ button.s5-ability:hover:not(:disabled) { border-color: var(--accent); }
 .arsenal .move-name { color: var(--accent); letter-spacing: 0.02em; }
 .translate-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
 .translate-bar progress { flex: 1; height: 6px; }
+
+/* Jukebox library */
+.mood-cloud { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }
+.mood-cloud .chip.empty { opacity: 0.45; }
+.chip.suggested { border-style: dashed; }
+.bulk-bar { position: sticky; top: 0; z-index: 2; }
+.jb-pick { max-width: 110px; padding: 2px 4px; }

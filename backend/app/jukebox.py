@@ -14,7 +14,7 @@ from pathlib import Path
 from .util import now, truncate
 
 MOODS = ("calm", "tavern", "exploration", "town", "forest", "dungeon", "mystery", "tension", "combat", "boss",
-         "victory", "sad", "romantic", "horror", "epic")
+         "victory", "sad", "romantic", "horror", "epic", "academy", "festival", "night", "training")
 MAX_AUDIO_BYTES = 40 * 1024 * 1024
 FILE_NAME = r"^[0-9a-f]{40}\.(mp3|ogg|wav|flac|m4a|webm)$"
 
@@ -49,20 +49,56 @@ def clean_tags(tags) -> list[str]:
     return out
 
 
-# Keyword check used when the tracker is off (or did not name a mood).
+# Keyword check used when the tracker is off (or did not name a mood); English and Portuguese stories.
 _MOOD_WORDS = {
-    "combat": r"\b(attack|sword|blade|fight|battle|strike|arrow|blood|charge|parry|dodge)\w*",
-    "horror": r"\b(scream|corpse|rot|shadow\w* move|whisper\w* in the dark|dread|ghoul|undead|nightmare)\w*",
-    "tavern": r"\b(tavern|inn|ale|mug|bartender|innkeeper|stew|bard)\w*",
-    "town": r"\b(market|street|square|guard|merchant|shop|crowd|city|village)\w*",
-    "forest": r"\b(forest|trees|woods|leaves|grove|path through)\w*",
-    "dungeon": r"\b(dungeon|crypt|tomb|corridor|cell|torch\w* flicker|stone stairs)\w*",
-    "mystery": r"\b(clue|strange|secret|riddle|hidden|mysterious|letter)\w*",
-    "tension": r"\b(silence|footsteps|watch\w*|hold your breath|careful|trap|ambush)\w*",
-    "sad": r"\b(tears|grief|funeral|mourn|loss|cry|weep)\w*",
-    "romantic": r"\b(kiss|blush|heart\w* race|gentle touch|embrace)\w*",
-    "victory": r"\b(victory|triumph|cheer|celebrat|reward)\w*",
+    "combat": r"\b(attack|sword|blade|fight|battle|strike|arrow|blood|charge|parry|dodge|ataca|ataque|espada|lâmina|luta|batalha|golpe|flecha|sangue|esquiva)\w*",
+    "horror": r"\b(scream|corpse|rot|shadow\w* move|whisper\w* in the dark|dread|ghoul|undead|nightmare|grito|cadáver|pesadelo|morto-vivo|pavor)\w*",
+    "tavern": r"\b(tavern|inn|ale|mug|bartender|innkeeper|stew|bard|taverna|estalagem|cerveja|caneca|taberneir|bardo)\w*",
+    "town": r"\b(market|street|square|guard|merchant|shop|crowd|city|village|mercado|rua|praça|guarda|mercador|loja|multidão|cidade|vila)\w*",
+    "forest": r"\b(forest|trees|woods|leaves|grove|path through|floresta|árvore|bosque|folhas|mata)\w*",
+    "dungeon": r"\b(dungeon|crypt|tomb|corridor|cell|torch\w* flicker|stone stairs|masmorra|cripta|tumba|corredor|cela|escadaria de pedra)\w*",
+    "mystery": r"\b(clue|strange|secret|riddle|hidden|mysterious|letter|pista|estranh|segredo|enigma|escondid|misterios|carta)\w*",
+    "tension": r"\b(silence|footsteps|watch\w*|hold your breath|careful|trap|ambush|silêncio|passos|cuidado|armadilha|emboscada)\w*",
+    "sad": r"\b(tears|grief|funeral|mourn|loss|cry|weep|lágrima|luto|perda|chora|pranto)\w*",
+    "romantic": r"\b(kiss|blush|heart\w* race|gentle touch|embrace|beijo|cora|abraço|coração dispara|toque gentil)\w*",
+    "victory": r"\b(victory|triumph|cheer|celebrat|reward|vitória|triunfo|comemora|celebra|recompensa)\w*",
+    "academy": r"\b(class|classroom|lecture|professor|student|campus|academy|lesson|exam|aula|sala de aula|professora?|alun|estudante|academia|lição|prova)\w*",
+    "festival": r"\b(festival|dance|ball|feast|party|music plays|parade|festa|baile|dança|banquete|desfile)\w*",
+    "night": r"\b(night|moon|stars|moonlight|midnight|lantern|noite|lua|estrelas|luar|meia-noite|lanterna)\w*",
+    "training": r"\b(training|drill|practice|spar|sparring|exercise|treino|treina|exercício|prática)\w*",
 }
+
+# Words in a song's name (or file name) that say its mood: "Boss Battle Theme", "sad_piano", "Taverna do Porto"
+_NAME_WORDS = {
+    "combat": r"battle|fight|combat|war|clash|skirmish|luta|batalha|combate|guerra|duel",
+    "boss": r"boss|final|chefe|dragon|dragão|showdown",
+    "victory": r"victory|fanfare|triumph|win|vitória|triunfo|celebrat",
+    "tavern": r"tavern|inn|pub|taverna|estalagem|bar\b|drinking|jig|bard",
+    "town": r"town|village|city|market|cidade|vila|mercado|castle|castelo|kingdom|reino",
+    "forest": r"forest|woods|grove|nature|floresta|bosque|mata|elven",
+    "dungeon": r"dungeon|cave|crypt|catacomb|masmorra|caverna|cripta|ruins|ruínas",
+    "mystery": r"myster|secret|enigma|mistério|segredo|puzzle|investigat",
+    "tension": r"tension|suspense|stealth|danger|tensão|perigo|sneak|chase",
+    "horror": r"horror|creepy|haunt|terror|dark ambient|ghost|fantasma|assombr",
+    "sad": r"sad|sorrow|lament|grief|triste|melanchol|tears|lágrimas|requiem",
+    "romantic": r"love|romance|romantic|amor|romântic|heart|coração",
+    "epic": r"epic|heroic|hero|legend|épic|heroi|herói|lenda|anthem|hino|orchestral",
+    "calm": r"calm|peace|relax|ambient|piano|lullaby|calma|paz|tranquil|serene|rest|descanso",
+    "exploration": r"explor|journey|adventure|travel|road|viagem|aventura|jornada|overworld|field",
+    "academy": r"school|academy|class|campus|escola|academia|aula|study",
+    "festival": r"festival|dance|ball|waltz|party|festa|baile|dança|valsa|carnival",
+    "night": r"night|moon|midnight|noite|lua|nocturne|noturno|stars|estrelas",
+    "training": r"training|practice|drill|treino|workout|spar",
+}
+
+
+def suggest_tags(name: str) -> list[str]:
+    """Moods a song's name suggests (up to 3): "Final Boss Battle" -> boss, combat."""
+    low = re.sub(r"[_\-.]+", " ", (name or "").lower())
+    found = [m for m, p in _NAME_WORDS.items() if re.search(rf"\b(?:{p})", low)]
+    if "boss" in found and "combat" not in found:
+        found.append("combat")
+    return found[:3]
 
 
 def guess_mood(text: str) -> str:
@@ -88,11 +124,15 @@ class MusicLibrary:
 
     @staticmethod
     def _row(r) -> dict:
+        tags = json.loads(r["tags"] or "[]")
         return {"id": r["id"], "name": r["name"], "url": r["url"] or f"/api/music/files/{r['file']}",
-                "source": "link" if r["url"] else "file", "tags": json.loads(r["tags"] or "[]"),
-                "cards": json.loads(r["cards"] or "[]")}
+                "source": "link" if r["url"] else "file", "tags": tags,
+                "cards": json.loads(r["cards"] or "[]"),
+                "suggested": [m for m in suggest_tags(r["name"]) if m not in tags]}
 
     def _insert(self, name: str, url: str, file: str, tags, cards) -> dict:
+        if not clean_tags(tags):  # no mood chosen: the song's name says it ("Tavern Jig" -> tavern)
+            tags = suggest_tags(name or url.rsplit("/", 1)[-1])
         cur = self.db.execute("INSERT INTO tracks(name, url, file, tags, cards, created_at) VALUES(?,?,?,?,?,?)",
                               (truncate(name.strip() or "Song", 80), url, file, json.dumps(clean_tags(tags)),
                                json.dumps(_ids(cards)), now()))
@@ -130,6 +170,31 @@ class MusicLibrary:
         if cards is not None:
             self.db.execute("UPDATE tracks SET cards = ? WHERE id = ?", (json.dumps(_ids(cards)), track_id))
         return self.get(track_id)
+
+    def autotag(self) -> int:
+        """Untagged songs get the moods their names suggest. Returns how many were tagged."""
+        n = 0
+        for r in self.db.query("SELECT id, name, tags FROM tracks"):
+            if not json.loads(r["tags"] or "[]"):
+                got = suggest_tags(r["name"])
+                if got:
+                    self.db.execute("UPDATE tracks SET tags = ? WHERE id = ?", (json.dumps(got), r["id"]))
+                    n += 1
+        return n
+
+    def bulk(self, ids, add=None, remove=None) -> int:
+        """Add or take away moods on several songs at once."""
+        add, remove = clean_tags(add or []), set(clean_tags(remove or []))
+        n = 0
+        for track_id in _ids(ids):
+            try:
+                t = self.get(track_id)
+            except MusicError:
+                continue
+            tags = [x for x in t["tags"] if x not in remove] + [x for x in add if x not in t["tags"]]
+            self.update(track_id, tags=tags)
+            n += 1
+        return n
 
     def delete(self, track_id: int) -> None:
         row = self.db.query_one("SELECT file FROM tracks WHERE id = ?", (track_id,))

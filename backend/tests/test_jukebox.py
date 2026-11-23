@@ -48,6 +48,35 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(clean_tags("combat, boss,  x"), ["combat", "boss"])
 
 
+class TaggingTests(unittest.TestCase):
+    def test_moods_from_song_names(self):
+        from app.jukebox import suggest_tags
+        self.assertEqual(suggest_tags("Final_Boss-Battle"), ["combat", "boss"])
+        self.assertIn("tavern", suggest_tags("Taverna do Porto (jig)"))
+        self.assertIn("night", suggest_tags("Moonlit Nocturne"))
+        self.assertEqual(suggest_tags("track 07"), [])
+
+    def test_new_moods_in_portuguese_stories(self):
+        self.assertEqual(guess_mood("A professora começa a aula; os alunos abrem os cadernos na sala de aula."), "academy")
+        self.assertEqual(guess_mood("Sob a lua, as estrelas brilham na noite fria."), "night")
+
+    def test_autotag_and_bulk(self):
+        import tempfile
+        from pathlib import Path
+        from app.db import Database
+        from app.jukebox import MusicLibrary
+        m = MusicLibrary(Database(":memory:"), Path(tempfile.mkdtemp()))
+        a = m.add_link("https://x.example/epic_battle.mp3", "Epic Battle")
+        self.assertEqual(a["tags"], ["combat", "epic"])  # tagged by its name when no mood was picked
+        b = m.add_link("https://x.example/b.mp3", "Song B", tags=["calm"])
+        m.update(b["id"], name="Rainy Night Piano", tags=[])
+        self.assertEqual(m.get(b["id"])["suggested"], ["calm", "night"])
+        self.assertEqual(m.autotag(), 1)
+        self.assertEqual(m.get(b["id"])["tags"], ["calm", "night"])
+        self.assertEqual(m.bulk([a["id"], b["id"], 999], add=["academy"], remove=["calm"]), 2)
+        self.assertEqual(m.get(b["id"])["tags"], ["night", "academy"])
+
+
 class SceneMoodTests(unittest.IsolatedAsyncioTestCase):
     async def test_tracker_sets_scene_mood(self):
         llm = FakeLLM()

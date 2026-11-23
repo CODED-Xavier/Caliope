@@ -2191,7 +2191,23 @@
 " is imported once.": " é importado uma vez.",
 "A rule set needs a name and its rules.": "Um conjunto de regras precisa de nome e das regras.",
 "Core rules": "Regras principais",
-"Core rules ✓": "Regras principais ✓"
+"Core rules ✓": "Regras principais ✓",
+"academy": "academia",
+"festival": "festival",
+"training": "treino",
+"Mood…": "Humor…",
+"Play this mood": "Tocar este humor",
+"Search songs…": "Buscar músicas…",
+"✨ Tag by name": "✨ Marcar pelo nome",
+"Give untagged songs the moods their names suggest": "Dá às músicas sem tag os humores que os nomes sugerem",
+"No untagged song has a name that says its mood.": "Nenhuma música sem tag tem um nome que diga o humor.",
+"Click a mood to add it to all of them; right-click to take it away.": "Clique num humor para pôr em todas; botão direito para tirar.",
+"Tick to tag many songs at once": "Marque para pôr tags em várias músicas de uma vez",
+"Its name suggests:": "O nome sugere:",
+"Add this mood": "Adicionar este humor",
+"No song has this mood yet": "Nenhuma música tem este humor ainda",
+"(none picked: the song's name chooses, e.g. \"Tavern Jig\" → tavern)": "(nenhum escolhido: o nome da música escolhe, ex.: \"Tavern Jig\" → taverna)",
+"Moods for the songs you add now ": "Humores das músicas que você adicionar agora "
 },
 "patterns": [
 [
@@ -3985,6 +4001,26 @@
 [
 "Reading {0} ({1}/{2})",
 "Lendo {0} ({1}/{2})"
+],
+[
+"Untagged ({0})",
+"Sem tag ({0})"
+],
+[
+"Tagged {0} songs by their names.",
+"{0} músicas marcadas pelos nomes."
+],
+[
+"{0} songs ticked",
+"{0} músicas marcadas"
+],
+[
+"{0} songs",
+"{0} músicas"
+],
+[
+"＋ {0}",
+"＋ {0}"
 ]
 ]
 }

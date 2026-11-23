@@ -11,6 +11,7 @@ const FALLBACK = {
   horror: ["tension", "mystery"], mystery: ["tension", "calm"], tavern: ["town", "calm"], town: ["tavern", "calm"],
   forest: ["exploration", "calm"], dungeon: ["tension", "mystery", "exploration"], exploration: ["forest", "calm"],
   sad: ["calm", "romantic"], romantic: ["calm", "sad"], epic: ["combat", "exploration"], calm: ["exploration", "tavern"],
+  academy: ["calm", "town"], festival: ["tavern", "town", "romantic"], night: ["calm", "mystery"], training: ["epic", "combat"],
 };
 
 function loadPrefs() {
@@ -50,7 +51,7 @@ export function JukeboxPlayer({ game, tracks, onOpenLibrary }) {
   const combat = game?.state?.combat;
   const fighting = !!combat?.active;
   const won = combat && !combat.active && combat.combatants?.filter((c) => c.side === "enemy").every((c) => c.hp <= 0);
-  let mood = fighting ? "combat" : game?.state?.scene_mood || "calm";
+  let mood = fighting ? "combat" : (!prefs.auto && prefs.mood) || game?.state?.scene_mood || "calm";
   if (fighting && combat.combatants?.some((c) => c.side === "enemy" && /boss|dragon|lord|queen|king|demon/i.test(c.name))) mood = "boss";
 
   const play = useCallback((track) => {
@@ -123,6 +124,15 @@ export function JukeboxPlayer({ game, tracks, onOpenLibrary }) {
       </button>
       <input type="range" min="0" max="1" step="0.05" value={prefs.volume} title="Volume" onChange={(e) => savePrefs({ ...prefs, volume: parseFloat(e.target.value) })} />
       <label className="jb-auto" title="Auto: the music follows the mood of the scene"><input type="checkbox" checked={prefs.auto} onChange={(e) => savePrefs({ ...prefs, auto: e.target.checked })} />Auto</label>
+      {!prefs.auto && (
+        <select className="field jb-pick" title="Play this mood" value={prefs.mood || ""} onChange={(e) => {
+          const m = e.target.value; savePrefs({ ...prefs, mood: m });
+          if (m) play(pickTrack(tracks, m, cardId, current?.id));
+        }}>
+          <option value="">Mood…</option>
+          {[...new Set(tracks.flatMap((t) => t.tags))].sort().map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+      )}
     </div>
   );
 }
@@ -138,6 +148,9 @@ export function JukeboxModal({ onClose, onChanged }) {
   const [newTags, setNewTags] = useState([]);
   const [filter, setFilter] = useState("");
   const [preview, setPreview] = useState(null);
+  const [search, setSearch] = useState("");
+  const [picked, setPicked] = useState({}); // songs ticked for tagging many at once
+  const [note, setNote] = useState("");
   const fileRef = useRef(null);
   const audio = useRef(null);
 
@@ -168,7 +181,17 @@ export function JukeboxModal({ onClose, onChanged }) {
     audio.current.play().then(() => setPreview(t.id)).catch((e) => setError(`Cannot play this song: ${e.message}`));
   };
   const toggleTag = (list, m) => (list.includes(m) ? list.filter((x) => x !== m) : [...list, m]);
-  const shown = filter ? tracks.filter((t) => t.tags.includes(filter)) : tracks;
+  const shown = tracks.filter((t) => (filter === "untagged" ? !t.tags.length : !filter || t.tags.includes(filter))
+    && (!search.trim() || t.name.toLowerCase().includes(search.trim().toLowerCase())));
+  const pickedIds = Object.keys(picked).filter((k) => picked[k]).map(Number);
+  const bulk = async (patch) => {
+    try { const r = await api.bulkMusic({ ids: pickedIds, ...patch }); setTracks(r.tracks); onChanged?.(r.tracks); } catch (e) { setError(e.message); }
+  };
+  const autotag = async () => {
+    try { const r = await api.autotagMusic(); setTracks(r.tracks); onChanged?.(r.tracks); setNote(r.tagged ? `Tagged ${r.tagged} songs by their names.` : "No untagged song has a name that says its mood."); }
+    catch (e) { setError(e.message); }
+  };
+  const untagged = tracks.filter((t) => !t.tags.length).length;
 
   return (
     <Modal title="Jukebox" onClose={onClose} wide>
@@ -177,7 +200,7 @@ export function JukeboxModal({ onClose, onChanged }) {
         mood of each scene, plays combat music during fights and a victory song when you win. <HelpTip id="jukebox" /></p>
 
       <div className="card">
-        <div className="small">Moods for the songs you add now:</div>
+        <div className="small">Moods for the songs you add now <span className="muted tiny">(none picked: the song's name chooses, e.g. "Tavern Jig" → tavern)</span>:</div>
         <div className="conds">
           {moods.map((m) => <button key={m} className={`chip ${newTags.includes(m) ? "on" : ""}`} onClick={() => setNewTags(toggleTag(newTags, m))}>{m}</button>)}
         </div>
@@ -195,22 +218,47 @@ export function JukeboxModal({ onClose, onChanged }) {
       </div>
       {error && <div className="error-text small">{error}</div>}
 
-      <div className="row gap center">
+      <div className="row gap center wrap">
         <div className="section-title grow">Your songs ({tracks.length})</div>
+        <input className="field" style={{ width: 180 }} placeholder="Search songs…" value={search} onChange={(e) => setSearch(e.target.value)} />
         <select className="field" value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="">All moods</option>
+          <option value="untagged">{`Untagged (${untagged})`}</option>
           {moods.map((m) => <option key={m} value={m}>{m} ({tracks.filter((t) => t.tags.includes(m)).length})</option>)}
         </select>
+        {untagged > 0 && <button className="btn small" onClick={autotag} title="Give untagged songs the moods their names suggest">✨ Tag by name</button>}
       </div>
+      {note && <div className="muted small">{note}</div>}
+      <div className="mood-cloud">
+        {moods.map((m) => { const n = tracks.filter((t) => t.tags.includes(m)).length; return (
+          <button key={m} className={`chip ${filter === m ? "on" : ""} ${n ? "" : "empty"}`} title={n ? `${n} songs` : "No song has this mood yet"}
+            onClick={() => setFilter(filter === m ? "" : m)}>{m} <span className="tiny">{n}</span></button>); })}
+      </div>
+      {pickedIds.length > 0 && (
+        <div className="card bulk-bar">
+          <div className="row gap center"><strong className="small grow">{`${pickedIds.length} songs ticked`}</strong>
+            <button className="btn small ghost" onClick={() => setPicked({})}>Clear</button></div>
+          <div className="small muted">Click a mood to add it to all of them; right-click to take it away.</div>
+          <div className="conds">
+            {moods.map((m) => <button key={m} className="chip" onClick={() => bulk({ add: [m] })} onContextMenu={(e) => { e.preventDefault(); bulk({ remove: [m] }); }}>{m}</button>)}
+          </div>
+        </div>
+      )}
       {shown.length === 0 && <div className="muted small">No songs yet.</div>}
       {shown.map((t) => (
         <div className="card track" key={t.id}>
           <div className="row gap center">
+            <input type="checkbox" title="Tick to tag many songs at once" checked={!!picked[t.id]} onChange={(e) => setPicked((x) => ({ ...x, [t.id]: e.target.checked }))} />
             <button className="icon-btn" title={preview === t.id ? "Stop" : "Listen"} onClick={() => listen(t)}>{preview === t.id ? "⏹" : "▶"}</button>
             <input className="field grow" defaultValue={t.name} onBlur={(e) => e.target.value.trim() && e.target.value !== t.name && update(t, { name: e.target.value })} />
             <span className="muted tiny">{t.source === "link" ? "link" : "file"}</span>
             <button className="icon-btn" title="Delete" onClick={async () => { if (await ask.confirm(`Delete "${t.name}"?`)) { await api.deleteMusic(t.id).catch((e) => setError(e.message)); load(); } }}>🗑</button>
           </div>
+          {(t.suggested || []).length > 0 && (
+            <div className="row gap center small"><span className="muted tiny">Its name suggests:</span>
+              {t.suggested.map((m) => <button key={m} className="chip suggested" title="Add this mood" onClick={() => update(t, { tags: [...t.tags, m] })}>＋ {m}</button>)}
+            </div>
+          )}
           <div className="conds">
             {moods.map((m) => <button key={m} className={`chip ${t.tags.includes(m) ? "on" : ""}`} onClick={() => update(t, { tags: toggleTag(t.tags, m) })}>{m}</button>)}
           </div>

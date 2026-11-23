@@ -834,6 +834,18 @@ async def add_music_link(body: dict[str, Any] = Body(...)):
     return svc().music.add_link(str(body.get("url", "")), str(body.get("name", "")), body.get("tags"), body.get("cards"))
 
 
+@app.post("/api/music/autotag")
+async def autotag_music():
+    """✨ Untagged songs get the moods their names suggest."""
+    return {"tagged": svc().music.autotag(), "tracks": svc().music.list()}
+
+
+@app.post("/api/music/bulk")
+async def bulk_music(body: dict[str, Any] = Body(...)):
+    """Add or take away moods on several songs at once."""
+    return {"changed": svc().music.bulk(body.get("ids"), body.get("add"), body.get("remove")), "tracks": svc().music.list()}
+
+
 @app.patch("/api/music/{track_id}")
 async def update_music(track_id: int, body: dict[str, Any] = Body(...)):
     return svc().music.update(track_id, body.get("name"), body.get("tags"), body.get("cards"))
