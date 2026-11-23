@@ -435,7 +435,11 @@ After each reply a short second call (the **tracker**) notes what changed. On qu
 
 ## 8. Rulebooks and skills
 
-**📚 Rules** → import a PDF or text rulebook, then tick it in a card's *Rulebooks*.
+**📚 Compendium** (Rules in the sidebar): rule sets and rulebooks, saved once and ticked on each card (card editor → *Rule sets & rulebooks*).
+- **＋ New rule set:** your own short rules (the Combat Spectrums, a magic system, house rules), with when they reach the Aedo: **Always**, **In fights and shows of power** (a fight is on, or the turn talks of attacking, duels, strikes, speed, power… in English or Portuguese; add your own words), or **When these words appear** (your trigger words). Rules that don't apply this turn stay out, so they never crowd a quiet scene.
+- A rulebook's own *Core rules* (the old house rules) can be set the same way.
+
+**Rulebooks:** import a PDF or text rulebook, then tick it in a card's *Rulebooks*.
 - When a turn touches a rule (grappling, falling, frenzy…), the Aedo gets the matching section, and **📖 Rules used** shows which.
 - **House rules** win over the book.
 - Scanned books need the free [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki).
@@ -611,6 +615,7 @@ Calíope is a FastAPI + SQLite backend (`backend/app`) that serves a React + Vit
 | 2.29.0 | Your turn by the 5e rules (action, bonus action, movement, reaction, End turn) with the option list sorted by cost; companions with 5e sheets built by the system around your hero or step by step; class and race emblems; ▸ details on classes, races and backgrounds; equipment categories; one Sheet tab (Status merged into it); the sheet owns gear and notes; fight damage reaches the sheet; the Aedo no longer acts for you when the app starts a fight; personas bring their world additions |
 | 2.29.1 | A book's placeholder classes are left out of the builder; hide repeated entries and choose each book's rules list (2014, 2024 or both) in the Library |
 | 2.30.0 | 📦 Export on every card tile and in the card editor; "Want to describe it?" after each part of your turn; the round card told by turns with your words and companion flavour; portrait tokens on the battle map; companion pictures on their sheets; 18 more race emblems (Goliath, Halfling, Minotaur, Kobold, Lizardfolk, Satyr, Vampire…) |
+| 2.47.0 | 📚 Compendium: rule sets written in Calíope, ticked per card, sent always, only in fights and shows of power, or on trigger words |
 | 2.46.0 | 🔗 The Muse drafts a card from any web pages you give (not only fan wikis): world, characters and lore |
 | 2.45.0 | 🌐 The story language per game (an English card played in Portuguese, its opening translated) and Portuguese copies of whole cards and adventures; a card's number can start from a choice (Lumencia's gold by origin) |
 | 2.44.0 | ✴ Arsenal: named techniques and spells of the player and the characters are kept (your [brackets], the Aedo's call-outs), reused with the same name and look, their power following the user's tier; an Arsenal tab to edit them |

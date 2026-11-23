@@ -157,8 +157,8 @@ function RulebookPicker({ attached, onChange }) {
   const toggle = (id) => onChange(attached.includes(id) ? attached.filter((x) => x !== id) : [...attached, id]);
   return (
     <details open={attached.length > 0}>
-      <summary className="muted small">Rulebooks <HelpTip id="rulebooks" /> {attached.length > 0 && <span className="tiny">({attached.length} attached)</span>}</summary>
-      {books.length === 0 && <div className="muted small">No rulebooks imported yet. Use 📚 Rules in the sidebar to import one.</div>}
+      <summary className="muted small">Rule sets & rulebooks <HelpTip id="rulebooks" /> {attached.length > 0 && <span className="tiny">({attached.length} attached)</span>}</summary>
+      {books.length === 0 && <div className="muted small">No rule sets or rulebooks yet. Make one in 📚 Compendium (Rules in the sidebar).</div>}
       {books.map((b) => (
         <label key={b.id} className={`check small ${b.status !== "ready" ? "dim" : ""}`}>
           <input type="checkbox" checked={attached.includes(b.id)} onChange={() => toggle(b.id)} disabled={b.status !== "ready" && !attached.includes(b.id)} />

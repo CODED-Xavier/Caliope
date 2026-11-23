@@ -271,6 +271,8 @@ class Database:
         self._ensure_column("npcs", "in_prompt", "INTEGER NOT NULL DEFAULT 1")
         self._ensure_column("npcs", "met", "INTEGER NOT NULL DEFAULT 1")
         self._ensure_column("messages", "snapshot", "BLOB")
+        self._ensure_column("rulebooks", "applies", "TEXT NOT NULL DEFAULT 'always'")   # World Compendium rule sets
+        self._ensure_column("rulebooks", "trigger_words", "TEXT NOT NULL DEFAULT ''")
         self._move_snapshots()
 
     def _move_snapshots(self) -> None:

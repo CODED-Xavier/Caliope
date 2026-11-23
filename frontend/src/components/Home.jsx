@@ -73,7 +73,7 @@ export default function Home({ view, onView, menuKey, onPlay, onEdit, onCreate, 
           <div className="hub-row">
             <Tile art="/emblems/wizard.png" title="Compendium" text="Classes, races, spells, items, feats…" onClick={() => onLibrary()} />
             <Tile art="/emblems/race-goblin.png" title="Bestiary" text="Monster sheets for fights" onClick={onBestiary} />
-            <Tile art="/emblems/cleric.png" title="Rulebooks" text="Rules the Aedo reads" onClick={onRulebooks} />
+            <Tile art="/emblems/cleric.png" title="Compendium" text="Rule sets and rulebooks the Aedo reads" onClick={onRulebooks} />
           </div>
           <h4 className="hub-sub">Compendium folders</h4>
           <div className="folder-grid">

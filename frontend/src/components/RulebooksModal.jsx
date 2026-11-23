@@ -6,13 +6,36 @@ import { api } from "../api.js";
 
 const SYSTEMS = { dnd5e: "D&D 5e", vtm5: "Vampire: the Masquerade 5e", other: "Other" };
 
+const APPLIES = { always: "Always", fights: "In fights and shows of power", words: "When these words appear" };
+
+/** When a rule set's core rules go to the Aedo: always, in fights, or when its words come up. */
+function AppliesFields({ applies, words, onApplies, onWords }) {
+  return (
+    <div className="row gap wrap">
+      <label className="lbl">Sent to the Aedo
+        <select className="field" value={applies} onChange={(e) => onApplies(e.target.value)}>
+          {Object.entries(APPLIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+      </label>
+      {applies !== "always" && (
+        <label className="lbl grow">{applies === "fights" ? "Extra words that count as a fight (optional)" : "Trigger words, separated by commas"}
+          <input className="field" value={words} onChange={(e) => onWords(e.target.value)} placeholder="duel, spar, aura, sword" />
+        </label>
+      )}
+    </div>
+  );
+}
+
 function BookCard({ book, onChanged, onDelete }) {
   const [rules, setRules] = useState(book.house_rules);
+  const [applies, setApplies] = useState(book.applies || "always");
+  const [words, setWords] = useState(book.trigger_words || "");
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState("");
-  useEffect(() => setRules(book.house_rules), [book.house_rules]);
+  useEffect(() => { setRules(book.house_rules); setApplies(book.applies || "always"); setWords(book.trigger_words || ""); }, [book.house_rules, book.applies, book.trigger_words]);
+  const ruleSet = !book.source && !book.sections;
   const save = async () => {
-    try { await api.updateRulebook(book.id, { house_rules: rules }); setSaved("Saved"); setTimeout(() => setSaved(""), 1500); onChanged(); }
+    try { await api.updateRulebook(book.id, { house_rules: rules, applies, trigger_words: words }); setSaved("Saved"); setTimeout(() => setSaved(""), 1500); onChanged(); }
     catch (e) { setSaved(e.message); }
   };
   const info = book.info || {};
@@ -20,24 +43,26 @@ function BookCard({ book, onChanged, onDelete }) {
     <div className={`card book ${book.status}`}>
       <div className="row gap center">
         <div className="grow">
-          <div className="book-name">📖 {book.name} <span className="tag">{SYSTEMS[book.system] || "Other"}</span></div>
+          <div className="book-name">{ruleSet ? "📜" : "📖"} {book.name} <span className="tag">{ruleSet ? "Rule set" : SYSTEMS[book.system] || "Other"}</span>
+            {(book.applies || "always") !== "always" && <span className="tag">{APPLIES[book.applies]}</span>}</div>
           {book.status === "processing" && (
             <>
               <div className="progress"><div style={{ width: `${Math.round(book.progress * 100)}%` }} /></div>
               <div className="muted tiny">{book.message || "Reading…"}</div>
             </>
           )}
-          {book.status === "ready" && <div className="muted tiny">{book.message}{info.ocr_pages ? ` · ${info.ocr_pages} pages read with OCR` : ""}</div>}
+          {book.status === "ready" && !ruleSet && <div className="muted tiny">{book.message}{info.ocr_pages ? ` · ${info.ocr_pages} pages read with OCR` : ""}</div>}
           {book.status === "error" && <div className="error-text tiny">{book.message}</div>}
         </div>
-        {book.status === "ready" && <button className="btn small" onClick={() => setOpen(!open)}>House rules{book.house_rules ? " ✓" : ""}</button>}
+        {book.status === "ready" && <button className="btn small" onClick={() => setOpen(!open)}>{ruleSet ? "✎ Rules" : `Core rules${book.house_rules ? " ✓" : ""}`}</button>}
         <button className="icon-btn" title="Delete this rulebook" onClick={async () => { if (await ask.confirm(`Delete "${book.name}"? Cards that use it simply stop using it.`)) onDelete(book.id); }}>🗑</button>
       </div>
       {open && (
         <div className="house-rules">
-          <label className="lbl">House rules <HelpTip id="house_rules" /></label>
-          <textarea className="field" rows={4} value={rules} onChange={(e) => setRules(e.target.value)}
+          <label className="lbl">Core rules (short: sent to the Aedo when they apply) <HelpTip id="house_rules" /></label>
+          <textarea className="field" rows={ruleSet ? 10 : 4} value={rules} onChange={(e) => setRules(e.target.value)}
             placeholder="e.g. Critical hits deal maximum damage. Potions of healing are a bonus action." />
+          <AppliesFields applies={applies} words={words} onApplies={setApplies} onWords={setWords} />
           <div className="row gap center end"><span className="muted tiny">{saved}</span><button className="btn small primary" onClick={save}>Save</button></div>
         </div>
       )}
@@ -55,6 +80,10 @@ export default function RulebooksModal({ onClose }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState(null);
   const fileRef = useRef(null);
+  const [draft, setDraft] = useState(null); // ＋ New rule set
+  const createRuleSet = async () => {
+    try { await api.createRuleSet(draft); setDraft(null); load(); } catch (e) { setError(e.message); }
+  };
 
   const load = async () => {
     try { const r = await api.rulebooks(); setBooks(r.books); setOcr(r.ocr_available); } catch (e) { setError(e.message); }
@@ -80,9 +109,11 @@ export default function RulebooksModal({ onClose }) {
   };
 
   return (
-    <Modal title="Rulebooks" onClose={onClose} wide>
+    <Modal title="📚 Compendium" onClose={onClose} wide>
       <p className="muted small">
-        Import a rulebook once. During play, the Aedo gets only the one or two passages that fit the moment, so the book never fills the
+        Rule sets and rulebooks, saved once and ticked on each card (✎ → Rulebooks). A <strong>rule set</strong> is your own short rules
+        (the Combat Spectrums, a magic system, house rules) sent to the Aedo always, only in fights and shows of power, or when its words come up.
+        A <strong>rulebook</strong> is imported once. During play, the Aedo gets only the one or two passages that fit the moment, so the book never fills the
         AI's memory. Attach books to a card in the card editor (✎ → Rulebooks). <HelpTip id="rulebooks" />
       </p>
 
@@ -100,6 +131,23 @@ export default function RulebooksModal({ onClose }) {
           {!ocr && <> Scanned books (pages that are pictures) need the free <a href="https://github.com/UB-Mannheim/tesseract/wiki" target="_blank" rel="noreferrer">Tesseract OCR</a> installed; restart the app after installing.</>}
           {ocr && <> OCR is installed, so scanned pages are read too (slower: about 2 to 4 seconds per page).</>}
         </div>
+      </div>
+
+      <div className="card">
+        {!draft ? (
+          <button className="btn" onClick={() => setDraft({ name: "", core: "", applies: "fights", words: "" })}>＋ New rule set</button>
+        ) : (
+          <>
+            <input className="field" placeholder="Name (e.g. Combat Spectrums)" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            <textarea className="field" rows={8} placeholder="The rules, short and clear: the Aedo reads them when they apply (about 400 words at most is best)."
+              value={draft.core} onChange={(e) => setDraft({ ...draft, core: e.target.value })} />
+            <AppliesFields applies={draft.applies} words={draft.words} onApplies={(v) => setDraft({ ...draft, applies: v })} onWords={(v) => setDraft({ ...draft, words: v })} />
+            <div className="row gap end">
+              <button className="btn ghost small" onClick={() => setDraft(null)}>Cancel</button>
+              <button className="btn primary small" disabled={!draft.name.trim() || !draft.core.trim()} onClick={createRuleSet}>Save the rule set</button>
+            </div>
+          </>
+        )}
       </div>
 
       {error && <div className="error-text small">{error}</div>}

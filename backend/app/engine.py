@@ -500,7 +500,7 @@ class ChatEngine:
             history = [*history, {"role": "user", "content": extra_user, "meta": {}}]
         recent = [m["content"] for m in reversed(history)]
         lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
-        _, house = await self._rules_for(scenario, "", settings)
+        _, house, _ = await self._rules_for(scenario, "", settings)
         tpl = self._status_template(scenario, settings)
         messages, _debug = self.prompts.build(
             scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=[],
@@ -752,14 +752,14 @@ class ChatEngine:
 
         recent = [m["content"] for m in reversed(history)]  # newest first, for the lorebook keyword scan
         lore = select_entries(scenario.get("lorebook"), recent, int(int(settings["context_window"]) * 0.1))
-        rules, house = await self._rules_for(scenario, query, settings)  # same text as the memory search: embedded once
+        rules, house, rules_now = await self._rules_for(scenario, query, settings, fighting=bool((state.get("combat") or {}).get("active")))
         tpl = self._status_template(scenario, settings)  # the card's INFO block, kept by the app
         messages, debug = self.prompts.build(
             scenario=scenario, state=state, npcs=npcs, summary=conv["summary"], memories=memories,
             skills=skills, history=history if tpl else with_latest_status(history), settings=settings,
             app_status=statusbook.render(tpl, state, npcs) if tpl else None, pinned=conv.get("pinned_memory", ""), player_lore=conv.get("player_lore"),
             appearance_hint=hint, lore=lore, status_due=None if tpl else self._status_due(conv_id, scenario),
-            player_name=state["player"].get("name") or "", rules=rules, house_rules=house,
+            player_name=state["player"].get("name") or "", rules=rules, house_rules=house, rules_now=rules_now,
             cantos=self.cantos.prompt_section(conv_id, int(settings["context_window"]) * 3 // 10) if self.cantos else "",
         )
         yield {"type": "context", "debug": debug, "skills": [s["name"] for s in skills],
@@ -994,15 +994,16 @@ class ChatEngine:
             raise LLMError("The model could not describe this scene. Is LM Studio running?")
         return self.repo.get_message(message_id)
 
-    async def _rules_for(self, scenario: dict, query: str, settings: dict) -> tuple[list[dict], list[tuple[str, str]]]:
-        """Rulebook passages that fit this turn, and the house rules of the card's books."""
+    async def _rules_for(self, scenario: dict, query: str, settings: dict, fighting: bool = False) -> tuple[list[dict], list, list]:
+        """Rulebook passages that fit this turn, the core rules that always apply, and those that apply this turn."""
         if not self.rulebooks or not scenario.get("rulebooks"):
-            return [], []
+            return [], [], []
         ids = self.rulebooks.ready_ids(scenario["rulebooks"])
         if not ids:
-            return [], []
+            return [], [], []
         passages = await self.rulebooks.passages_for_turn(ids, query, int(settings.get("rules_char_budget", 1400)))
-        return passages, self.rulebooks.house_rules(ids)
+        always, now_ = self.rulebooks.core_rules(ids, query, fighting=bool(fighting))
+        return passages, always, now_  # now_: rule sets that apply this turn only (fights, trigger words)
 
     def _calibrate(self, messages: list[dict]) -> int | None:
         """Learn how many characters make one token for the model in use, from the real count the server reports,

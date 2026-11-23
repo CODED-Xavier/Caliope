@@ -279,7 +279,7 @@ class PromptBuilder:
               appearance_hint: str = "", lore: tuple[list[dict], list[dict]] = ([], []),
               status_due: bool | None = None, player_name: str = "", rules: list[dict] | None = None,
               house_rules: list[tuple[str, str]] | None = None, player_lore: list[dict] | None = None,
-              app_status: str | None = None, cantos: str = "") -> tuple[list[dict], dict]:
+              app_status: str | None = None, cantos: str = "", rules_now: list[tuple[str, str]] | None = None) -> tuple[list[dict], dict]:
         """Return (messages, debug_info). History items need id, role, content and meta."""
         ctx = int(settings["context_window"])
         reserve = reply_token_limit(settings) + 150
@@ -410,6 +410,9 @@ class PromptBuilder:
             mine = "## The player's world additions (relevant right now, canon)\n" + "\n\n".join(
                 f"{e['name']}: {e['content']}" for e in lore_hits)
             extra = mine + ("\n\n" + extra if extra else "")
+        if rules_now:  # World Compendium rule sets that apply this turn (a fight, a show of power, their trigger words)
+            extra = ("## Rules in play right now\n" + "\n\n".join(f"{name}:\n{text}" for name, text in rules_now)
+                     + ("\n\n" + extra if extra else ""))
         if rules:
             ref = "## Rules reference (from the rulebook; apply it, do not quote it at length)\n" + "\n\n".join(
                 f"[{r['book']}, p. {r['page']}{' - ' + r['heading'] if r['heading'] else ''}]\n{r['text']}" for r in rules)

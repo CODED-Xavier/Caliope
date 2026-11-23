@@ -940,9 +940,19 @@ async def upload_rulebook(request: Request, name: str = Query(""), system: str =
     return book
 
 
+@app.post("/api/rulebooks/ruleset")
+async def create_rule_set(body: dict[str, Any] = Body(...)):
+    """📚 Compendium: a rule set written in Calíope (core rules sent always, in fights, or on trigger words)."""
+    if not str(body.get("name") or "").strip() or not str(body.get("core") or "").strip():
+        raise HTTPException(400, "A rule set needs a name and its rules.")
+    return svc().rulebooks.create_ruleset(str(body["name"]), str(body["core"]), str(body.get("applies") or "always"),
+                                          str(body.get("words") or ""))
+
+
 @app.patch("/api/rulebooks/{book_id}")
 async def update_rulebook(book_id: int, body: dict[str, Any] = Body(...)):
-    return svc().rulebooks.update(book_id, body.get("name"), body.get("house_rules"), body.get("system"))
+    return svc().rulebooks.update(book_id, body.get("name"), body.get("house_rules"), body.get("system"),
+                                  body.get("applies"), body.get("trigger_words"))
 
 
 @app.delete("/api/rulebooks/{book_id}")

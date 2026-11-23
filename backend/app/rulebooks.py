@@ -32,6 +32,22 @@ MIN_CHUNK_WORDS = 40
 SYSTEMS = ("dnd5e", "vtm5", "other")
 
 
+APPLIES = ("always", "fights", "words")
+FIGHT_WORDS = ("fight", "duel", "spar", "sparring", "battle", "attack", "strike", "blow", "clash", "faster", "stronger",
+               "overwhelm", "power", "speed", "durability", "dodge", "parry", "punch", "slash", "luta", "lutar", "duelo",
+               "treino", "batalha", "ataque", "ataca", "golpe", "mais rápido", "mais forte", "esquiva", "poder", "velocidade")
+
+
+def applies_now(applies: str, words: str, text: str, fighting: bool = False) -> bool:
+    low = (text or "").lower()
+    has = lambda ws: any(re.search(rf"(?<!\w){re.escape(w.strip().lower())}", low) for w in ws if w.strip())  # noqa: E731
+    if applies == "fights":
+        return fighting or has(FIGHT_WORDS) or has(words.split(","))
+    if applies == "words":
+        return has(words.split(","))
+    return True
+
+
 class RulebookError(ValueError):
     pass
 
@@ -262,14 +278,28 @@ class RulebookRepository:
         count = self.db.query_one("SELECT COUNT(*) AS n FROM rule_chunks WHERE book_id = ?", (row["id"],))["n"]
         return {"id": row["id"], "name": row["name"], "system": row["system"], "source": row["source"], "status": row["status"],
                 "progress": row["progress"], "message": row["message"], "info": json.loads(row["info"] or "{}"),
-                "house_rules": row["house_rules"], "sections": count, "created_at": row["created_at"]}
+                "house_rules": row["house_rules"], "sections": count, "created_at": row["created_at"],
+                "applies": row.get("applies") or "always", "trigger_words": row.get("trigger_words") or ""}
 
-    def update(self, book_id: int, name: str | None = None, house_rules: str | None = None, system: str | None = None) -> dict:
+    def create_ruleset(self, name: str, core: str = "", applies: str = "always", words: str = "") -> dict:
+        """A rule set written in Calíope (no file): its core rules are sent to the Aedo when they apply."""
+        cur = self.db.execute(
+            "INSERT INTO rulebooks(name, system, source, status, progress, message, info, house_rules, created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            (truncate(name.strip() or "Rule set", 80), "other", "", "ready", 1.0, "Rule set", "{}", "", now()))
+        return self.update(cur.lastrowid, house_rules=core, applies=applies, trigger_words=words)
+
+    def update(self, book_id: int, name: str | None = None, house_rules: str | None = None, system: str | None = None,
+               applies: str | None = None, trigger_words: str | None = None) -> dict:
         self.get(book_id)
+        if applies in APPLIES:
+            self.db.execute("UPDATE rulebooks SET applies = ? WHERE id = ?", (applies, book_id))
+        if trigger_words is not None:
+            words = ", ".join(dict.fromkeys(w.strip() for w in str(trigger_words).split(",") if w.strip()))
+            self.db.execute("UPDATE rulebooks SET trigger_words = ? WHERE id = ?", (truncate(words, 800), book_id))
         if name is not None and name.strip():
             self.db.execute("UPDATE rulebooks SET name = ? WHERE id = ?", (truncate(name.strip(), 80), book_id))
         if house_rules is not None:
-            self.db.execute("UPDATE rulebooks SET house_rules = ? WHERE id = ?", (truncate(house_rules, 4000), book_id))
+            self.db.execute("UPDATE rulebooks SET house_rules = ? WHERE id = ?", (truncate(house_rules, 6000), book_id))
         if system in SYSTEMS:
             self.db.execute("UPDATE rulebooks SET system = ? WHERE id = ?", (system, book_id))
         return self.get(book_id)
@@ -418,12 +448,40 @@ class RulebookRepository:
                 break
         return out
 
-    def house_rules(self, book_ids: list[int]) -> list[tuple[str, str]]:
+    def house_rules(self, book_ids: list[int], text: str | None = None, fighting: bool = False) -> list[tuple[str, str]]:
+        """The core rules of the card's books and rule sets. With `text` (this turn's words), only those that apply
+        now: *always*, *in fights and shows of power* (a fight is on or the words say so), *when these words appear*."""
         if not book_ids:
             return []
         marks = ",".join("?" * len(book_ids))
-        rows = self.db.query(f"SELECT name, house_rules FROM rulebooks WHERE id IN ({marks}) AND status = 'ready' ORDER BY name", tuple(book_ids))
-        return [(r["name"], r["house_rules"].strip()) for r in rows if (r["house_rules"] or "").strip()]
+        rows = self.db.query(f"SELECT name, house_rules, applies, trigger_words FROM rulebooks WHERE id IN ({marks}) "
+                             f"AND status = 'ready' ORDER BY name", tuple(book_ids))
+        out = []
+        for r in rows:
+            if not (r["house_rules"] or "").strip():
+                continue
+            if text is not None and not applies_now(r.get("applies") or "always", r.get("trigger_words") or "", text, fighting):
+                continue
+            out.append((r["name"], r["house_rules"].strip()))
+        return out
+
+    def core_rules(self, book_ids: list[int], text: str, fighting: bool = False) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+        """(rules that always apply: the stable part of the prompt, rules that apply this turn only)."""
+        if not book_ids:
+            return [], []
+        marks = ",".join("?" * len(book_ids))
+        rows = self.db.query(f"SELECT name, house_rules, applies, trigger_words FROM rulebooks WHERE id IN ({marks}) "
+                             f"AND status = 'ready' ORDER BY name", tuple(book_ids))
+        always, now_ = [], []
+        for r in rows:
+            core = (r["house_rules"] or "").strip()
+            if not core:
+                continue
+            if (r.get("applies") or "always") == "always":
+                always.append((r["name"], core))
+            elif applies_now(r["applies"], r.get("trigger_words") or "", text, fighting):
+                now_.append((r["name"], core))
+        return always, now_
 
     def ready_ids(self, book_ids: list[int]) -> list[int]:
         if not book_ids:
