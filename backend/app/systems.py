@@ -347,7 +347,9 @@ def merge_state(sys: dict, raw) -> dict:
             _set_value(sys, st, stat, v, maxes)
     for stat in sys.get("stats") or []:  # "Origin: High noble" sets the starting gold, unless the player typed another
         by = stat.get("start_by")
-        if by and str(raw.get("values", {}).get(stat["key"], stat.get("start")) if isinstance(raw.get("values"), dict) else stat.get("start")) == str(stat.get("start")):
+        given = raw.get("values", {}).get(stat["key"], stat.get("start")) if isinstance(raw.get("values"), dict) else stat.get("start")
+        # untouched: still the card's start, or the start another choice gave it (switching Origin back changes it back)
+        if by and str(given) in {str(stat.get("start"))} | {str(v) for v in by["values"].values()}:
             pick = str(st["values"].get(by["stat"], ""))
             if pick in by["values"]:
                 _set_value(sys, st, stat, by["values"][pick], maxes)

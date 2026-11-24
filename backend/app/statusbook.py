@@ -175,10 +175,10 @@ def render(template: str, state: dict, npcs: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def harvest(state: dict, template: str, block: str | None) -> None:
-    """Keep the card's own fields from a block the AI wrote anyway (or the opening scene's)."""
+def harvest(state: dict, template: str, block: str | None, skip: set | None = None) -> None:
+    """Keep the card's own fields from a block the AI wrote anyway (or the opening scene's); `skip`: fields the app keeps."""
     if block:
-        found = read_block(template, block)
+        found = {k: v for k, v in read_block(template, block).items() if k not in (skip or set())}
         for key in ("location", "time"):
             value = found.pop("@" + key, "")
             if value and not state.get(key) and not state.get("date_label"):

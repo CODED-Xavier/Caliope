@@ -112,3 +112,15 @@ class StartByChoiceTests(unittest.TestCase):
         self.assertEqual(merge_state(sys, {"values": {"Origin": "Foreign scholarship"}})["values"]["Gold"], 30)
         self.assertEqual(merge_state(sys, {"values": {"Origin": "High noble", "Gold": 77}})["values"]["Gold"], 77)  # typed by hand
         self.assertEqual(merge_state(sys, None)["values"]["Gold"], 30)
+
+
+class OriginSwitchTests(unittest.TestCase):
+    def test_changing_the_origin_back_changes_the_gold_back(self):
+        from app.systems import merge_state, normalize as normalize_systems
+        sys = normalize_systems(StartByChoiceTests.SYS)
+        st = merge_state(sys, {"values": {"Origin": "High noble"}})
+        self.assertEqual(st["values"]["Gold"], 500)
+        st = merge_state(sys, {"values": {**st["values"], "Origin": "Commoner"}})  # the start screen sends the 500 back
+        self.assertEqual(st["values"]["Gold"], 30)
+        st = merge_state(sys, {"values": {**st["values"], "Origin": "Minor noble"}})
+        self.assertEqual(st["values"]["Gold"], 150)

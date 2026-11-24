@@ -505,8 +505,20 @@ class ChatEngine:
                     text, extra, met = process_reply(joined, npcs)
                     for npc_id in met:
                         self.repo.update_npc(npc_id, met=True)
+                    more: dict = {}
+                    scenario = self.repo.get(conv_id)["scenario"]
+                    fight_rules = self._fight_rules(scenario)
+                    if fight_rules:  # the part written after Continue can open or close a fight too
+                        text, *marks = fights.take_tags(text)
+                        if marks[0] or marks[1]:
+                            more["fight_lines"] = (last["meta"].get("fight_lines") or []) + self._apply_fight_marks(conv_id, scenario, fight_rules, marks)
+                    if self._arsenal_on(conv_id):  # and call out a technique
+                        text, found = arsenal.take_from_reply(text, npcs, self.repo.get_state(conv_id)["player"].get("name") or "")
+                        kept = self._keep_moves(conv_id, npcs, found) if found else []
+                        if kept:
+                            more["moves"] = (last["meta"].get("moves") or []) + kept
                     self.repo.update_message(last["id"], text)
-                    self.repo.update_message_meta(last["id"], {**extra, "continued": True})
+                    self.repo.update_message_meta(last["id"], {**extra, **more, "continued": True})
             if error:
                 yield {"type": "error", "message": error}
                 return
@@ -701,6 +713,10 @@ class ChatEngine:
                     self.repo.set_message_snapshot(message_id, before)
                     self.repo.update_message_meta(message_id, {"time_skip": True, "app_line": line})
                 yield {"type": "state", "state": self.repo.get_state(conv_id), "npcs": self.repo.list_npcs(conv_id), "changes": []}
+            st_now = self.repo.get_state(conv_id)
+            if (st_now.get("fight") or {}).get("active") and self._fight_rules(self.repo.get(conv_id)["scenario"]):
+                fights.count_turn(st_now, content)  # the new words are this fight's exchange (the snapshot undid the old one)
+                self.repo.save_state(conv_id, st_now)
             self.repo.update_message(message_id, content)
             self.repo.update_message_meta(message_id, {"edited": True})
             user_msg = self.repo.get_message(message_id)
@@ -747,6 +763,37 @@ class ChatEngine:
             said = strip_thoughts(text)  # thoughts and GM messages never end up in the title
             if said and not said.startswith(("\U0001F3B2", "\u2694", "\u2728", "\U0001F6D2", "\U0001F4B0", "\u23f3", "\U0001F6CC")):
                 self.repo.rename(conv_id, truncate(f"{scenario_name}: {said}" if scenario_name else said, 60))
+
+    def _apply_fight_marks(self, conv_id: int, scenario: dict, fight_rules: dict, marks) -> list[str]:
+        """[[fight: …]] / [[fight end: …]] taken from a reply: start or close the fight, and pay its EXP."""
+        st = self.repo.get_state(conv_id)
+        lines: list[str] = []
+        starts, ends = marks
+        day = self._day(scenario, st)
+
+        def begin():
+            if starts and not (st.get("fight") or {}).get("active"):
+                fights.start(st, *starts[-1])
+                lines.append(f"⚔ {starts[-1][1].capitalize()} with {starts[-1][0]} begins")
+
+        def end():
+            if ends and (st.get("fight") or {}).get("active"):
+                lines.extend(fights.finish(fight_rules, st, ends[-1][0], ends[-1][1], day))
+
+        # a fight going on ends before a new one starts; with none going on, one can start and end in one reply
+        for step in ((end, begin) if (st.get("fight") or {}).get("active") else (begin, end)):
+            step()
+        self.repo.save_state(conv_id, st)
+        return lines
+
+    def _keep_moves(self, conv_id: int, npcs: list[dict], found_moves: list) -> list:
+        st = self.repo.get_state(conv_id)
+        by_name = {n["name"]: n for n in npcs}
+        kept = [m for m in (arsenal.record(st, owner, name, desc, arsenal.tier_in((by_name.get(owner) or {}).get("description") or ""))
+                            for owner, name, desc in found_moves) if m]
+        if kept:
+            self.repo.save_state(conv_id, st)
+        return kept
 
     async def _reply(self, conv_id: int, user_msg: dict) -> AsyncIterator[dict]:
         if is_gm_message(user_msg["content"]):  # "/question": the Aedo answers outside the story
@@ -842,47 +889,30 @@ class ChatEngine:
         reply, extra, met = process_reply(reply, npcs)
         for npc_id in met:
             self.repo.update_npc(npc_id, met=True)
-        if tpl and extra.get("status"):  # the model wrote the block anyway: keep the card's values it reports
-            st = self.repo.get_state(conv_id)
-            statusbook.harvest(st, tpl, extra.pop("status"))
-            self.repo.save_state(conv_id, st)
-        found_moves: list = []
-        if self._arsenal_on(conv_id):  # [[move: Lilia | Crimson Fang]] becomes a call-out, and Lilia keeps the move
-            reply, found_moves = arsenal.take_from_reply(reply, npcs, state["player"].get("name") or "")
         fight_rules = self._fight_rules(scenario)
         fight_marks: tuple = ([], [])
         if fight_rules:  # [[fight: Lilia | spar]] … [[fight end: won | Body, INT]]: counted by the app, not shown
             reply, *fight_marks = fights.take_tags(reply)
+        if tpl and extra.get("status"):  # the model wrote the block anyway: keep the card's values it reports
+            st = self.repo.get_state(conv_id)
+            skip: set = set()
+            if fight_rules and ((st.get("fight") or {}).get("active") or fight_marks[0] or fight_marks[1]):
+                # during a fight the app pays the EXP: the model's own numbers for those bars would count it twice
+                skip = set(fight_rules["stats"]) | {v for v in fight_rules["log"].values() if v}
+            statusbook.harvest(st, tpl, extra.pop("status"), skip)
+            self.repo.save_state(conv_id, st)
+        found_moves: list = []
+        if self._arsenal_on(conv_id):  # [[move: Lilia | Crimson Fang]] becomes a call-out, and Lilia keeps the move
+            reply, found_moves = arsenal.take_from_reply(reply, npcs, state["player"].get("name") or "")
         snapshot = self.repo.capture_snapshot(conv_id)
         meta = {"snapshot": snapshot, **extra}
         if fight_rules and (fight_marks[0] or fight_marks[1]):
-            st = self.repo.get_state(conv_id)
-            lines = []
-            starts, ends = fight_marks
-            day = self._day(scenario, st)
-
-            def begin():
-                if starts and not (st.get("fight") or {}).get("active"):
-                    fights.start(st, *starts[-1])
-                    lines.append(f"⚔ {starts[-1][1].capitalize()} with {starts[-1][0]} begins")
-
-            def end():
-                if ends and (st.get("fight") or {}).get("active"):
-                    lines.extend(fights.finish(fight_rules, st, ends[-1][0], ends[-1][1], day))
-
-            # a fight going on ends before a new one starts; with none going on, one can start and end in one reply
-            for step in ((end, begin) if (st.get("fight") or {}).get("active") else (begin, end)):
-                step()
-            self.repo.save_state(conv_id, st)
+            lines = self._apply_fight_marks(conv_id, scenario, fight_rules, fight_marks)
             if lines:
                 meta["fight_lines"] = lines
         if found_moves:
-            st = self.repo.get_state(conv_id)
-            by_name = {n["name"]: n for n in npcs}
-            kept = [m for m in (arsenal.record(st, owner, name, desc, arsenal.tier_in((by_name.get(owner) or {}).get("description") or ""))
-                                for owner, name, desc in found_moves) if m]
+            kept = self._keep_moves(conv_id, npcs, found_moves)
             if kept:
-                self.repo.save_state(conv_id, st)
                 meta["moves"] = kept
         asked = find_checks(reply)  # "Make a DEX (Stealth) check, DC 13" becomes a roll button
         fight_now = (self.repo.get_state(conv_id).get("combat") or {})

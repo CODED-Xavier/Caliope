@@ -140,3 +140,52 @@ class BoardGradeNameTests(unittest.TestCase):
         sys = normalize({"board": {"grades": [{"grade": "Outskirts", "pay": 60}, {"grade": "Expedition", "pay": 400}]},
                          "stats": [{"key": "Gold", "kind": "number"}]})
         self.assertEqual([g["grade"] for g in sys["board"]["grades"]], ["Outskirts", "Expedition"])
+
+
+class AuditTests(unittest.IsolatedAsyncioTestCase):
+    async def _game(self):
+        from tests.test_core import FakeLLM, make_services, new_game
+        llm = FakeLLM()
+        s = make_services(llm)
+        book = s.rulebooks.create_ruleset("Lumencia EXP", "Fights are counted.", "fights")
+        s.rulebooks.update(book["id"], fight_exp=fights.LUMENCIA)
+        info = {"post_history": "Rules.\n\nINFO\nLocation: [Location]\nStats:\n- Body: [Grade] [[X]/100]\n- INT: [Grade] [[X]/100]"}
+        cid = new_game(s, kind="roleplay", rulebooks=[book["id"]], information=info)
+        st = s.conversations.get_state(cid)
+        st["card_status"] = sheet()["card_status"]
+        s.conversations.save_state(cid, st)
+        return s, llm, cid
+
+    async def test_continue_hides_fight_and_move_tags(self):
+        from tests.test_core import collect
+        s, llm, cid = await self._game()
+        llm.reply = "Lilia draws."
+        await collect(s.engine.send(cid, "I challenge Lilia."))
+        llm.reply = "She lunges.\n[[fight: Lilia | spar]]\n[[move: Lilia | Crimson Fang]]"
+        await collect(s.engine.continue_reply(cid))
+        text = s.conversations.list_messages(cid)[-1]["content"]
+        self.assertNotIn("[[fight", text)
+        self.assertNotIn("[[move", text)
+        self.assertTrue(s.conversations.get_state(cid)["fight"]["active"])
+
+    async def test_exp_the_model_wrote_is_not_paid_twice(self):
+        from tests.test_core import collect
+        s, llm, cid = await self._game()
+        llm.reply = "[[fight: Lilia | spar]]\nShe circles."
+        await collect(s.engine.send(cid, "I challenge Lilia to a spar."))
+        # the model also writes its own INFO block with EXP added (old card rules): the app's count must win
+        llm.reply = "She yields.\n[[fight end: won | Body]]\n\nINFO\nLocation: Grounds\nStats:\n- Body: D+ [35/100]\n- INT: C- [90/100]"
+        await collect(s.engine.send(cid, "I slash at her guard."))
+        self.assertEqual(s.conversations.get_state(cid)["card_status"]["Body"], "D+ [36/100]")  # 20 + 11 + 5, once
+
+    async def test_a_resent_message_still_counts_as_an_exchange(self):
+        from tests.test_core import collect
+        s, llm, cid = await self._game()
+        llm.reply = "[[fight: Lilia | spar]]\nShe circles."
+        await collect(s.engine.send(cid, "I challenge Lilia to a spar."))
+        llm.reply = "Steel rings."
+        await collect(s.engine.send(cid, "I strike low."))
+        self.assertEqual(s.conversations.get_state(cid)["fight"]["exchanges"], 2)
+        mine = [m for m in s.conversations.list_messages(cid) if m["role"] == "user"][-1]
+        await collect(s.engine.resend(cid, mine["id"], "I feint, then slash high."))
+        self.assertEqual(s.conversations.get_state(cid)["fight"]["exchanges"], 2)
