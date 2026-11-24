@@ -97,7 +97,7 @@ def normalize(raw) -> dict:
     if isinstance(bd, dict) and isinstance(bd.get("grades"), list) and bd["grades"]:
         out["board"] = {"size": max(1, min(6, as_int(bd.get("size"), 3))), "pay_stat": _s(bd.get("pay_stat"), 30),
                         "level_stat": _s(bd.get("level_stat"), 30), "refresh_days": max(1, min(30, as_int(bd.get("refresh_days"), 7))),
-                        "grades": [{"grade": _s(g.get("grade"), 8), "pay": max(0, as_int(g.get("pay"))),
+                        "grades": [{"grade": _s(g.get("grade"), 24), "pay": max(0, as_int(g.get("pay"))),
                                     "min_level": max(0, as_int(g.get("min_level"))), "text": _s(g.get("text"), 160)}
                                    for g in bd["grades"][:8] if isinstance(g, dict) and _s(g.get("grade"))]}
     rk = raw.get("ranking")

@@ -132,3 +132,11 @@ class GameTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("Body +17 EXP" in x for x in s.conversations.list_messages(cid)[-1]["meta"]["fight_lines"]))
         s.engine.undo(cid)  # undo takes the EXP back
         self.assertEqual(s.conversations.get_state(cid)["card_status"]["Body"], "D+ [20/100]")
+
+
+class BoardGradeNameTests(unittest.TestCase):
+    def test_long_grade_names_are_kept(self):
+        from app.systems import normalize
+        sys = normalize({"board": {"grades": [{"grade": "Outskirts", "pay": 60}, {"grade": "Expedition", "pay": 400}]},
+                         "stats": [{"key": "Gold", "kind": "number"}]})
+        self.assertEqual([g["grade"] for g in sys["board"]["grades"]], ["Outskirts", "Expedition"])
